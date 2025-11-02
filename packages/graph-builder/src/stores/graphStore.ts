@@ -139,6 +139,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...connection,
         id: `e${connection.source}-${connection.target}`,
         type: 'default',
+        markerEnd: {
+          type: 'arrowclosed',
+          width: 25,
+          height: 25,
+          color: '#374151',
+        },
+        style: {
+          strokeWidth: 2,
+          stroke: '#374151',
+        },
       };
       return {
         edges: addEdge(newEdge, state.edges),
@@ -162,6 +172,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       source: edge.from,
       target: edge.to,
       type: 'default',
+      markerEnd: {
+        type: 'arrowclosed',
+        width: 25,
+        height: 25,
+        color: '#374151',
+      },
+      style: {
+        strokeWidth: 2,
+        stroke: '#374151',
+      },
     }));
 
     set({

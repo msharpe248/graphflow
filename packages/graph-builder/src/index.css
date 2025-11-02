@@ -40,3 +40,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ReactFlow edge customization */
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+}
+
+/* Remove edge background/halo effect */
+.react-flow__edge-interaction {
+  stroke: transparent;
+  fill: none;
+}
