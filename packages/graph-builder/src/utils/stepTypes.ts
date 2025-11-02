@@ -8,6 +8,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Start',
     description: 'Entry point for the graph',
     color: '#10b981', // green
+    icon: 'Play',
     configSchema: {},
   },
   output: {
@@ -16,6 +17,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Output',
     description: 'Map intermediate values to outputs',
     color: '#ef4444', // red
+    icon: 'CheckCircle',
     configSchema: {
       mappings: {
         type: 'object',
@@ -29,6 +31,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'LLM',
     description: 'Call LLM with optional tools and structured output',
     color: '#8b5cf6', // purple
+    icon: 'Sparkles',
     configSchema: {
       provider: {
         type: 'string',
@@ -67,6 +70,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'HTTP',
     description: 'Make HTTP request',
     color: '#3b82f6', // blue
+    icon: 'Globe',
     configSchema: {
       method: {
         type: 'string',
@@ -93,6 +97,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Transform',
     description: 'Execute Python code for data transformation',
     color: '#f59e0b', // amber
+    icon: 'Code',
     configSchema: {
       code: {
         type: 'string',
@@ -106,6 +111,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Conditional',
     description: 'Branch based on condition',
     color: '#06b6d4', // cyan
+    icon: 'GitBranch',
     configSchema: {
       condition: {
         type: 'string',
@@ -119,6 +125,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Join',
     description: 'Wait for multiple branches to complete',
     color: '#14b8a6', // teal
+    icon: 'GitMerge',
     configSchema: {
       wait_for_all: {
         type: 'boolean',
@@ -133,6 +140,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Loop',
     description: 'Iterate over a collection',
     color: '#ec4899', // pink
+    icon: 'RefreshCw',
     configSchema: {
       collection_key: {
         type: 'string',
@@ -155,6 +163,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'DB Query',
     description: 'Execute database query',
     color: '#6366f1', // indigo
+    icon: 'Database',
     configSchema: {
       connection_string: {
         type: 'string',
@@ -176,6 +185,7 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     label: 'Human Input',
     description: 'Wait for human input',
     color: '#f97316', // orange
+    icon: 'User',
     configSchema: {
       prompt: {
         type: 'string',

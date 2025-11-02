@@ -1,3 +1,4 @@
+import * as Icons from 'lucide-react';
 import { getStepTypesByCategory } from '@/utils/stepTypes';
 import { StepTypeInfo } from '@/types/graph';
 
@@ -8,28 +9,40 @@ interface StepPaletteProps {
 export default function StepPalette({ onDragStart }: StepPaletteProps) {
   const stepsByCategory = getStepTypesByCategory();
 
-  const renderStepType = (stepType: StepTypeInfo) => (
-    <div
-      key={stepType.type}
-      draggable
-      onDragStart={(e) => onDragStart(e, stepType.type)}
-      className="
-        p-3 rounded-lg border border-gray-300 bg-white
-        cursor-grab active:cursor-grabbing
-        hover:border-gray-400 hover:shadow-md
-        transition-all
-      "
-      style={{
-        borderLeftColor: stepType.color,
-        borderLeftWidth: '4px',
-      }}
-    >
-      <div className="font-medium text-sm text-gray-900">{stepType.label}</div>
-      <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-        {stepType.description}
+  const renderStepType = (stepType: StepTypeInfo) => {
+    const IconComponent = stepType.icon ? (Icons as any)[stepType.icon] : null;
+
+    return (
+      <div
+        key={stepType.type}
+        draggable
+        onDragStart={(e) => onDragStart(e, stepType.type)}
+        className="
+          p-3 rounded-lg border border-gray-300 bg-white
+          cursor-grab active:cursor-grabbing
+          hover:border-gray-400 hover:shadow-md
+          transition-all
+        "
+        style={{
+          borderLeftColor: stepType.color,
+          borderLeftWidth: '4px',
+        }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          {IconComponent && (
+            <IconComponent
+              className="w-4 h-4 flex-shrink-0"
+              style={{ color: stepType.color }}
+            />
+          )}
+          <div className="font-medium text-sm text-gray-900">{stepType.label}</div>
+        </div>
+        <div className="text-xs text-gray-500 line-clamp-2">
+          {stepType.description}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">

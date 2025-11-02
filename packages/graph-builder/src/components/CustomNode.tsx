@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import * as Icons from 'lucide-react';
 import { NodeData } from '@/types/graph';
 import { useGraphStore } from '@/stores/graphStore';
 
@@ -10,6 +11,11 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
   const handleClick = () => {
     setSelectedNode(id);
   };
+
+  // Get the icon component
+  const IconComponent = stepTypeInfo.icon
+    ? (Icons as any)[stepTypeInfo.icon]
+    : null;
 
   return (
     <div
@@ -43,8 +49,16 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
 
       {/* Node content */}
       <div className="flex flex-col gap-1">
-        <div className="text-xs font-semibold text-gray-500 uppercase">
-          {stepTypeInfo.label}
+        <div className="flex items-center gap-2">
+          {IconComponent && (
+            <IconComponent
+              className="w-4 h-4 flex-shrink-0"
+              style={{ color: stepTypeInfo.color }}
+            />
+          )}
+          <div className="text-xs font-semibold text-gray-500 uppercase">
+            {stepTypeInfo.label}
+          </div>
         </div>
         <div className="text-sm font-medium text-gray-900 truncate">
           {step.id}
