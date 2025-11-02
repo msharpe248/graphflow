@@ -5,6 +5,7 @@ import ReactFlow, {
   MiniMap,
   BackgroundVariant,
   ReactFlowProvider,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -17,6 +18,7 @@ const nodeTypes = {
 
 function GraphCanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const reactFlowInstance = useReactFlow();
   const {
     nodes,
     edges,
@@ -41,14 +43,15 @@ function GraphCanvasInner() {
       const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
       if (!reactFlowBounds) return;
 
-      const position = {
-        x: event.clientX - reactFlowBounds.left - 100,
-        y: event.clientY - reactFlowBounds.top - 50,
-      };
+      // Convert screen coordinates to flow coordinates
+      const position = reactFlowInstance.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
 
       addNode(stepType, position);
     },
-    [addNode]
+    [addNode, reactFlowInstance]
   );
 
   return (
@@ -62,8 +65,8 @@ function GraphCanvasInner() {
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
-        fitView
         className="bg-gray-50"
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         <Controls />
