@@ -1,12 +1,20 @@
+import { useEffect } from 'react';
 import * as Icons from 'lucide-react';
-import { getStepTypesByCategory } from '@/utils/stepTypes';
 import { StepTypeInfo } from '@/types/graph';
+import { usePluginStore } from '@/stores/pluginStore';
 
 interface StepPaletteProps {
   onDragStart: (event: React.DragEvent, stepType: string) => void;
 }
 
 export default function StepPalette({ onDragStart }: StepPaletteProps) {
+  const { stepTypes, isLoading, error, fetchStepTypes, getStepTypesByCategory } = usePluginStore();
+
+  // Fetch step types on mount
+  useEffect(() => {
+    fetchStepTypes();
+  }, [fetchStepTypes]);
+
   const stepsByCategory = getStepTypesByCategory();
 
   const renderStepType = (stepType: StepTypeInfo) => {
@@ -43,6 +51,32 @@ export default function StepPalette({ onDragStart }: StepPaletteProps) {
       </div>
     );
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Step Palette</h2>
+        <div className="flex items-center justify-center p-8">
+          <div className="text-sm text-gray-500">Loading step types...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Step Palette</h2>
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-900">
+            <strong>Error:</strong> {error}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from graphflow_core.models import GraphDefinition
 from graphflow_runtime.storage.models import Agent, AgentRun
 from graphflow_runtime.executor.async_executor import AsyncExecutor
+from graphflow_core.plugins.manager import PluginManager
 
 # Router
 router = APIRouter()
@@ -65,14 +66,43 @@ class HealthResponse(BaseModel):
     active_runs: int
 
 
+class StepTypeResponse(BaseModel):
+    """Step type metadata response."""
+    type: str
+    plugin: str
+    plugin_version: str
+    label: str
+    description: str
+    category: str
+    config_schema: dict
+    ui_component: Optional[str]
+
+
+class PluginResponse(BaseModel):
+    """Plugin information response."""
+    name: str
+    version: str
+    steps: List[str]
+    ui_components: dict
+    has_manifest: bool
+
+
 # Dependency injection
 executor: Optional[AsyncExecutor] = None
+plugin_manager: Optional[PluginManager] = None
 
 def get_executor() -> AsyncExecutor:
     """Get executor instance."""
     if executor is None:
         raise HTTPException(500, "Executor not initialized")
     return executor
+
+
+def get_plugin_manager() -> PluginManager:
+    """Get plugin manager instance."""
+    if plugin_manager is None:
+        raise HTTPException(500, "Plugin manager not initialized")
+    return plugin_manager
 
 
 def get_db() -> Session:
@@ -379,3 +409,26 @@ async def get_memory_key(
         return {"key": key, "value": value}
     except KeyError:
         raise HTTPException(404, f"Memory key not found: {key}")
+
+
+@router.get("/steps", response_model=List[StepTypeResponse])
+async def list_step_types(pm: PluginManager = Depends(get_plugin_manager)):
+    """
+    List all available step types.
+
+    Returns metadata for all registered step types including those from plugins.
+    Each step type includes its configuration schema and optional custom UI component path.
+    """
+    all_steps = pm.get_all_steps()
+    return list(all_steps.values())
+
+
+@router.get("/plugins", response_model=List[PluginResponse])
+async def list_plugins(pm: PluginManager = Depends(get_plugin_manager)):
+    """
+    List all loaded plugins.
+
+    Returns information about all discovered and loaded plugins including
+    their version, provided step types, and custom UI components.
+    """
+    return pm.get_plugin_info_dict()

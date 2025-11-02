@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from graphflow_runtime.storage.database import init_db
 from graphflow_runtime.executor.async_executor import AsyncExecutor
 from graphflow_runtime.api import routes
+from graphflow_core.plugins.manager import PluginManager
 
 
-# Global executor instance
+# Global instances
 executor = AsyncExecutor()
+plugin_manager = PluginManager()
 
 
 @asynccontextmanager
@@ -19,8 +21,14 @@ async def lifespan(app: FastAPI):
     # Startup
     init_db()
     routes.executor = executor
+    routes.plugin_manager = plugin_manager
+
+    # Discover and load plugins
+    plugins = plugin_manager.discover_and_load()
+
     print("✓ Database initialized")
     print("✓ Executor started")
+    print(f"✓ Loaded {len(plugins)} plugin(s)")
 
     yield
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "graphflow-plugin-example"
+version = "0.1.0"
+description = "Example plugin for GraphFlow demonstrating custom step types"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "graphflow-core",
+]
+
+[project.entry-points."graphflow.plugins"]
+example = "graphflow_plugin_example"

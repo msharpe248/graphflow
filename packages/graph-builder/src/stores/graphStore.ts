@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
 import { GraphDefinition, Step, Metadata, MemorySchema, NodeData } from '@/types/graph';
-import { STEP_TYPES } from '@/utils/stepTypes';
+import { usePluginStore } from './pluginStore';
 
 interface GraphStore {
   // Graph metadata
@@ -69,7 +69,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
   // Node operations
   addNode: (stepType, position) => {
-    const stepTypeInfo = STEP_TYPES[stepType];
+    const stepTypeInfo = usePluginStore.getState().getStepType(stepType);
     if (!stepTypeInfo) return;
 
     const id = `${stepType}_${nodeIdCounter++}`;
@@ -158,7 +158,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // Graph operations
   loadGraph: (graph) => {
     const nodes: Node<NodeData>[] = graph.steps.map((step, index) => {
-      const stepTypeInfo = STEP_TYPES[step.type];
+      const stepTypeInfo = usePluginStore.getState().getStepType(step.type);
       return {
         id: step.id,
         type: 'custom',

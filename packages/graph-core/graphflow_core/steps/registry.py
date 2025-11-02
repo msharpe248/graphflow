@@ -145,6 +145,83 @@ class StepRegistry:
         return framework in supported
 
     @classmethod
+    def register_step(
+        cls,
+        step_type: str,
+        step_class: Type[StepBase],
+        category: str = "general",
+        description: str = "",
+        framework_support: Optional[List[str]] = None,
+        allow_override: bool = False
+    ) -> None:
+        """
+        Programmatically register a step class.
+
+        This method allows plugins to register steps without using decorators.
+        Supports namespaced step types (e.g., "myplugin.custom_step").
+
+        Args:
+            step_type: Step type identifier (can include namespace)
+            step_class: Step class to register
+            category: Category for UI organization
+            description: Human-readable description
+            framework_support: List of supported frameworks (None = all)
+            allow_override: If True, allows overriding existing registrations
+
+        Raises:
+            ValueError: If step type already registered and allow_override is False
+        """
+        if step_type in cls._registry and not allow_override:
+            raise ValueError(f"Step type already registered: {step_type}")
+
+        cls._registry[step_type] = step_class
+        cls._metadata[step_type] = {
+            "category": category,
+            "description": description,
+            "framework_support": framework_support or ["pydantic_ai", "langgraph"],
+            "schema": step_class.get_schema(),
+        }
+
+    @classmethod
+    def unregister_step(cls, step_type: str) -> bool:
+        """
+        Unregister a step type.
+
+        Useful for unloading plugins or cleaning up registrations.
+
+        Args:
+            step_type: Step type identifier to unregister
+
+        Returns:
+            True if step was unregistered, False if not found
+        """
+        if step_type not in cls._registry:
+            return False
+
+        del cls._registry[step_type]
+        if step_type in cls._metadata:
+            del cls._metadata[step_type]
+
+        return True
+
+    @classmethod
+    def list_namespaced_types(cls, namespace: str) -> List[str]:
+        """
+        List all step types under a specific namespace.
+
+        Args:
+            namespace: Namespace prefix (e.g., "myplugin")
+
+        Returns:
+            List of step type identifiers in the namespace
+        """
+        prefix = f"{namespace}."
+        return [
+            step_type for step_type in cls._registry.keys()
+            if step_type.startswith(prefix)
+        ]
+
+    @classmethod
     def clear(cls) -> None:
         """Clear registry (useful for testing)."""
         cls._registry.clear()

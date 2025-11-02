@@ -69,6 +69,7 @@ export interface StepTypeInfo {
   icon?: string;
   color?: string;
   configSchema?: Record<string, any>;
+  uiComponent?: string;
 }
 
 // ReactFlow node types

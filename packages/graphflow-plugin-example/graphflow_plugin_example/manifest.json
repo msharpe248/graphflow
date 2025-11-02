@@ -1,0 +1,10 @@
+{
+  "name": "example",
+  "version": "0.1.0",
+  "description": "Example plugin demonstrating custom GraphFlow steps",
+  "steps": [
+    "EmailStep",
+    "SlackNotificationStep"
+  ],
+  "ui_components": {}
+}
