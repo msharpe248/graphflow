@@ -89,6 +89,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         step,
         stepTypeInfo,
       },
+      deletable: true,
     };
 
     set((state) => ({
@@ -139,6 +140,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...connection,
         id: `e${connection.source}-${connection.target}`,
         type: 'default',
+        deletable: true,
         markerEnd: {
           type: 'arrowclosed',
           width: 25,
@@ -164,6 +166,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         type: 'custom',
         position: { x: 100 + (index % 3) * 250, y: 100 + Math.floor(index / 3) * 150 },
         data: { step, stepTypeInfo },
+        deletable: true,
       };
     });
 
@@ -172,6 +175,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       source: edge.from,
       target: edge.to,
       type: 'default',
+      deletable: true,
       markerEnd: {
         type: 'arrowclosed',
         width: 25,

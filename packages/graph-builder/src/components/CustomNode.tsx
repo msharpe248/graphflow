@@ -1,15 +1,22 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import * as Icons from 'lucide-react';
+import { X } from 'lucide-react';
 import { NodeData } from '@/types/graph';
 import { useGraphStore } from '@/stores/graphStore';
 
 function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
   const { step, stepTypeInfo } = data;
   const setSelectedNode = useGraphStore((state) => state.setSelectedNode);
+  const deleteNode = useGraphStore((state) => state.deleteNode);
 
   const handleClick = () => {
     setSelectedNode(id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteNode(id);
   };
 
   // Get the icon component
@@ -23,7 +30,7 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
       className={`
         px-4 py-3 rounded-lg border-2 bg-white shadow-md
         min-w-[160px] max-w-[200px]
-        cursor-pointer transition-all
+        cursor-pointer transition-all relative group
         ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-gray-300 hover:border-gray-400'}
       `}
       style={{
@@ -31,6 +38,14 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
         borderLeftWidth: '4px',
       }}
     >
+      {/* Delete button - appears on hover */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600 z-10"
+        title="Delete node"
+      >
+        <X className="w-3 h-3" />
+      </button>
       {/* Handles */}
       {step.type !== 'start' && (
         <Handle
