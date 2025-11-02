@@ -1,0 +1,283 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Advanced Research Agent",
+    "description": "Multi-step research agent with LLM, loops, conditionals, and HTTP calls",
+    "created": "2025-10-29T00:00:00Z",
+    "framework_hints": ["pydantic_ai", "langgraph"],
+    "tags": ["example", "advanced", "research", "llm", "loop"]
+  },
+  "memory": {
+    "inputs": {
+      "research_topic": {
+        "type": "string",
+        "description": "Topic to research",
+        "required": true
+      },
+      "max_sources": {
+        "type": "number",
+        "description": "Maximum number of sources to check",
+        "required": false,
+        "default": 3
+      }
+    },
+    "outputs": {
+      "final_report": {
+        "type": "string",
+        "description": "Comprehensive research report"
+      },
+      "confidence_score": {
+        "type": "number",
+        "description": "Confidence in findings (0-1)"
+      },
+      "sources_used": {
+        "type": "array",
+        "description": "List of sources consulted"
+      }
+    },
+    "intermediate": {
+      "search_queries": {
+        "type": "array",
+        "description": "Generated search queries"
+      },
+      "current_query": {
+        "type": "string",
+        "description": "Current query being processed"
+      },
+      "query_index": {
+        "type": "number",
+        "description": "Current query index"
+      },
+      "search_results": {
+        "type": "array",
+        "description": "Collected search results"
+      },
+      "current_search_result": {
+        "type": "object",
+        "description": "Current search result from HTTP call"
+      },
+      "has_enough_data": {
+        "type": "boolean",
+        "description": "Whether we have enough data"
+      },
+      "llm_analysis": {
+        "type": "object",
+        "description": "LLM analysis of research"
+      },
+      "human_approval": {
+        "type": "boolean",
+        "description": "Human approval of findings"
+      }
+    },
+    "secrets": {
+      "openrouter_api_key": {
+        "provider": "env",
+        "key": "OPENROUTER_API_KEY",
+        "description": "API key for OpenRouter"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "start",
+      "type": "start",
+      "config": {},
+      "memory_reads": [],
+      "memory_writes": [],
+      "description": "Entry point"
+    },
+    {
+      "id": "generate_queries",
+      "type": "llm",
+      "config": {
+        "provider": "openrouter",
+        "model": "anthropic/claude-3.5-sonnet",
+        "api_key_secret": "openrouter_api_key",
+        "system_prompt": "You are a research assistant that generates effective search queries.",
+        "user_prompt": "Generate 3 search queries to research this topic: {{research_topic}}",
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "queries": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "List of search queries"
+            }
+          },
+          "required": ["queries"]
+        },
+        "output_key": "search_queries",
+        "temperature": 0.8,
+        "max_tokens": 500
+      },
+      "memory_reads": ["research_topic"],
+      "memory_writes": ["search_queries"],
+      "description": "Generate search queries using LLM"
+    },
+    {
+      "id": "loop_searches",
+      "type": "loop",
+      "config": {
+        "collection_key": "search_queries",
+        "item_key": "current_query",
+        "index_key": "query_index",
+        "max_iterations": 10,
+        "results_key": "search_results"
+      },
+      "memory_reads": ["search_queries"],
+      "memory_writes": ["current_query", "query_index", "search_results"],
+      "description": "Loop through search queries"
+    },
+    {
+      "id": "execute_search",
+      "type": "http",
+      "config": {
+        "method": "GET",
+        "url": "https://api.example.com/search?q={{current_query}}",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "response_key": "current_search_result",
+        "timeout": 30
+      },
+      "memory_reads": ["current_query"],
+      "memory_writes": ["current_search_result"],
+      "description": "Execute HTTP search (mock)"
+    },
+    {
+      "id": "check_data_sufficiency",
+      "type": "conditional",
+      "config": {
+        "condition": "query_index >= max_sources - 1",
+        "result_key": "has_enough_data"
+      },
+      "memory_reads": ["query_index", "max_sources"],
+      "memory_writes": ["has_enough_data"],
+      "description": "Check if we have enough data"
+    },
+    {
+      "id": "analyze_results",
+      "type": "llm",
+      "config": {
+        "provider": "openrouter",
+        "model": "anthropic/claude-3.5-sonnet",
+        "api_key_secret": "openrouter_api_key",
+        "system_prompt": "You are a research analyst. Analyze the collected data and provide comprehensive insights.",
+        "user_prompt": "Analyze these search results for topic '{{research_topic}}':\n\nResults: {{search_results}}\n\nProvide analysis with confidence score.",
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "type": "string",
+              "description": "Summary of findings"
+            },
+            "key_points": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Key points discovered"
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Confidence score 0-1"
+            }
+          },
+          "required": ["summary", "key_points", "confidence"]
+        },
+        "output_key": "llm_analysis",
+        "temperature": 0.3,
+        "max_tokens": 1500
+      },
+      "memory_reads": ["research_topic", "search_results"],
+      "memory_writes": ["llm_analysis"],
+      "description": "Analyze results with LLM"
+    },
+    {
+      "id": "request_human_review",
+      "type": "human_input",
+      "config": {
+        "prompt": "Please review the research findings:\n\nSummary: {{llm_analysis.summary}}\n\nApprove for final report?",
+        "input_type": "approval",
+        "output_key": "human_approval"
+      },
+      "memory_reads": ["llm_analysis"],
+      "memory_writes": ["human_approval"],
+      "description": "Request human review"
+    },
+    {
+      "id": "generate_final_report",
+      "type": "transform",
+      "config": {
+        "operation": "format_report",
+        "code": "import json\nanalysis = llm_analysis if isinstance(llm_analysis, dict) else {}\nreport = f\"\"\"# Research Report: {research_topic}\n\n## Summary\n{analysis.get('summary', 'N/A')}\n\n## Key Findings\n\"\"\"\nfor i, point in enumerate(analysis.get('key_points', []), 1):\n    report += f\"\\n{i}. {point}\"\nreport += f\"\\n\\n## Confidence Score: {analysis.get('confidence', 0):.2f}\"\nreport += f\"\\n\\n## Human Approved: {human_approval}\"\nreturn report",
+        "input_keys": ["research_topic", "llm_analysis", "human_approval"],
+        "output_key": "final_report"
+      },
+      "memory_reads": ["research_topic", "llm_analysis", "human_approval"],
+      "memory_writes": ["final_report"],
+      "description": "Generate final formatted report"
+    },
+    {
+      "id": "output_results",
+      "type": "output",
+      "config": {
+        "mapping": {
+          "final_report": "final_report",
+          "confidence_score": "llm_analysis.confidence",
+          "sources_used": "search_results"
+        }
+      },
+      "memory_reads": ["final_report", "llm_analysis", "search_results"],
+      "memory_writes": ["final_report", "confidence_score", "sources_used"],
+      "description": "Map to outputs"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "generate_queries"
+    },
+    {
+      "id": "e2",
+      "from": "generate_queries",
+      "to": "loop_searches"
+    },
+    {
+      "id": "e3",
+      "from": "loop_searches",
+      "to": "execute_search"
+    },
+    {
+      "id": "e4",
+      "from": "execute_search",
+      "to": "check_data_sufficiency"
+    },
+    {
+      "id": "e5",
+      "from": "check_data_sufficiency",
+      "to": "analyze_results",
+      "condition": "has_enough_data == True"
+    },
+    {
+      "id": "e6",
+      "from": "check_data_sufficiency",
+      "to": "loop_searches",
+      "condition": "has_enough_data == False"
+    },
+    {
+      "id": "e7",
+      "from": "analyze_results",
+      "to": "request_human_review"
+    },
+    {
+      "id": "e8",
+      "from": "request_human_review",
+      "to": "generate_final_report"
+    },
+    {
+      "id": "e9",
+      "from": "generate_final_report",
+      "to": "output_results"
+    }
+  ]
+}

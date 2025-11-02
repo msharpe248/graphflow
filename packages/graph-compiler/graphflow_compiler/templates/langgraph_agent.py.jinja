@@ -1,0 +1,91 @@
+# Define state schema
+class AgentState(TypedDict):
+    """State for the agent."""
+{% for field in state_fields %}
+    {{ field.name }}: {{ field.type }}  # {{ field.section }}
+{% endfor %}
+
+
+class GeneratedAgent:
+    """
+    Generated agent: {{ graph.metadata.name }}
+
+    {{ graph.metadata.description or '' }}
+    """
+
+    def __init__(self):
+        """Initialize agent with LangGraph."""
+        self.memory = MemoryStore(schema=MEMORY_SCHEMA)
+        self.graph = self._build_graph()
+        self.app = self.graph.compile()
+
+    def _build_graph(self) -> StateGraph:
+        """Build the LangGraph StateGraph."""
+        graph = StateGraph(AgentState)
+
+        # Add nodes for each step
+{% for step in steps %}
+        graph.add_node("{{ step.id }}", self._node_{{ step.id }})
+{% endfor %}
+
+        # Add edges
+{% for edge in graph_edges %}
+{% if edge.condition %}
+        # Conditional edge: {{ edge.condition }}
+        graph.add_conditional_edges(
+            "{{ edge.source }}",
+            self._condition_{{ edge.source }}_{{ edge.target }},
+            {
+                True: "{{ edge.target }}",
+                False: END
+            }
+        )
+{% else %}
+        graph.add_edge("{{ edge.source }}", "{{ edge.target }}")
+{% endif %}
+{% endfor %}
+
+        # Set entry point
+        graph.set_entry_point("{{ steps[0].id }}")
+
+        # Set finish point (last step should lead to END)
+        graph.add_edge("{{ steps[-1].id }}", END)
+
+        return graph
+
+{% for step_id, step_code in step_execution_map.items() %}
+    async def _node_{{ step_id }}(self, state: AgentState) -> AgentState:
+        """Node for step: {{ step_id }}"""
+{{ step_code | indent(8, first=False) }}
+
+{% endfor %}
+
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Run agent with given inputs.
+
+        Args:
+            inputs: Dictionary of input values
+
+        Returns:
+            Dictionary of output values
+        """
+        # Initialize state with inputs
+        state = AgentState(**inputs)
+
+        # Run graph
+        final_state = await self.app.ainvoke(state)
+
+        # Extract outputs
+        outputs = {}
+{% for key, field in graph.memory.outputs.items() %}
+        if "{{ key }}" in final_state:
+            outputs["{{ key }}"] = final_state["{{ key }}"]
+{% endfor %}
+
+        return outputs
+
+    def get_memory_state(self) -> Dict[str, Any]:
+        """Get current memory state (from last run)."""
+        # LangGraph manages state internally
+        return {"note": "LangGraph manages state during execution"}

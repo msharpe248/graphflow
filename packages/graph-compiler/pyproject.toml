@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphflow-compiler"
+version = "0.1.0"
+description = "Compiler for GraphFlow graphs to Pydantic AI and LangGraph"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "GraphFlow Contributors"}
+]
+dependencies = [
+    "graphflow-core>=0.1.0",
+    "jinja2>=3.1.0",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+pydantic_ai = [
+    "pydantic-ai>=0.0.1",
+]
+langgraph = [
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+]
+
+[project.scripts]
+graphflow-compile = "graphflow_compiler.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["graphflow_compiler*"]
+
+[tool.setuptools.package-data]
+graphflow_compiler = ["templates/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

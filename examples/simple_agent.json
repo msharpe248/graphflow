@@ -1,0 +1,104 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Simple Question Answering Agent",
+    "description": "A basic agent that transforms a question and outputs an answer",
+    "created": "2025-10-29T00:00:00Z",
+    "framework_hints": ["pydantic_ai", "langgraph"],
+    "tags": ["example", "simple", "qa"]
+  },
+  "memory": {
+    "inputs": {
+      "user_question": {
+        "type": "string",
+        "description": "Question from user",
+        "required": true
+      }
+    },
+    "outputs": {
+      "formatted_answer": {
+        "type": "string",
+        "description": "Formatted answer to the question"
+      }
+    },
+    "intermediate": {
+      "processed_question": {
+        "type": "string",
+        "description": "Processed/cleaned question"
+      },
+      "answer": {
+        "type": "string",
+        "description": "Raw answer"
+      }
+    },
+    "secrets": {}
+  },
+  "steps": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "config": {},
+      "memory_reads": [],
+      "memory_writes": [],
+      "description": "Entry point"
+    },
+    {
+      "id": "transform_1",
+      "type": "transform",
+      "config": {
+        "operation": "clean_question",
+        "code": "return user_question.strip().lower()",
+        "input_keys": ["user_question"],
+        "output_key": "processed_question"
+      },
+      "memory_reads": ["user_question"],
+      "memory_writes": ["processed_question"],
+      "description": "Clean and normalize the question"
+    },
+    {
+      "id": "transform_2",
+      "type": "transform",
+      "config": {
+        "operation": "mock_answer",
+        "code": "return f'This is a mock answer to: {processed_question}'",
+        "input_keys": ["processed_question"],
+        "output_key": "answer"
+      },
+      "memory_reads": ["processed_question"],
+      "memory_writes": ["answer"],
+      "description": "Generate mock answer (would be LLM in real scenario)"
+    },
+    {
+      "id": "output_1",
+      "type": "output",
+      "config": {
+        "mapping": {
+          "formatted_answer": "answer"
+        }
+      },
+      "memory_reads": ["answer"],
+      "memory_writes": ["formatted_answer"],
+      "description": "Map to output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "from": "start_1",
+      "to": "transform_1",
+      "condition": null
+    },
+    {
+      "id": "edge_2",
+      "from": "transform_1",
+      "to": "transform_2",
+      "condition": null
+    },
+    {
+      "id": "edge_3",
+      "from": "transform_2",
+      "to": "output_1",
+      "condition": null
+    }
+  ]
+}

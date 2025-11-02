@@ -1,0 +1,102 @@
+# Standalone execution wrapper
+
+async def main_async(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Run agent with given inputs.
+
+    Args:
+        inputs: Dictionary of input values
+
+    Returns:
+        Dictionary of output values
+    """
+    agent = GeneratedAgent()
+    outputs = await agent.run(inputs)
+    return outputs
+
+
+def main_cli():
+    """CLI entry point."""
+    import sys
+    import json
+
+    if len(sys.argv) < 2:
+        print("Usage: python {{ graph.metadata.name | replace(' ', '_') }}.py <inputs.json>")
+        print("\nExpected inputs:")
+{% for key in input_keys %}
+        print("  - {{ key }}")
+{% endfor %}
+        sys.exit(1)
+
+    # Load inputs from JSON file
+    with open(sys.argv[1]) as f:
+        inputs = json.load(f)
+
+    # Run agent
+    outputs = asyncio.run(main_async(inputs))
+
+    # Print outputs
+    print(json.dumps(outputs, indent=2))
+
+
+# Optional FastAPI wrapper
+def create_fastapi_app():
+    """Create FastAPI application for this agent."""
+    try:
+        from fastapi import FastAPI, HTTPException
+        from pydantic import BaseModel, Field
+    except ImportError:
+        raise ImportError("FastAPI not installed. Install with: pip install fastapi uvicorn")
+
+    app = FastAPI(title="{{ graph.metadata.name }}")
+
+    # Define input/output models
+    class AgentInput(BaseModel):
+{%- for key, field in graph.memory.inputs.items() %}
+        {{ key }}: {% if field.type == "string" %}str{% elif field.type == "number" %}float{% elif field.type == "boolean" %}bool{% else %}Any{% endif %} = Field(description="{{ field.description or '' }}")
+{%- endfor %}
+
+    class AgentOutput(BaseModel):
+{%- for key, field in graph.memory.outputs.items() %}
+        {{ key }}: {% if field.type == "string" %}str{% elif field.type == "number" %}float{% elif field.type == "boolean" %}bool{% else %}Any{% endif %} = Field(description="{{ field.description or '' }}")
+{%- endfor %}
+
+    @app.post("/invoke", response_model=AgentOutput)
+    async def invoke(input_data: AgentInput) -> AgentOutput:
+        """Invoke the agent."""
+        try:
+            inputs = input_data.model_dump()
+            outputs = await main_async(inputs)
+            return AgentOutput(**outputs)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/health")
+    async def health():
+        """Health check endpoint."""
+        return {"status": "healthy"}
+
+    return app
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--server" in sys.argv:
+        # Run as FastAPI server
+        try:
+            import uvicorn
+        except ImportError:
+            print("Error: uvicorn not installed. Install with: pip install uvicorn")
+            sys.exit(1)
+
+        app = create_fastapi_app()
+        port = 8000
+        if "--port" in sys.argv:
+            port = int(sys.argv[sys.argv.index("--port") + 1])
+
+        print(f"Starting server on http://localhost:{port}")
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        # Run as CLI
+        main_cli()

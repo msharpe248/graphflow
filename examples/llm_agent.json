@@ -1,0 +1,183 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "LLM-Powered Q&A Agent",
+    "description": "Agent that uses LLM to answer questions with tool calling support",
+    "created": "2025-10-29T00:00:00Z",
+    "framework_hints": ["pydantic_ai", "langgraph"],
+    "tags": ["example", "llm", "tools", "qa"]
+  },
+  "memory": {
+    "inputs": {
+      "user_question": {
+        "type": "string",
+        "description": "Question from the user",
+        "required": true
+      },
+      "context": {
+        "type": "string",
+        "description": "Additional context for the question",
+        "required": false
+      }
+    },
+    "outputs": {
+      "answer": {
+        "type": "string",
+        "description": "Answer from the LLM"
+      },
+      "confidence": {
+        "type": "number",
+        "description": "Confidence score of the answer"
+      },
+      "sources": {
+        "type": "array",
+        "description": "Sources used (from tool calls)"
+      }
+    },
+    "intermediate": {
+      "llm_response": {
+        "type": "object",
+        "description": "Structured response from LLM"
+      },
+      "tool_calls": {
+        "type": "array",
+        "description": "Tool calls made by the LLM"
+      }
+    },
+    "secrets": {
+      "openrouter_api_key": {
+        "provider": "env",
+        "key": "OPENROUTER_API_KEY",
+        "description": "API key for OpenRouter"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "config": {},
+      "memory_reads": [],
+      "memory_writes": [],
+      "description": "Entry point"
+    },
+    {
+      "id": "llm_1",
+      "type": "llm",
+      "config": {
+        "provider": "openrouter",
+        "model": "anthropic/claude-3.5-sonnet",
+        "api_key_secret": "openrouter_api_key",
+        "system_prompt": "You are a helpful assistant that provides accurate, well-researched answers. If you need to look up information, use the available tools.",
+        "user_prompt": "Question: {{user_question}}\n\nContext: {{context}}\n\nPlease provide a detailed answer with sources.",
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "web_search",
+              "description": "Search the web for current information",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Search query"
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "calculate",
+              "description": "Perform mathematical calculations",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "description": "Mathematical expression to evaluate"
+                  }
+                },
+                "required": ["expression"]
+              }
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "answer": {
+              "type": "string",
+              "description": "The answer to the question"
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Confidence score from 0 to 1"
+            },
+            "_meta": {
+              "type": "object",
+              "description": "Metadata about the response"
+            }
+          },
+          "required": ["answer", "confidence"]
+        },
+        "output_key": "llm_response",
+        "tool_calls_key": "tool_calls",
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "response_format": "json"
+      },
+      "memory_reads": ["user_question", "context"],
+      "memory_writes": ["llm_response", "tool_calls"],
+      "description": "Call LLM with tool support"
+    },
+    {
+      "id": "transform_1",
+      "type": "transform",
+      "config": {
+        "operation": "extract_sources",
+        "code": "sources = []\nif tool_calls:\n    for call in tool_calls:\n        if 'function' in call and call['function'].get('name') == 'web_search':\n            sources.append(call['function']['arguments'].get('query', 'Unknown'))\nreturn sources if sources else ['Direct knowledge']",
+        "input_keys": ["tool_calls"],
+        "output_key": "sources"
+      },
+      "memory_reads": ["tool_calls"],
+      "memory_writes": ["sources"],
+      "description": "Extract sources from tool calls"
+    },
+    {
+      "id": "output_1",
+      "type": "output",
+      "config": {
+        "mapping": {
+          "answer": "llm_response.answer",
+          "confidence": "llm_response.confidence",
+          "sources": "sources"
+        }
+      },
+      "memory_reads": ["llm_response", "sources"],
+      "memory_writes": ["answer", "confidence", "sources"],
+      "description": "Map LLM response to outputs"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "from": "start_1",
+      "to": "llm_1"
+    },
+    {
+      "id": "edge_2",
+      "from": "llm_1",
+      "to": "transform_1"
+    },
+    {
+      "id": "edge_3",
+      "from": "transform_1",
+      "to": "output_1"
+    }
+  ]
+}

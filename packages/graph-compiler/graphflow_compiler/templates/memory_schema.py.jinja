@@ -1,0 +1,42 @@
+# Memory schema definition
+MEMORY_SCHEMA = MemorySchema(
+    inputs={
+{%- for key, field in memory.inputs.items() %}
+        "{{ key }}": FieldDefinition(
+            type="{{ field.type }}",
+            description={{ field.description | repr }},
+            required={{ field.required }},
+            {% if field.default is not none %}default={{ field.default | repr }},{% endif %}
+        ),
+{%- endfor %}
+    },
+    outputs={
+{%- for key, field in memory.outputs.items() %}
+        "{{ key }}": FieldDefinition(
+            type="{{ field.type }}",
+            description={{ field.description | repr }},
+            required={{ field.required }},
+            {% if field.default is not none %}default={{ field.default | repr }},{% endif %}
+        ),
+{%- endfor %}
+    },
+    intermediate={
+{%- for key, field in memory.intermediate.items() %}
+        "{{ key }}": FieldDefinition(
+            type="{{ field.type }}",
+            description={{ field.description | repr }},
+            required={{ field.required }},
+            {% if field.default is not none %}default={{ field.default | repr }},{% endif %}
+        ),
+{%- endfor %}
+    },
+    secrets={
+{%- for key, secret in memory.secrets.items() %}
+        "{{ key }}": SecretDefinition(
+            provider="{{ secret.provider }}",
+            key="{{ secret.key }}",
+            {% if secret.description %}description={{ secret.description | repr }},{% endif %}
+        ),
+{%- endfor %}
+    }
+)
