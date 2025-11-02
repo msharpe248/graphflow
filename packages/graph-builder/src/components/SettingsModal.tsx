@@ -186,7 +186,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {activeTab === 'metadata' ? (
+          {activeTab === 'metadata' && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -253,7 +253,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 />
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'memory' && (
             <div>
               {renderMemorySection('inputs', 'Input Fields')}
               {renderMemorySection('outputs', 'Output Fields')}

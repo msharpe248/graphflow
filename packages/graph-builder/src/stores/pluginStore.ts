@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { StepTypeInfo } from '@/types/graph';
+import { useSettingsStore } from './settingsStore';
 
 interface PluginStore {
   // State
@@ -14,8 +15,6 @@ interface PluginStore {
   getStepTypesByCategory: () => Record<string, StepTypeInfo[]>;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 export const usePluginStore = create<PluginStore>((set, get) => ({
   // Initial state
   stepTypes: {},
@@ -28,7 +27,8 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/steps`);
+      const apiBaseUrl = useSettingsStore.getState().getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/v1/steps`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch step types: ${response.statusText}`);
