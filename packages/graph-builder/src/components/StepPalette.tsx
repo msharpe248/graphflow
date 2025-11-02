@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Layers, Package } from 'lucide-react';
 import { StepTypeInfo } from '@/types/graph';
 import { usePluginStore } from '@/stores/pluginStore';
 
@@ -7,16 +8,59 @@ interface StepPaletteProps {
   onDragStart: (event: React.DragEvent, stepType: string) => void;
 }
 
+type ViewMode = 'category' | 'plugin';
+
 export default function StepPalette({ onDragStart }: StepPaletteProps) {
-  const { stepTypes, isLoading, error, fetchStepTypes, getStepTypesByCategory } = usePluginStore();
+  const { stepTypes, isLoading, error, fetchStepTypes, getStepTypesByCategory, getStepTypesByPlugin } = usePluginStore();
+
+  const [viewMode, setViewMode] = useState<ViewMode>('category');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   // Fetch step types on mount
   useEffect(() => {
     fetchStepTypes();
   }, [fetchStepTypes]);
 
+  // Get grouped steps based on view mode
   const stepsByCategory = getStepTypesByCategory();
+  const stepsByPlugin = getStepTypesByPlugin();
 
+  // Filter steps based on search query
+  const filteredSteps = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return viewMode === 'category' ? stepsByCategory : stepsByPlugin;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const groups = viewMode === 'category' ? stepsByCategory : stepsByPlugin;
+    const filtered: Record<string, StepTypeInfo[]> = {};
+
+    Object.entries(groups).forEach(([groupName, steps]) => {
+      const matchingSteps = steps.filter(
+        (step) =>
+          step.label.toLowerCase().includes(query) ||
+          step.description.toLowerCase().includes(query) ||
+          step.type.toLowerCase().includes(query)
+      );
+
+      if (matchingSteps.length > 0) {
+        filtered[groupName] = matchingSteps;
+      }
+    });
+
+    return filtered;
+  }, [searchQuery, viewMode, stepsByCategory, stepsByPlugin]);
+
+  // Toggle collapse state for a group
+  const toggleCollapse = (groupName: string) => {
+    setCollapsed((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  // Render individual step
   const renderStepType = (stepType: StepTypeInfo) => {
     const IconComponent = stepType.icon ? (Icons as any)[stepType.icon] : null;
 
@@ -52,12 +96,47 @@ export default function StepPalette({ onDragStart }: StepPaletteProps) {
     );
   };
 
+  // Render a collapsible group
+  const renderGroup = (groupName: string, steps: StepTypeInfo[]) => {
+    const isCollapsed = collapsed[groupName] || false;
+    const stepCount = steps.length;
+
+    return (
+      <div key={groupName} className="mb-4">
+        <button
+          onClick={() => toggleCollapse(groupName)}
+          className="w-full flex items-center justify-between p-2 hover:bg-gray-100 rounded-md transition-colors group"
+        >
+          <div className="flex items-center gap-2">
+            {isCollapsed ? (
+              <ChevronRight className="w-4 h-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            )}
+            <h3 className="text-sm font-semibold text-gray-700 uppercase">
+              {groupName}
+            </h3>
+            <span className="text-xs text-gray-500">({stepCount})</span>
+          </div>
+        </button>
+
+        {!isCollapsed && (
+          <div className="mt-2 ml-6 space-y-2">
+            {steps.map(renderStepType)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Show loading state
   if (isLoading) {
     return (
-      <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Step Palette</h2>
-        <div className="flex items-center justify-center p-8">
+      <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-gray-900">Step Palette</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-sm text-gray-500">Loading step types...</div>
         </div>
       </div>
@@ -67,40 +146,94 @@ export default function StepPalette({ onDragStart }: StepPaletteProps) {
   // Show error state
   if (error) {
     return (
-      <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Step Palette</h2>
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-xs text-red-900">
-            <strong>Error:</strong> {error}
-          </p>
+      <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-gray-900">Step Palette</h2>
+        </div>
+        <div className="flex-1 p-4">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-xs text-red-900">
+              <strong>Error:</strong> {error}
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 border-r border-gray-200 p-4">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Step Palette</h2>
+    <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200 space-y-3 shrink-0">
+        <h2 className="text-lg font-bold text-gray-900">Step Palette</h2>
 
-      {Object.entries(stepsByCategory).map(([category, steps]) => {
-        if (steps.length === 0) return null;
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search steps..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
 
-        return (
-          <div key={category} className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-700 uppercase mb-2">
-              {category}
-            </h3>
-            <div className="space-y-2">
-              {steps.map(renderStepType)}
-            </div>
+        {/* View Mode Tabs */}
+        <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('category')}
+            className={`
+              flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+              ${
+                viewMode === 'category'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }
+            `}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Category
+          </button>
+          <button
+            onClick={() => setViewMode('plugin')}
+            className={`
+              flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+              ${
+                viewMode === 'plugin'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }
+            `}
+          >
+            <Package className="w-3.5 h-3.5" />
+            Plugin
+          </button>
+        </div>
+      </div>
+
+      {/* Steps List */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {Object.keys(filteredSteps).length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-gray-500">
+              {searchQuery ? 'No steps found matching your search.' : 'No steps available.'}
+            </p>
           </div>
-        );
-      })}
+        ) : (
+          Object.entries(filteredSteps).map(([groupName, steps]) =>
+            steps.length > 0 ? renderGroup(groupName, steps) : null
+          )
+        )}
+      </div>
 
-      <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-xs text-blue-900">
-          <strong>Tip:</strong> Drag and drop steps onto the canvas to build your graph.
-        </p>
+      {/* Tip */}
+      <div className="p-4 border-t border-gray-200 shrink-0">
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-900">
+            <strong>Tip:</strong> Drag and drop steps onto the canvas to build your graph.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ interface PluginStore {
   fetchStepTypes: () => Promise<void>;
   getStepType: (type: string) => StepTypeInfo | undefined;
   getStepTypesByCategory: () => Record<string, StepTypeInfo[]>;
+  getStepTypesByPlugin: () => Record<string, StepTypeInfo[]>;
 }
 
 export const usePluginStore = create<PluginStore>((set, get) => ({
@@ -89,6 +90,26 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
         grouped[category] = [];
       }
       grouped[category].push(stepType);
+    });
+
+    return grouped;
+  },
+
+  // Get step types grouped by plugin
+  getStepTypesByPlugin: () => {
+    const grouped: Record<string, StepTypeInfo[]> = {};
+    const stepTypes = get().stepTypes;
+
+    Object.values(stepTypes).forEach((stepType) => {
+      // Extract plugin name from namespaced type (e.g., "example.EmailStep" -> "example")
+      // Built-in steps don't have namespace
+      const parts = stepType.type.split('.');
+      const plugin = parts.length > 1 ? parts[0] : 'built-in';
+
+      if (!grouped[plugin]) {
+        grouped[plugin] = [];
+      }
+      grouped[plugin].push(stepType);
     });
 
     return grouped;
