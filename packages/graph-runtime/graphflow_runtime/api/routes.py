@@ -75,6 +75,8 @@ class StepTypeResponse(BaseModel):
     description: str
     category: str
     config_schema: dict
+    inputs_schema: dict
+    outputs_schema: dict
     ui_component: Optional[str]
 
 

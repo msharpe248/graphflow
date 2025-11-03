@@ -49,6 +49,8 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
           color: getColorForCategory(step.category),
           icon: getIconForCategory(step.category),
           configSchema: step.config_schema,
+          inputsSchema: step.inputs_schema,
+          outputsSchema: step.outputs_schema,
           uiComponent: step.ui_component,
         };
       }

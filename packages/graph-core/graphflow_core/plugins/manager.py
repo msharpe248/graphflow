@@ -284,6 +284,8 @@ class PluginManager:
                     "description": metadata.get("description", ""),
                     "category": metadata.get("category", "general"),
                     "config_schema": metadata.get("schema", {}),
+                    "inputs_schema": step_class.get_inputs_schema() if hasattr(step_class, "get_inputs_schema") else {},
+                    "outputs_schema": step_class.get_outputs_schema() if hasattr(step_class, "get_outputs_schema") else {},
                     "ui_component": None,
                 }
             except Exception as e:
@@ -308,6 +310,8 @@ class PluginManager:
                     "description": getattr(step_class, "description", ""),
                     "category": getattr(step_class, "category", "general"),
                     "config_schema": step_class.get_schema() if hasattr(step_class, "get_schema") else {},
+                    "inputs_schema": step_class.get_inputs_schema() if hasattr(step_class, "get_inputs_schema") else {},
+                    "outputs_schema": step_class.get_outputs_schema() if hasattr(step_class, "get_outputs_schema") else {},
                     "ui_component": plugin_info.ui_components.get(step_type),
                 }
 

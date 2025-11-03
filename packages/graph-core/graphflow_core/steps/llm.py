@@ -169,6 +169,36 @@ class LLMStep(StepBase):
             "required": ["model", "output_key"]
         }
 
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """
+        LLMStep reads memory keys referenced in prompt templates.
+        Inputs are dynamic based on {{variable}} syntax in prompts.
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Reads memory keys referenced in system_prompt and user_prompt templates using {{variable}} syntax"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """LLMStep writes LLM response to output_key."""
+        return {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "description": "LLM response (text or structured object based on output_schema)"
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "description": "Tool calls made by LLM (written to tool_calls_key if configured)"
+                }
+            },
+            "description": "Writes LLM response to output_key and optionally tool calls to tool_calls_key"
+        }
+
     def validate_config(self) -> List[str]:
         """Validate LLM step configuration."""
         errors = []
@@ -344,6 +374,36 @@ class HTTPStep(StepBase):
                 }
             },
             "required": ["url", "response_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """
+        HTTPStep reads memory keys referenced in URL and body templates.
+        Inputs are dynamic based on {{variable}} syntax.
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Reads memory keys referenced in url, headers, and body templates using {{variable}} syntax"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """HTTPStep writes HTTP response to response_key."""
+        return {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "description": "HTTP response data (written to response_key)"
+                },
+                "status_code": {
+                    "type": "integer",
+                    "description": "HTTP status code (written to status_code_key if configured)"
+                }
+            },
+            "description": "Writes HTTP response to response_key and optionally status code to status_code_key"
         }
 
     async def execute(self, memory: MemoryStore) -> None:

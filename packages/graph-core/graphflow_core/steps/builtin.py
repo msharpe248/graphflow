@@ -19,6 +19,24 @@ class StartStep(StepBase):
     def get_type(cls) -> str:
         return "start"
 
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """Start step has no inputs."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """Start step has no outputs."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
+
     async def execute(self, memory: MemoryStore) -> None:
         """No-op execution."""
         pass
@@ -50,6 +68,32 @@ class OutputStep(StepBase):
                 }
             },
             "required": ["mapping"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """
+        OutputStep reads from any memory location specified in mapping config.
+        The actual inputs are dynamic based on the mapping values.
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Reads memory keys specified in the 'mapping' config"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """
+        OutputStep writes to output namespace.
+        The actual outputs are dynamic based on the mapping keys.
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Writes to output namespace using keys from 'mapping' config"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -101,6 +145,33 @@ class ConditionalStep(StepBase):
                 }
             },
             "required": ["condition", "result_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """
+        ConditionalStep reads any memory keys referenced in the condition.
+        Inputs are dynamic based on the condition expression.
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Reads memory keys referenced in the 'condition' expression"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """ConditionalStep writes the boolean result to result_key."""
+        return {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "boolean",
+                    "description": "Boolean result of condition evaluation (written to result_key)"
+                }
+            },
+            "description": "Writes boolean result to the key specified in 'result_key' config"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -183,6 +254,30 @@ class TransformStep(StepBase):
             "required": ["code", "output_key"]
         }
 
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """TransformStep reads memory keys specified in input_keys config."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Reads memory keys specified in 'input_keys' config"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """TransformStep writes result to output_key."""
+        return {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Result of transformation (written to output_key)"
+                }
+            },
+            "description": "Writes transformation result to the key specified in 'output_key' config"
+        }
+
     async def execute(self, memory: MemoryStore) -> None:
         """Execute transformation code."""
         code = self.config.get("code")
@@ -260,6 +355,26 @@ class JoinStep(StepBase):
                 }
             },
             "required": ["wait_for"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """JoinStep has no specific inputs - it's a synchronization point."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+            "description": "Synchronization point - no specific inputs"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """JoinStep has no specific outputs - it's a synchronization point."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+            "description": "Synchronization point - no specific outputs"
         }
 
     async def execute(self, memory: MemoryStore) -> None:

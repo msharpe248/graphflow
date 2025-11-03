@@ -69,6 +69,8 @@ export interface StepTypeInfo {
   icon?: string;
   color?: string;
   configSchema?: Record<string, any>;
+  inputsSchema?: Record<string, any>;
+  outputsSchema?: Record<string, any>;
   uiComponent?: string;
 }
 

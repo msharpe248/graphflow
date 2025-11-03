@@ -81,6 +81,55 @@ class StepBase(ABC):
             "additionalProperties": True
         }
 
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """
+        Return schema for step inputs (what it reads from memory).
+
+        Override this to specify what inputs this step expects.
+
+        Returns:
+            JSON schema dict defining expected inputs:
+            {
+                "properties": {
+                    "input_name": {
+                        "type": "string",
+                        "description": "Description of input",
+                        "required": True
+                    }
+                }
+            }
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """
+        Return schema for step outputs (what it writes to memory).
+
+        Override this to specify what outputs this step produces.
+
+        Returns:
+            JSON schema dict defining produced outputs:
+            {
+                "properties": {
+                    "output_name": {
+                        "type": "string",
+                        "description": "Description of output"
+                    }
+                }
+            }
+        """
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True
+        }
+
     def validate_config(self) -> List[str]:
         """
         Validate step configuration.
