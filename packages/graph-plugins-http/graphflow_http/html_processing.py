@@ -394,13 +394,13 @@ class HTMLTableExtractStep(StepBase):
         # Find the table
         table = soup.select_one(table_selector)
         if not table:
-            # Write output
-        if "output" in self.outputs:
-            output_template = self.outputs["output"]
-            match = pattern.search(output_template)
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, [])
+            # Write empty output if table not found
+            if "output" in self.outputs:
+                output_template = self.outputs["output"]
+                match = pattern.search(output_template)
+                if match:
+                    output_key = match.group(1)
+                    memory.write(output_key, [])
             return
 
         # Extract all rows
@@ -411,13 +411,13 @@ class HTMLTableExtractStep(StepBase):
             rows = rows[skip_rows:]
 
         if not rows:
-            # Write output
-        if "output" in self.outputs:
-            output_template = self.outputs["output"]
-            match = pattern.search(output_template)
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, [])
+            # Write empty output if no rows
+            if "output" in self.outputs:
+                output_template = self.outputs["output"]
+                match = pattern.search(output_template)
+                if match:
+                    output_key = match.group(1)
+                    memory.write(output_key, [])
             return
 
         # Extract data
