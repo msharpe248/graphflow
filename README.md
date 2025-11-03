@@ -266,6 +266,7 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 ## 📖 Documentation
 
 ### Core Documentation
+- **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** - **Complete JSON format specification** for graph definitions
 - **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - Complete technical specification
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What we built and how it works
 - **API Docs** - Visit http://localhost:8000/docs when runtime is running
@@ -296,25 +297,52 @@ python test_end_to_end.py
 
 ## 🎨 Graph Definition Format
 
-Graphs are defined in JSON with:
-- **metadata**: Name, description, tags
-- **memory**: Input/output/intermediate schemas
-- **steps**: Array of step definitions
-- **edges**: Array of connections
+Graphs are defined in JSON format. See **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** for the complete specification.
 
+**Key Components:**
+- **version**: Format version (currently `"1.0"`)
+- **metadata**: Name, description, tags, framework hints
+- **memory**: Schemas for inputs, outputs, intermediate data, and secrets
+- **steps**: Array of step definitions (nodes in the graph)
+- **edges**: Array of connections between steps (control flow)
+
+**Quick Example:**
 ```json
 {
   "version": "1.0",
-  "metadata": {"name": "My Agent"},
+  "metadata": {"name": "My Agent", "description": "What it does"},
   "memory": {
-    "inputs": {"question": {"type": "string"}},
+    "inputs": {"question": {"type": "string", "required": true}},
     "outputs": {"answer": {"type": "string"}},
-    "intermediate": {}
+    "intermediate": {"processed": {"type": "string"}},
+    "secrets": {}
   },
   "steps": [
-    {"id": "start", "type": "start"},
-    {"id": "llm", "type": "llm", "config": {...}},
-    {"id": "output", "type": "output", "config": {...}}
+    {
+      "id": "start",
+      "type": "start",
+      "config": {},
+      "memory_reads": [],
+      "memory_writes": []
+    },
+    {
+      "id": "llm",
+      "type": "llm",
+      "config": {
+        "model": "gpt-4",
+        "prompt": "{{question}}",
+        "output_key": "processed"
+      },
+      "memory_reads": ["question"],
+      "memory_writes": ["processed"]
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "config": {"mapping": {"answer": "processed"}},
+      "memory_reads": ["processed"],
+      "memory_writes": ["answer"]
+    }
   ],
   "edges": [
     {"id": "e1", "from": "start", "to": "llm"},
@@ -322,6 +350,15 @@ Graphs are defined in JSON with:
   ]
 }
 ```
+
+📘 **See [GRAPH_FORMAT.md](GRAPH_FORMAT.md) for:**
+- Complete field specifications
+- Memory schema details
+- Step configuration examples
+- The `_key` suffix convention
+- Template syntax (`{{variable}}`)
+- Validation rules
+- Best practices
 
 ## 🔧 CLI Tools
 
@@ -433,6 +470,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 
 ## 🔗 Quick Links
 
+- **[Graph Format Specification](GRAPH_FORMAT.md)** - Complete JSON format documentation
 - **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** - 17 steps for web APIs and data processing
 - **[Plugin Development Guide](packages/graphflow-plugin-example/README.md)** - Create your own custom steps
 - **[Core Documentation](packages/graph-core/README.md)** - Step types and memory management
