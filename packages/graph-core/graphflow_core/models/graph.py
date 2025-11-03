@@ -1,6 +1,7 @@
 """Core Pydantic models for graph definitions."""
 
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
@@ -53,13 +54,55 @@ class MemorySchema(BaseModel):
     secrets: Dict[str, SecretDefinition] = Field(default_factory=dict)
 
 
+def parse_memory_references(config: Dict[str, Any], outputs: Dict[str, str]) -> Tuple[Set[str], Set[str]]:
+    """
+    Parse config and outputs dicts to extract memory references.
+
+    Args:
+        config: Step configuration dict
+        outputs: Step outputs dict (maps output names to memory locations)
+
+    Returns:
+        Tuple of (reads, writes) where each is a set of memory keys
+    """
+    reads = set()
+    writes = set()
+
+    # Pattern to match {memory.variable} or {memory.nested.path}
+    pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+    def scan_value(value: Any, is_output: bool = False):
+        """Recursively scan a value for memory references."""
+        if isinstance(value, str):
+            # Find all {memory.field} references
+            for match in pattern.finditer(value):
+                memory_key = match.group(1)
+                if is_output:
+                    writes.add(memory_key)
+                else:
+                    reads.add(memory_key)
+        elif isinstance(value, dict):
+            for v in value.values():
+                scan_value(v, is_output)
+        elif isinstance(value, list):
+            for item in value:
+                scan_value(item, is_output)
+
+    # Scan config for reads
+    scan_value(config, is_output=False)
+
+    # Scan outputs for writes
+    scan_value(outputs, is_output=True)
+
+    return reads, writes
+
+
 class Step(BaseModel):
     """Definition of a graph step/node."""
     id: str
     type: str
     config: Dict[str, Any] = Field(default_factory=dict)
-    memory_reads: List[str] = Field(default_factory=list)
-    memory_writes: List[str] = Field(default_factory=list)
+    outputs: Dict[str, str] = Field(default_factory=dict)
     description: Optional[str] = None
 
     @field_validator('id')
@@ -68,6 +111,18 @@ class Step(BaseModel):
         if not v or not v.strip():
             raise ValueError('id cannot be empty')
         return v
+
+    @property
+    def memory_reads(self) -> List[str]:
+        """Extract memory reads from config by parsing {memory.field} syntax."""
+        reads, _ = parse_memory_references(self.config, {})
+        return sorted(reads)
+
+    @property
+    def memory_writes(self) -> List[str]:
+        """Extract memory writes from outputs by parsing {memory.field} syntax."""
+        _, writes = parse_memory_references({}, self.outputs)
+        return sorted(writes)
 
 
 class Edge(BaseModel):
@@ -149,7 +204,7 @@ class GraphDefinition(BaseModel):
                 errors.append(f"Duplicate edge ID: {edge.id}")
             seen_edge_ids.add(edge.id)
 
-        # Check that memory_reads and memory_writes reference valid memory keys
+        # Check that memory references in config and outputs point to valid memory keys
         all_memory_keys = (
             set(self.memory.inputs.keys()) |
             set(self.memory.outputs.keys()) |
@@ -157,18 +212,26 @@ class GraphDefinition(BaseModel):
         )
 
         for step in self.steps:
-            for key in step.memory_reads:
+            # Parse memory references from config and outputs
+            reads, writes = parse_memory_references(step.config, step.outputs)
+
+            # Validate reads
+            for key in reads:
                 # Allow dotted paths for nested access (e.g., "object.field")
                 base_key = key.split('.')[0]
                 if base_key not in all_memory_keys:
                     errors.append(
-                        f"Step {step.id}: memory_read key '{key}' not in memory schema"
+                        f"Step {step.id}: memory reference '{{memory.{key}}}' in config "
+                        f"references undeclared memory key '{base_key}'"
                     )
-            for key in step.memory_writes:
+
+            # Validate writes
+            for key in writes:
                 base_key = key.split('.')[0]
                 if base_key not in all_memory_keys:
                     errors.append(
-                        f"Step {step.id}: memory_write key '{key}' not in memory schema"
+                        f"Step {step.id}: memory reference '{{memory.{key}}}' in outputs "
+                        f"references undeclared memory key '{base_key}'"
                     )
 
         return errors

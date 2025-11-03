@@ -1,7 +1,8 @@
 """Base class for all step types."""
 
+import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 from graphflow_core.memory.store import MemoryStore
 
 
@@ -17,8 +18,7 @@ class StepBase(ABC):
         self,
         id: str,
         config: Dict[str, Any],
-        memory_reads: List[str],
-        memory_writes: List[str]
+        outputs: Dict[str, str]
     ):
         """
         Initialize step.
@@ -26,13 +26,48 @@ class StepBase(ABC):
         Args:
             id: Unique step identifier
             config: Step-specific configuration
-            memory_reads: List of memory keys this step reads
-            memory_writes: List of memory keys this step writes
+            outputs: Output mappings (output_name -> memory location)
         """
         self.id = id
         self.config = config
-        self.memory_reads = memory_reads
-        self.memory_writes = memory_writes
+        self.outputs = outputs
+
+    def _extract_memory_refs(self, value: Any) -> Set[str]:
+        """
+        Recursively extract memory references from a value.
+
+        Looks for {memory.variable} pattern in strings, dicts, and lists.
+
+        Args:
+            value: Value to scan for memory references
+
+        Returns:
+            Set of memory keys referenced
+        """
+        refs = set()
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        if isinstance(value, str):
+            for match in pattern.finditer(value):
+                refs.add(match.group(1))
+        elif isinstance(value, dict):
+            for v in value.values():
+                refs.update(self._extract_memory_refs(v))
+        elif isinstance(value, list):
+            for item in value:
+                refs.update(self._extract_memory_refs(item))
+
+        return refs
+
+    @property
+    def memory_reads(self) -> List[str]:
+        """Extract memory reads from config by parsing {memory.field} syntax."""
+        return sorted(self._extract_memory_refs(self.config))
+
+    @property
+    def memory_writes(self) -> List[str]:
+        """Extract memory writes from outputs by parsing {memory.field} syntax."""
+        return sorted(self._extract_memory_refs(self.outputs))
 
     @abstractmethod
     async def execute(self, memory: MemoryStore) -> None:

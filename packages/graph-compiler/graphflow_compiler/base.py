@@ -210,18 +210,23 @@ step_class = StepRegistry.get("{step.type}")
 step = step_class(
     id="{step.id}",
     config={repr(step.config)},
-    memory_reads={repr(step.memory_reads)},
-    memory_writes={repr(step.memory_writes)}
+    outputs={repr(step.outputs)}
 )
 await step.execute(self.memory)
 """
 
     def _generate_output_step_code(self, step: Step) -> str:
         """Generate code for output step."""
-        mapping = step.config.get("mapping", {})
+        import re
         lines = ["# Output step - map to outputs"]
-        for output_key, source_key in mapping.items():
-            lines.append(f'self.memory.write("{output_key}", self.memory.read("{source_key}"))')
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        for output_name, source_template in step.outputs.items():
+            match = pattern.search(source_template)
+            if match:
+                source_key = match.group(1)
+                lines.append(f'self.memory.write("{output_name}", self.memory.read("{source_key}"))')
+
         return "\n".join(lines)
 
     def _generate_transform_step_code(self, step: Step) -> str:

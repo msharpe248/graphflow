@@ -34,8 +34,8 @@ export interface Step {
   id: string;
   type: string;
   config: Record<string, any>;
-  memory_reads?: string[];
-  memory_writes?: string[];
+  outputs?: Record<string, string>;
+  description?: string;
 }
 
 export interface Edge {

@@ -19,13 +19,13 @@ class BaseHTTPStep(StepBase, ABC):
         """
         Render template string with memory values.
 
-        Supports {{variable}} syntax for memory binding.
+        Supports {memory.variable} syntax for memory binding.
         """
         if not template:
             return ""
 
-        # Find all {{variable}} patterns
-        pattern = r'\{\{(\w+(?:\.\w+)*)\}\}'
+        # Find all {memory.variable} patterns
+        pattern = r'\{memory\.(\w+(?:\.\w+)*)\}'
         matches = re.findall(pattern, template)
 
         result = template
@@ -43,7 +43,7 @@ class BaseHTTPStep(StepBase, ABC):
 
             # Replace in template
             if value is not None:
-                result = result.replace(f'{{{{{match}}}}}', str(value))
+                result = result.replace(f'{{memory.{match}}}', str(value))
 
         return result
 
@@ -182,3 +182,23 @@ class BaseHTTPStep(StepBase, ABC):
         except Exception:
             # Fallback to text
             return response.text
+
+    def _write_output(self, memory: MemoryStore, output_name: str, value: Any) -> None:
+        """
+        Write a value to memory using the outputs dict.
+
+        Args:
+            memory: Memory store
+            output_name: Name of the output in the outputs dict
+            value: Value to write
+        """
+        if output_name not in self.outputs:
+            return
+
+        output_template = self.outputs[output_name]
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = pattern.search(output_template)
+
+        if match:
+            memory_key = match.group(1)
+            memory.write(memory_key, value)

@@ -4,8 +4,15 @@
     "name": "Conditional Branching Agent",
     "description": "Demonstrates conditional branching based on input value",
     "created": "2025-10-29T00:00:00Z",
-    "framework_hints": ["pydantic_ai", "langgraph"],
-    "tags": ["example", "conditional", "branching"]
+    "framework_hints": [
+      "pydantic_ai",
+      "langgraph"
+    ],
+    "tags": [
+      "example",
+      "conditional",
+      "branching"
+    ]
   },
   "memory": {
     "inputs": {
@@ -46,18 +53,17 @@
       "id": "start_1",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": []
+      "outputs": {}
     },
     {
       "id": "conditional_1",
       "type": "conditional",
       "config": {
-        "condition": "score >= 80",
-        "result_key": "is_high_score"
+        "condition": "score >= 80"
       },
-      "memory_reads": ["score"],
-      "memory_writes": ["is_high_score"],
+      "outputs": {
+        "result": "{memory.is_high_score}"
+      },
       "description": "Check if score is high (>= 80)"
     },
     {
@@ -66,11 +72,13 @@
       "config": {
         "operation": "high_score_message",
         "code": "return f'Excellent! Your score of {score} is outstanding!'",
-        "input_keys": ["score"],
-        "output_key": "high_message"
+        "input_keys": [
+          "score"
+        ]
       },
-      "memory_reads": ["score"],
-      "memory_writes": ["high_message"],
+      "outputs": {
+        "output": "{memory.high_message}"
+      },
       "description": "Generate high score message"
     },
     {
@@ -79,21 +87,25 @@
       "config": {
         "operation": "low_score_message",
         "code": "return f'Your score of {score} needs improvement.'",
-        "input_keys": ["score"],
-        "output_key": "low_message"
+        "input_keys": [
+          "score"
+        ]
       },
-      "memory_reads": ["score"],
-      "memory_writes": ["low_message"],
+      "outputs": {
+        "output": "{memory.low_message}"
+      },
       "description": "Generate low score message"
     },
     {
       "id": "join_1",
       "type": "join",
       "config": {
-        "wait_for": ["transform_high", "transform_low"]
+        "wait_for": [
+          "transform_high",
+          "transform_low"
+        ]
       },
-      "memory_reads": [],
-      "memory_writes": [],
+      "outputs": {},
       "description": "Wait for both branches to complete"
     },
     {
@@ -102,11 +114,15 @@
       "config": {
         "operation": "select_message",
         "code": "return high_message if is_high_score else low_message",
-        "input_keys": ["is_high_score", "high_message", "low_message"],
-        "output_key": "result"
+        "input_keys": [
+          "is_high_score",
+          "high_message",
+          "low_message"
+        ]
       },
-      "memory_reads": ["is_high_score", "high_message", "low_message"],
-      "memory_writes": ["result"],
+      "outputs": {
+        "output": "{memory.result}"
+      },
       "description": "Select appropriate message based on condition"
     },
     {
@@ -118,8 +134,10 @@
           "category": "is_high_score"
         }
       },
-      "memory_reads": ["result", "is_high_score"],
-      "memory_writes": ["result", "category"]
+      "outputs": {
+        "result": "{memory.result}",
+        "category": "{memory.is_high_score}"
+      }
     }
   ],
   "edges": [

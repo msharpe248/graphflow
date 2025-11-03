@@ -182,8 +182,6 @@ Steps are the nodes in your graph. Each step represents a unit of work.
     "url": "https://api.example.com/data",
     "response_key": "api_response"
   },
-  "memory_reads": [],
-  "memory_writes": ["api_response"],
   "description": "Fetch data from API"
 }
 ```
@@ -195,8 +193,7 @@ Steps are the nodes in your graph. Each step represents a unit of work.
 | `id` | string | **Yes** | Unique identifier for this step |
 | `type` | string | **Yes** | Step type (e.g., `start`, `llm`, `http-get`, `transform`) |
 | `config` | object | **Yes** | Configuration specific to the step type (can be empty `{}`) |
-| `memory_reads` | array[string] | **Yes** | Memory keys this step reads from |
-| `memory_writes` | array[string] | **Yes** | Memory keys this step writes to |
+| `outputs` | object | No | Maps output names to memory locations using `{memory.field}` syntax |
 | `description` | string | No | Human-readable description of what the step does |
 
 ### Step Types
@@ -253,12 +250,12 @@ The `config` object is step-type specific. Each step type defines its own config
 3. **Template Syntax** (for string substitution):
    ```json
    {
-     "url": "https://api.example.com/users/{{user_id}}",
-     "prompt": "Answer this: {{user_question}}"
+     "url": "https://api.example.com/users/{memory.user_id}",
+     "prompt": "Answer this: {memory.user_question}"
    }
    ```
-   - Use `{{memory_key}}` to reference memory values
-   - Supports nested access: `{{user.profile.name}}`
+   - Use `{memory.memory_key}` to reference memory values
+   - Supports nested access: `{memory.user.profile.name}`
 
 ### Example Step Configs
 
@@ -269,8 +266,6 @@ The `config` object is step-type specific. Each step type defines its own config
   "id": "start_1",
   "type": "start",
   "config": {},
-  "memory_reads": [],
-  "memory_writes": [],
   "description": "Entry point"
 }
 ```
@@ -286,7 +281,7 @@ The `config` object is step-type specific. Each step type defines its own config
     "model": "anthropic/claude-3.5-sonnet",
     "api_key_secret": "openrouter_api_key",
     "system_prompt": "You are a helpful assistant.",
-    "user_prompt": "{{user_question}}",
+    "user_prompt": "{memory.user_question}",
     "output_schema": {
       "type": "object",
       "properties": {
@@ -299,8 +294,6 @@ The `config` object is step-type specific. Each step type defines its own config
     "temperature": 0.7,
     "max_tokens": 2000
   },
-  "memory_reads": ["user_question"],
-  "memory_writes": ["llm_response"],
   "description": "Generate answer with LLM"
 }
 ```
@@ -314,13 +307,11 @@ The `config` object is step-type specific. Each step type defines its own config
   "config": {
     "url": "https://api.example.com/data",
     "headers": {
-      "Authorization": "Bearer {{api_token}}"
+      "Authorization": "Bearer {memory.api_token}"
     },
     "response_key": "api_data",
     "status_code_key": "api_status"
   },
-  "memory_reads": ["api_token"],
-  "memory_writes": ["api_data", "api_status"],
   "description": "Fetch data from API"
 }
 ```
@@ -337,8 +328,6 @@ The `config` object is step-type specific. Each step type defines its own config
     "input_keys": ["text"],
     "output_key": "cleaned_text"
   },
-  "memory_reads": ["text"],
-  "memory_writes": ["cleaned_text"],
   "description": "Clean and normalize text"
 }
 ```
@@ -353,8 +342,6 @@ The `config` object is step-type specific. Each step type defines its own config
     "condition": "confidence > 0.8",
     "result_key": "is_confident"
   },
-  "memory_reads": ["confidence"],
-  "memory_writes": ["is_confident"],
   "description": "Check if confidence is high"
 }
 ```
@@ -372,8 +359,6 @@ The `config` object is step-type specific. Each step type defines its own config
     "max_iterations": 100,
     "results_key": "processed_items"
   },
-  "memory_reads": ["items"],
-  "memory_writes": ["current_item", "item_index", "processed_items"],
   "description": "Process each item"
 }
 ```
@@ -390,8 +375,6 @@ The `config` object is step-type specific. Each step type defines its own config
       "score": "confidence"
     }
   },
-  "memory_reads": ["llm_response", "confidence"],
-  "memory_writes": ["answer", "score"],
   "description": "Map to outputs"
 }
 ```
@@ -515,32 +498,32 @@ Many steps use a configuration pattern where fields ending in `_key` specify mem
 
 ### Template Syntax
 
-String values support `{{variable}}` template syntax for dynamic memory substitution:
+String values support `{memory.variable}` template syntax for dynamic memory substitution:
 
 ```json
 {
-  "url": "https://api.example.com/users/{{user_id}}/posts/{{post_id}}",
-  "prompt": "Summarize this: {{document.content}}",
+  "url": "https://api.example.com/users/{memory.user_id}/posts/{memory.post_id}",
+  "prompt": "Summarize this: {memory.document.content}",
   "headers": {
-    "Authorization": "Bearer {{api_token}}"
+    "Authorization": "Bearer {memory.api_token}"
   }
 }
 ```
 
 **Features:**
-- Supports nested access with dot notation: `{{user.profile.name}}`
+- Supports nested access with dot notation: `{memory.user.profile.name}`
 - Works in strings, URLs, headers, prompts, etc.
 - Replaced at runtime with actual memory values
 
 ### Memory Reads and Writes
 
-The `memory_reads` and `memory_writes` arrays must accurately reflect what the step accesses:
+Memory access is automatically tracked by parsing `{memory.field}` references in your step configuration and outputs:
 
-**Best Practices:**
-1. List all memory keys the step reads in `memory_reads`
-2. List all memory keys the step writes in `memory_writes`
-3. Include base keys for nested access: for `user.name`, include `user`
-4. Ensure all keys are declared in the memory schema
+**How it works:**
+1. Memory reads are extracted from any `{memory.field}` references in the `config` object
+2. Memory writes are extracted from any `{memory.field}` references in the `outputs` object
+3. The compiler and runtime automatically detect these references - no manual tracking needed
+4. Ensure all referenced memory keys are declared in the memory schema
 
 ### Step ID Naming
 
@@ -583,8 +566,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
       "id": "start",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": []
     },
     {
       "id": "output",
@@ -594,8 +575,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
           "echo": "message"
         }
       },
-      "memory_reads": ["message"],
-      "memory_writes": ["echo"]
     }
   ],
   "edges": [
@@ -655,21 +634,17 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
       "id": "start",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": []
     },
     {
       "id": "fetch_user",
       "type": "http-get",
       "config": {
-        "url": "https://api.example.com/users/{{user_id}}",
+        "url": "https://api.example.com/users/{memory.user_id}",
         "headers": {
-          "Authorization": "Bearer {{api_key}}"
+          "Authorization": "Bearer {memory.api_key}"
         },
         "response_key": "api_response"
       },
-      "memory_reads": ["user_id", "api_key"],
-      "memory_writes": ["api_response"]
     },
     {
       "id": "process_data",
@@ -680,8 +655,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
         "input_keys": ["api_response"],
         "output_key": "processed_data"
       },
-      "memory_reads": ["api_response"],
-      "memory_writes": ["processed_data"]
     },
     {
       "id": "output",
@@ -691,8 +664,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
           "user_profile": "processed_data"
         }
       },
-      "memory_reads": ["processed_data"],
-      "memory_writes": ["user_profile"]
     }
   ],
   "edges": [
@@ -759,8 +730,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
       "id": "start",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": []
     },
     {
       "id": "check_complexity",
@@ -769,8 +738,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
         "condition": "len(question) > 50",
         "result_key": "is_complex"
       },
-      "memory_reads": ["question"],
-      "memory_writes": ["is_complex"]
     },
     {
       "id": "llm_path",
@@ -779,11 +746,9 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
         "provider": "openai",
         "model": "gpt-4",
         "api_key_secret": "openai_key",
-        "user_prompt": "{{question}}",
+        "user_prompt": "{memory.question}",
         "output_key": "llm_answer"
       },
-      "memory_reads": ["question"],
-      "memory_writes": ["llm_answer"]
     },
     {
       "id": "simple_path",
@@ -792,8 +757,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
         "code": "return 'Thanks for your question!'",
         "output_key": "simple_answer"
       },
-      "memory_reads": [],
-      "memory_writes": ["simple_answer"]
     },
     {
       "id": "merge_llm",
@@ -801,8 +764,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
       "config": {
         "mapping": {"answer": "llm_answer"}
       },
-      "memory_reads": ["llm_answer"],
-      "memory_writes": ["answer"]
     },
     {
       "id": "merge_simple",
@@ -810,8 +771,6 @@ The `memory_reads` and `memory_writes` arrays must accurately reflect what the s
       "config": {
         "mapping": {"answer": "simple_answer"}
       },
-      "memory_reads": ["simple_answer"],
-      "memory_writes": ["answer"]
     }
   ],
   "edges": [
@@ -861,7 +820,7 @@ graphflow-compile validate my_graph.json
 1. **Invalid step references in edges**: Ensure all `from` and `to` values match step IDs
 2. **Duplicate step IDs**: Each step must have a unique ID
 3. **Duplicate edge IDs**: Each edge must have a unique ID
-4. **Undeclared memory keys**: All keys in `memory_reads`/`memory_writes` must be in memory schema
+4. **Undeclared memory keys**: All keys in memory references in config and outputs must be in memory schema
 5. **Invalid version**: Only `"1.0"` is supported
 6. **Invalid field types**: Memory field types must be valid (`string`, `number`, `boolean`, `object`, `array`, `any`)
 

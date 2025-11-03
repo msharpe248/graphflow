@@ -58,16 +58,24 @@ class PydanticAIGenerator(CodeGenerator):
 
     def _generate_llm_step_code(self, step: Step, graph: GraphDefinition) -> str:
         """Generate Pydantic AI specific LLM step code."""
+        import re
+
         config = step.config
         provider = config.get("provider", "openrouter")
         model = config.get("model")
         system_prompt = config.get("system_prompt", "")
         user_prompt = config.get("user_prompt", "")
-        output_key = config.get("output_key")
         output_schema = config.get("output_schema")
         tools = config.get("tools", [])
         temperature = config.get("temperature", 0.7)
         max_tokens = config.get("max_tokens")
+
+        # Extract memory references from prompts
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set()
+        for prompt in [system_prompt, user_prompt]:
+            if prompt:
+                memory_refs.update(pattern.findall(prompt))
 
         lines = [
             "# LLM step using Pydantic AI",
@@ -90,7 +98,7 @@ class PydanticAIGenerator(CodeGenerator):
 
         # Render prompts with memory values
         lines.append("# Render prompts")
-        for key in step.memory_reads:
+        for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
             lines.append(f'{var_name} = self.memory.read("{key}")')
 
@@ -99,11 +107,11 @@ class PydanticAIGenerator(CodeGenerator):
         lines.append("# Build prompt")
 
         if user_prompt:
-            # Simple template rendering (replace {{var}} with values)
+            # Simple template rendering (replace {memory.var} with values)
             lines.append(f'user_prompt_template = {repr(user_prompt)}')
-            for key in step.memory_reads:
+            for key in sorted(memory_refs):
                 var_name = key.replace('.', '_')
-                lines.append(f'user_prompt_template = user_prompt_template.replace("{{{{{key}}}}}", str({var_name}))')
+                lines.append(f'user_prompt_template = user_prompt_template.replace("{{memory.{key}}}", str({var_name}))')
         else:
             lines.append('user_prompt_template = ""')
 
@@ -154,14 +162,22 @@ class PydanticAIGenerator(CodeGenerator):
         else:
             lines.append(f'response_data = result.data')
 
-        # Write to memory
-        lines.append(f'self.memory.write("{output_key}", response_data)')
+        # Write to memory using outputs dict
+        if 'response' in step.outputs:
+            response_template = step.outputs['response']
+            match = pattern.search(response_template)
+            if match:
+                output_key = match.group(1)
+                lines.append(f'self.memory.write("{output_key}", response_data)')
 
         # Handle tool calls if configured
-        tool_calls_key = config.get("tool_calls_key")
-        if tool_calls_key:
-            lines.append(f'# Tool calls not yet implemented in generated code')
-            lines.append(f'self.memory.write("{tool_calls_key}", [])')
+        if 'tool_calls' in step.outputs:
+            tool_calls_template = step.outputs['tool_calls']
+            match = pattern.search(tool_calls_template)
+            if match:
+                tool_calls_key = match.group(1)
+                lines.append(f'# Tool calls not yet implemented in generated code')
+                lines.append(f'self.memory.write("{tool_calls_key}", [])')
 
         return "\n".join(lines)
 

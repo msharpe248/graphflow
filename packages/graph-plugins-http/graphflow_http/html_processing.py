@@ -1,4 +1,5 @@
 """HTML processing step implementations."""
+import re
 from typing import Any, Dict, List, Optional, Union
 from bs4 import BeautifulSoup
 
@@ -23,13 +24,9 @@ class HTMLStripStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing HTML content to strip"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write plain text"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "separator": {
                     "type": "string",
@@ -42,7 +39,7 @@ class HTMLStripStep(StepBase):
                     "description": "Remove excess whitespace from output"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -52,7 +49,7 @@ class HTMLStripStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to strip tags from (from input_key)"
+                    "description": "HTML content to strip tags from "
                 }
             },
             "required": ["html"]
@@ -65,7 +62,7 @@ class HTMLStripStep(StepBase):
             "properties": {
                 "text": {
                     "type": "string",
-                    "description": "Plain text with HTML tags removed (written to output_key)"
+                    "description": "Plain text with HTML tags removed "
                 }
             }
         }
@@ -89,7 +86,13 @@ class HTMLStripStep(StepBase):
             text = re.sub(r'\s+', ' ', text).strip()
 
         # Write to memory
-        memory.write(self.config["output_key"], text)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, text)
 
 
 class HTMLParseStep(StepBase):
@@ -109,13 +112,9 @@ class HTMLParseStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing HTML content to parse"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write extracted data"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "selectors": {
                     "type": "object",
@@ -146,7 +145,7 @@ class HTMLParseStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to parse (from input_key)"
+                    "description": "HTML content to parse "
                 }
             },
             "required": ["html"]
@@ -159,7 +158,7 @@ class HTMLParseStep(StepBase):
             "properties": {
                 "data": {
                     "type": "object",
-                    "description": "Extracted data as object with keys from selectors (written to output_key)"
+                    "description": "Extracted data as object with keys from selectors "
                 }
             }
         }
@@ -206,7 +205,13 @@ class HTMLParseStep(StepBase):
                     extracted[key] = None
 
         # Write to memory
-        memory.write(self.config["output_key"], extracted)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, extracted)
 
 
 class HTMLFindLinksStep(StepBase):
@@ -226,13 +231,9 @@ class HTMLFindLinksStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing HTML content"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write list of links"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "absolute_only": {
                     "type": "boolean",
@@ -245,7 +246,7 @@ class HTMLFindLinksStep(StepBase):
                     "description": "Remove duplicate URLs"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -255,7 +256,7 @@ class HTMLFindLinksStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to extract links from (from input_key)"
+                    "description": "HTML content to extract links from "
                 }
             },
             "required": ["html"]
@@ -269,7 +270,7 @@ class HTMLFindLinksStep(StepBase):
                 "links": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of URLs found in HTML (written to output_key)"
+                    "description": "List of URLs found in HTML "
                 }
             }
         }
@@ -306,7 +307,13 @@ class HTMLFindLinksStep(StepBase):
             links = unique_links
 
         # Write to memory
-        memory.write(self.config["output_key"], links)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, links)
 
 
 class HTMLTableExtractStep(StepBase):
@@ -326,13 +333,9 @@ class HTMLTableExtractStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing HTML content with tables"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write extracted table data"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "table_selector": {
                     "type": "string",
@@ -350,7 +353,7 @@ class HTMLTableExtractStep(StepBase):
                     "description": "Number of rows to skip at start"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -360,7 +363,7 @@ class HTMLTableExtractStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content with table (from input_key)"
+                    "description": "HTML content with table "
                 }
             },
             "required": ["html"]
@@ -391,7 +394,13 @@ class HTMLTableExtractStep(StepBase):
         # Find the table
         table = soup.select_one(table_selector)
         if not table:
-            memory.write(self.config["output_key"], [])
+            # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, [])
             return
 
         # Extract all rows
@@ -402,7 +411,13 @@ class HTMLTableExtractStep(StepBase):
             rows = rows[skip_rows:]
 
         if not rows:
-            memory.write(self.config["output_key"], [])
+            # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, [])
             return
 
         # Extract data
@@ -431,4 +446,10 @@ class HTMLTableExtractStep(StepBase):
                     table_data.append(cell_values)
 
         # Write to memory
-        memory.write(self.config["output_key"], table_data)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, table_data)

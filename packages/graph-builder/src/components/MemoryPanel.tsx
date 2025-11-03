@@ -15,25 +15,21 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
   const getStepsUsingMemory = (memoryKey: string): string[] => {
     const stepsUsing: string[] = [];
 
+    // Recursive function to scan any value for the specific memory key
+    const scanValue = (value: any): boolean => {
+      if (typeof value === 'string' && value.includes(`{memory.${memoryKey}}`)) {
+        return true;
+      } else if (typeof value === 'object' && value !== null) {
+        return Object.values(value).some(scanValue);
+      }
+      return false;
+    };
+
     nodes.forEach((node) => {
       const { step } = node.data;
 
-      // Check config values for this memory binding
-      Object.values(step.config).forEach((value) => {
-        if (typeof value === 'string' && value === `{memory.${memoryKey}}`) {
-          if (!stepsUsing.includes(step.id)) {
-            stepsUsing.push(step.id);
-          }
-        }
-      });
-
-      // Check memory_reads and memory_writes
-      if (step.memory_reads?.includes(memoryKey)) {
-        if (!stepsUsing.includes(step.id)) {
-          stepsUsing.push(step.id);
-        }
-      }
-      if (step.memory_writes?.includes(memoryKey)) {
+      // Check both config and outputs for this memory binding
+      if (scanValue(step.config) || scanValue(step.outputs)) {
         if (!stepsUsing.includes(step.id)) {
           stepsUsing.push(step.id);
         }

@@ -42,21 +42,25 @@ let nodeIdCounter = 1;
 function findUsedMemoryBindings(nodes: Node<NodeData>[]): Set<string> {
   const used = new Set<string>();
 
+  // Recursive function to scan any value for {memory.field} patterns
+  const scanValue = (value: any) => {
+    if (typeof value === 'string') {
+      const pattern = /\{memory\.([^}]+)\}/g;
+      let match;
+      while ((match = pattern.exec(value)) !== null) {
+        used.add(match[1]);
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      Object.values(value).forEach(scanValue);
+    }
+  };
+
   nodes.forEach((node) => {
     const { step } = node.data;
-
-    // Check config values for memory bindings
-    Object.values(step.config).forEach((value) => {
-      if (typeof value === 'string' && value.startsWith('{memory.') && value.endsWith('}')) {
-        // Extract the memory key (remove '{memory.' prefix and '}' suffix)
-        const memoryKey = value.substring(8, value.length - 1);
-        used.add(memoryKey);
-      }
-    });
-
-    // Check memory_reads and memory_writes
-    step.memory_reads?.forEach((key) => used.add(key));
-    step.memory_writes?.forEach((key) => used.add(key));
+    // Scan config for {memory.field} patterns
+    scanValue(step.config);
+    // Scan outputs for {memory.field} patterns
+    scanValue(step.outputs);
   });
 
   return used;
@@ -121,8 +125,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       id,
       type: stepType,
       config,
-      memory_reads: [],
-      memory_writes: [],
+      outputs: {},
     };
 
     const newNode: Node<NodeData> = {

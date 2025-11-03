@@ -1,5 +1,6 @@
 """LangGraph/LangChain code generator."""
 
+import re
 from typing import List
 from graphflow_core.models import GraphDefinition, Step
 from graphflow_compiler.base import CodeGenerator
@@ -122,7 +123,14 @@ class LangGraphGenerator(CodeGenerator):
 
         # Render prompts with state values
         lines.append("# Render prompts from state")
-        for key in step.memory_reads:
+        # Extract memory references from prompts
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set()
+        for prompt in [system_prompt, user_prompt]:
+            if prompt:
+                memory_refs.update(pattern.findall(prompt))
+        
+        for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
             lines.append(f'{var_name} = state.get("{key}", "")')
 
@@ -131,9 +139,16 @@ class LangGraphGenerator(CodeGenerator):
         # Build prompt
         if user_prompt:
             lines.append(f'user_prompt_template = {repr(user_prompt)}')
-            for key in step.memory_reads:
+            # Extract memory references from prompts
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set()
+        for prompt in [system_prompt, user_prompt]:
+            if prompt:
+                memory_refs.update(pattern.findall(prompt))
+        
+        for key in sorted(memory_refs):
                 var_name = key.replace('.', '_')
-                lines.append(f'user_prompt_template = user_prompt_template.replace("{{{{{key}}}}}", str({var_name}))')
+                lines.append(f'user_prompt_template = user_prompt_template.replace("{{memory.{key}}}", str({var_name}))')
         else:
             lines.append('user_prompt_template = ""')
 
@@ -185,7 +200,7 @@ class LangGraphGenerator(CodeGenerator):
             lines.append("")
             lines.append("# Parse structured output (placeholder)")
             lines.append("# In production, use with_structured_output()")
-            lines.append(f'response_data = {{"answer": response.content, "confidence": 0.85}}')
+            lines.append('response_data = {"answer": response.content, "confidence": 0.85}')
             lines.append(f'state["{output_key}"] = response_data')
         else:
             lines.append(f'state["{output_key}"] = response.content')
@@ -261,7 +276,13 @@ class LangGraphGenerator(CodeGenerator):
     def _generate_transform_step_code_langgraph(self, step: Step) -> str:
         """Generate code for transform step (LangGraph version)."""
         code = step.config.get("code", "")
-        output_key = step.config.get("output_key")
+        # Extract output key from outputs dict
+        output_key = None
+        if "response" in step.outputs:
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(step.outputs["response"])
+            if match:
+                output_key = match.group(1)
         input_keys = step.config.get("input_keys", step.memory_reads)
 
         # Build context
@@ -287,13 +308,27 @@ class LangGraphGenerator(CodeGenerator):
         result_key = step.config.get("result_key")
 
         lines = ["# Conditional step"]
-        for key in step.memory_reads:
+        # Extract memory references from prompts
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set()
+        for prompt in [system_prompt, user_prompt]:
+            if prompt:
+                memory_refs.update(pattern.findall(prompt))
+        
+        for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
             lines.append(f'{var_name} = state.get("{key}", "")')
 
         # Adjust condition for dotted keys
         adjusted_condition = condition
-        for key in step.memory_reads:
+        # Extract memory references from prompts
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set()
+        for prompt in [system_prompt, user_prompt]:
+            if prompt:
+                memory_refs.update(pattern.findall(prompt))
+        
+        for key in sorted(memory_refs):
             if '.' in key:
                 adjusted_condition = adjusted_condition.replace(key, key.replace('.', '_'))
 

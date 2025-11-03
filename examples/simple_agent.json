@@ -4,8 +4,15 @@
     "name": "Simple Question Answering Agent",
     "description": "A basic agent that transforms a question and outputs an answer",
     "created": "2025-10-29T00:00:00Z",
-    "framework_hints": ["pydantic_ai", "langgraph"],
-    "tags": ["example", "simple", "qa"]
+    "framework_hints": [
+      "pydantic_ai",
+      "langgraph"
+    ],
+    "tags": [
+      "example",
+      "simple",
+      "qa"
+    ]
   },
   "memory": {
     "inputs": {
@@ -38,8 +45,7 @@
       "id": "start_1",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": [],
+      "outputs": {},
       "description": "Entry point"
     },
     {
@@ -48,11 +54,13 @@
       "config": {
         "operation": "clean_question",
         "code": "return user_question.strip().lower()",
-        "input_keys": ["user_question"],
-        "output_key": "processed_question"
+        "input_keys": [
+          "user_question"
+        ]
       },
-      "memory_reads": ["user_question"],
-      "memory_writes": ["processed_question"],
+      "outputs": {
+        "output": "{memory.processed_question}"
+      },
       "description": "Clean and normalize the question"
     },
     {
@@ -61,11 +69,13 @@
       "config": {
         "operation": "mock_answer",
         "code": "return f'This is a mock answer to: {processed_question}'",
-        "input_keys": ["processed_question"],
-        "output_key": "answer"
+        "input_keys": [
+          "processed_question"
+        ]
       },
-      "memory_reads": ["processed_question"],
-      "memory_writes": ["answer"],
+      "outputs": {
+        "output": "{memory.answer}"
+      },
       "description": "Generate mock answer (would be LLM in real scenario)"
     },
     {
@@ -76,8 +86,9 @@
           "formatted_answer": "answer"
         }
       },
-      "memory_reads": ["answer"],
-      "memory_writes": ["formatted_answer"],
+      "outputs": {
+        "formatted_answer": "{memory.answer}"
+      },
       "description": "Map to output"
     }
   ],

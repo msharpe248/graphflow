@@ -23,7 +23,7 @@ class HTTPGetStep(BaseHTTPStep):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "Request URL (supports {{variable}} template syntax)"
+                    "description": "Request URL (supports {memory.variable} template syntax)"
                 },
                 "params": {
                     "type": "object",
@@ -66,21 +66,9 @@ class HTTPGetStep(BaseHTTPStep):
                     "type": "boolean",
                     "default": True,
                     "description": "Follow HTTP redirects"
-                },
-                "response_key": {
-                    "type": "string",
-                    "description": "Memory key to write response body"
-                },
-                "status_code_key": {
-                    "type": "string",
-                    "description": "Memory key to write HTTP status code (optional)"
-                },
-                "headers_key": {
-                    "type": "string",
-                    "description": "Memory key to write response headers (optional)"
                 }
             },
-            "required": ["url", "response_key"]
+            "required": ["url"]
         }
 
     @classmethod
@@ -89,7 +77,7 @@ class HTTPGetStep(BaseHTTPStep):
             "type": "object",
             "properties": {},
             "additionalProperties": True,
-            "description": "Reads memory keys referenced in url, params, and headers using {{variable}} syntax"
+            "description": "Reads memory keys referenced in url, params, and headers using {memory.variable} syntax"
         }
 
     @classmethod
@@ -98,18 +86,18 @@ class HTTPGetStep(BaseHTTPStep):
             "type": "object",
             "properties": {
                 "response": {
-                    "description": "HTTP response body (written to response_key)"
+                    "description": "HTTP response body"
                 },
                 "status_code": {
                     "type": "integer",
-                    "description": "HTTP status code (written to status_code_key if configured)"
+                    "description": "HTTP status code"
                 },
                 "headers": {
                     "type": "object",
-                    "description": "Response headers (written to headers_key if configured)"
+                    "description": "Response headers"
                 }
             },
-            "description": "Writes HTTP GET response to configured memory keys"
+            "description": "Writes HTTP GET response to locations specified in outputs dict"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -137,16 +125,11 @@ class HTTPGetStep(BaseHTTPStep):
             follow_redirects=follow_redirects,
         )
 
-        # Parse and write response
+        # Parse and write response using outputs dict
         response_body = self._parse_response(response)
-        memory.write(self.config["response_key"], response_body)
-
-        # Write optional outputs
-        if self.config.get("status_code_key"):
-            memory.write(self.config["status_code_key"], response.status_code)
-
-        if self.config.get("headers_key"):
-            memory.write(self.config["headers_key"], dict(response.headers))
+        self._write_output(memory, "response", response_body)
+        self._write_output(memory, "status_code", response.status_code)
+        self._write_output(memory, "headers", dict(response.headers))
 
 
 class HTTPPostStep(BaseHTTPStep):
@@ -167,7 +150,7 @@ class HTTPPostStep(BaseHTTPStep):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "Request URL (supports {{variable}} template syntax)"
+                    "description": "Request URL (supports {memory.variable} template syntax)"
                 },
                 "body": {
                     "description": "Request body (JSON object, string, or template)"
@@ -213,21 +196,9 @@ class HTTPPostStep(BaseHTTPStep):
                     "type": "boolean",
                     "default": True,
                     "description": "Follow HTTP redirects"
-                },
-                "response_key": {
-                    "type": "string",
-                    "description": "Memory key to write response body"
-                },
-                "status_code_key": {
-                    "type": "string",
-                    "description": "Memory key to write HTTP status code (optional)"
-                },
-                "headers_key": {
-                    "type": "string",
-                    "description": "Memory key to write response headers (optional)"
                 }
             },
-            "required": ["url", "response_key"]
+            "required": ["url"]
         }
 
     @classmethod
@@ -236,7 +207,7 @@ class HTTPPostStep(BaseHTTPStep):
             "type": "object",
             "properties": {},
             "additionalProperties": True,
-            "description": "Reads memory keys referenced in url, body, params, and headers using {{variable}} syntax"
+            "description": "Reads memory keys referenced in url, body, params, and headers using {memory.variable} syntax"
         }
 
     @classmethod
@@ -245,18 +216,18 @@ class HTTPPostStep(BaseHTTPStep):
             "type": "object",
             "properties": {
                 "response": {
-                    "description": "HTTP response body (written to response_key)"
+                    "description": "HTTP response body"
                 },
                 "status_code": {
                     "type": "integer",
-                    "description": "HTTP status code (written to status_code_key if configured)"
+                    "description": "HTTP status code"
                 },
                 "headers": {
                     "type": "object",
-                    "description": "Response headers (written to headers_key if configured)"
+                    "description": "Response headers"
                 }
             },
-            "description": "Writes HTTP POST response to configured memory keys"
+            "description": "Writes HTTP POST response to locations specified in outputs dict"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -292,16 +263,11 @@ class HTTPPostStep(BaseHTTPStep):
             follow_redirects=follow_redirects,
         )
 
-        # Parse and write response
+        # Parse and write response using outputs dict
         response_body = self._parse_response(response)
-        memory.write(self.config["response_key"], response_body)
-
-        # Write optional outputs
-        if self.config.get("status_code_key"):
-            memory.write(self.config["status_code_key"], response.status_code)
-
-        if self.config.get("headers_key"):
-            memory.write(self.config["headers_key"], dict(response.headers))
+        self._write_output(memory, "response", response_body)
+        self._write_output(memory, "status_code", response.status_code)
+        self._write_output(memory, "headers", dict(response.headers))
 
 
 class HTTPPutStep(BaseHTTPStep):
@@ -331,18 +297,18 @@ class HTTPPutStep(BaseHTTPStep):
             "type": "object",
             "properties": {
                 "response": {
-                    "description": "HTTP response body (written to response_key)"
+                    "description": "HTTP response body "
                 },
                 "status_code": {
                     "type": "integer",
-                    "description": "HTTP status code (written to status_code_key if configured)"
+                    "description": "HTTP status code "
                 },
                 "headers": {
                     "type": "object",
-                    "description": "Response headers (written to headers_key if configured)"
+                    "description": "Response headers "
                 }
             },
-            "description": "Writes HTTP PUT response to configured memory keys"
+            "description": "Writes HTTP PUT response to locations specified in outputs dict"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -380,14 +346,12 @@ class HTTPPutStep(BaseHTTPStep):
 
         # Parse and write response
         response_body = self._parse_response(response)
-        memory.write(self.config["response_key"], response_body)
+        self._write_output(memory, "response", response_body)
 
         # Write optional outputs
-        if self.config.get("status_code_key"):
-            memory.write(self.config["status_code_key"], response.status_code)
+        self._write_output(memory, "status_code", response.status_code)
 
-        if self.config.get("headers_key"):
-            memory.write(self.config["headers_key"], dict(response.headers))
+        self._write_output(memory, "headers", dict(response.headers))
 
 
 class HTTPPatchStep(BaseHTTPStep):
@@ -416,18 +380,18 @@ class HTTPPatchStep(BaseHTTPStep):
             "type": "object",
             "properties": {
                 "response": {
-                    "description": "HTTP response body (written to response_key)"
+                    "description": "HTTP response body "
                 },
                 "status_code": {
                     "type": "integer",
-                    "description": "HTTP status code (written to status_code_key if configured)"
+                    "description": "HTTP status code "
                 },
                 "headers": {
                     "type": "object",
-                    "description": "Response headers (written to headers_key if configured)"
+                    "description": "Response headers "
                 }
             },
-            "description": "Writes HTTP PATCH response to configured memory keys"
+            "description": "Writes HTTP PATCH response to locations specified in outputs dict"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -465,14 +429,12 @@ class HTTPPatchStep(BaseHTTPStep):
 
         # Parse and write response
         response_body = self._parse_response(response)
-        memory.write(self.config["response_key"], response_body)
+        self._write_output(memory, "response", response_body)
 
         # Write optional outputs
-        if self.config.get("status_code_key"):
-            memory.write(self.config["status_code_key"], response.status_code)
+        self._write_output(memory, "status_code", response.status_code)
 
-        if self.config.get("headers_key"):
-            memory.write(self.config["headers_key"], dict(response.headers))
+        self._write_output(memory, "headers", dict(response.headers))
 
 
 class HTTPDeleteStep(BaseHTTPStep):
@@ -501,18 +463,18 @@ class HTTPDeleteStep(BaseHTTPStep):
             "type": "object",
             "properties": {
                 "response": {
-                    "description": "HTTP response body (written to response_key)"
+                    "description": "HTTP response body "
                 },
                 "status_code": {
                     "type": "integer",
-                    "description": "HTTP status code (written to status_code_key if configured)"
+                    "description": "HTTP status code "
                 },
                 "headers": {
                     "type": "object",
-                    "description": "Response headers (written to headers_key if configured)"
+                    "description": "Response headers "
                 }
             },
-            "description": "Writes HTTP DELETE response to configured memory keys"
+            "description": "Writes HTTP DELETE response to locations specified in outputs dict"
         }
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -542,11 +504,9 @@ class HTTPDeleteStep(BaseHTTPStep):
 
         # Parse and write response
         response_body = self._parse_response(response)
-        memory.write(self.config["response_key"], response_body)
+        self._write_output(memory, "response", response_body)
 
         # Write optional outputs
-        if self.config.get("status_code_key"):
-            memory.write(self.config["status_code_key"], response.status_code)
+        self._write_output(memory, "status_code", response.status_code)
 
-        if self.config.get("headers_key"):
-            memory.write(self.config["headers_key"], dict(response.headers))
+        self._write_output(memory, "headers", dict(response.headers))

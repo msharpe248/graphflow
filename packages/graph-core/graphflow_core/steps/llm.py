@@ -118,14 +118,6 @@ class LLMStep(StepBase):
                     "type": "object",
                     "description": "JSON schema for structured output (Pydantic-compatible)"
                 },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write LLM response"
-                },
-                "tool_calls_key": {
-                    "type": "string",
-                    "description": "Memory key to write tool calls (optional)"
-                },
 
                 # LLM parameters
                 "temperature": {
@@ -166,25 +158,25 @@ class LLMStep(StepBase):
                     "description": "Number of retries on failure"
                 },
             },
-            "required": ["model", "output_key"]
+            "required": ["model"]
         }
 
     @classmethod
     def get_inputs_schema(cls) -> Dict[str, Any]:
         """
         LLMStep reads memory keys referenced in prompt templates.
-        Inputs are dynamic based on {{variable}} syntax in prompts.
+        Inputs are dynamic based on {memory.variable} syntax in prompts.
         """
         return {
             "type": "object",
             "properties": {},
             "additionalProperties": True,
-            "description": "Reads memory keys referenced in system_prompt and user_prompt templates using {{variable}} syntax"
+            "description": "Reads memory keys referenced in system_prompt and user_prompt templates using {memory.variable} syntax"
         }
 
     @classmethod
     def get_outputs_schema(cls) -> Dict[str, Any]:
-        """LLMStep writes LLM response to output_key."""
+        """LLMStep writes LLM response."""
         return {
             "type": "object",
             "properties": {
@@ -193,10 +185,10 @@ class LLMStep(StepBase):
                 },
                 "tool_calls": {
                     "type": "array",
-                    "description": "Tool calls made by LLM (written to tool_calls_key if configured)"
+                    "description": "Tool calls made by LLM (optional)"
                 }
             },
-            "description": "Writes LLM response to output_key and optionally tool calls to tool_calls_key"
+            "description": "Writes LLM response and optionally tool calls to locations specified in outputs dict"
         }
 
     def validate_config(self) -> List[str]:
@@ -206,9 +198,6 @@ class LLMStep(StepBase):
         # Check required fields
         if "model" not in self.config:
             errors.append(f"LLMStep {self.id}: 'model' is required")
-
-        if "output_key" not in self.config:
-            errors.append(f"LLMStep {self.id}: 'output_key' is required")
 
         # Check at least one prompt is provided
         if not self.config.get("system_prompt") and not self.config.get("user_prompt"):
@@ -229,6 +218,10 @@ class LLMStep(StepBase):
         if provider == "custom" and not self.config.get("base_url"):
             errors.append(f"LLMStep {self.id}: 'base_url' required for custom provider")
 
+        # Check outputs
+        if not self.outputs or 'response' not in self.outputs:
+            errors.append(f"LLMStep {self.id}: outputs.response is required")
+
         return errors
 
     async def execute(self, memory: MemoryStore) -> None:
@@ -240,8 +233,9 @@ class LLMStep(StepBase):
 
         For testing purposes, this returns a mock response.
         """
+        import re
+
         # Extract configuration
-        output_key = self.config["output_key"]
         system_prompt = self.config.get("system_prompt", "")
         user_prompt = self.config.get("user_prompt", "")
 
@@ -265,18 +259,29 @@ class LLMStep(StepBase):
             # Text output
             response = f"Mock LLM response. System: {rendered_system[:30]}... User: {rendered_user[:30]}..."
 
-        # Write to memory
-        memory.write(output_key, response)
+        # Write to outputs
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        if 'response' in self.outputs:
+            response_template = self.outputs['response']
+            match = pattern.search(response_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, response)
 
         # Write tool calls if configured
-        if self.config.get("tool_calls_key"):
-            memory.write(self.config["tool_calls_key"], [])
+        if 'tool_calls' in self.outputs:
+            tool_calls_template = self.outputs['tool_calls']
+            match = pattern.search(tool_calls_template)
+            if match:
+                tool_calls_key = match.group(1)
+                memory.write(tool_calls_key, [])
 
     def _render_template(self, template: str, memory: MemoryStore) -> str:
         """
         Render template with memory values.
 
-        Supports {{variable}} and {{nested.path}} syntax.
+        Supports {memory.variable} and {memory.nested.path} syntax.
 
         Args:
             template: Template string
@@ -290,8 +295,8 @@ class LLMStep(StepBase):
 
         import re
 
-        # Find all {{variable}} patterns
-        pattern = r'\{\{([^}]+)\}\}'
+        # Find all {memory.variable} patterns
+        pattern = r'\{memory\.([^}]+)\}'
         matches = re.findall(pattern, template)
 
         rendered = template
@@ -301,7 +306,7 @@ class LLMStep(StepBase):
                 value = memory.read(var_name)
                 # Convert to string
                 value_str = str(value) if value is not None else ""
-                rendered = rendered.replace(f"{{{{{var_name}}}}}", value_str)
+                rendered = rendered.replace(f"{{memory.{var_name}}}", value_str)
             except KeyError:
                 # Leave placeholder if key not found
                 pass

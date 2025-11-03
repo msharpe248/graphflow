@@ -322,26 +322,20 @@ Graphs are defined in JSON format. See **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** fo
       "id": "start",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": []
     },
     {
       "id": "llm",
       "type": "llm",
       "config": {
         "model": "gpt-4",
-        "prompt": "{{question}}",
+        "prompt": "{memory.question}",
         "output_key": "processed"
       },
-      "memory_reads": ["question"],
-      "memory_writes": ["processed"]
     },
     {
       "id": "output",
       "type": "output",
       "config": {"mapping": {"answer": "processed"}},
-      "memory_reads": ["processed"],
-      "memory_writes": ["answer"]
     }
   ],
   "edges": [
@@ -356,7 +350,7 @@ Graphs are defined in JSON format. See **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** fo
 - Memory schema details
 - Step configuration examples
 - The `_key` suffix convention
-- Template syntax (`{{variable}}`)
+- Template syntax (`{memory.variable}`)
 - Validation rules
 - Best practices
 

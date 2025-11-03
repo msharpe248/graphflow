@@ -1,6 +1,7 @@
 """Data transformation step implementations."""
 import json
 import base64
+import re
 from typing import Any, Dict
 
 from graphflow_core.memory import MemoryStore
@@ -24,16 +25,12 @@ class JSONParseStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing JSON string to parse"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write parsed object"
+                    "description": "Input value using {memory.variable} syntax"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -43,7 +40,7 @@ class JSONParseStep(StepBase):
             "properties": {
                 "json_string": {
                     "type": "string",
-                    "description": "JSON string to parse (from input_key)"
+                    "description": "JSON string to parse "
                 }
             },
             "required": ["json_string"]
@@ -55,7 +52,7 @@ class JSONParseStep(StepBase):
             "type": "object",
             "properties": {
                 "parsed": {
-                    "description": "Parsed JSON object (written to output_key)"
+                    "description": "Parsed JSON object "
                 }
             }
         }
@@ -71,7 +68,13 @@ class JSONParseStep(StepBase):
             raise ValueError(f"Invalid JSON string: {e}")
 
         # Write to memory
-        memory.write(self.config["output_key"], parsed)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, parsed)
 
 
 class JSONStringifyStep(StepBase):
@@ -91,13 +94,9 @@ class JSONStringifyStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing object to stringify"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write JSON string"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "indent": {
                     "type": "integer",
@@ -109,7 +108,7 @@ class JSONStringifyStep(StepBase):
                     "description": "Sort dictionary keys in output"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -118,7 +117,7 @@ class JSONStringifyStep(StepBase):
             "type": "object",
             "properties": {
                 "object": {
-                    "description": "Object to convert to JSON (from input_key)"
+                    "description": "Object to convert to JSON "
                 }
             },
             "required": ["object"]
@@ -131,7 +130,7 @@ class JSONStringifyStep(StepBase):
             "properties": {
                 "json_string": {
                     "type": "string",
-                    "description": "JSON string representation (written to output_key)"
+                    "description": "JSON string representation "
                 }
             }
         }
@@ -149,7 +148,13 @@ class JSONStringifyStep(StepBase):
             raise ValueError(f"Cannot convert object to JSON: {e}")
 
         # Write to memory
-        memory.write(self.config["output_key"], json_string)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, json_string)
 
 
 class Base64EncodeStep(StepBase):
@@ -169,13 +174,9 @@ class Base64EncodeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing data to encode"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write Base64 encoded string"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "encoding": {
                     "type": "string",
@@ -183,7 +184,7 @@ class Base64EncodeStep(StepBase):
                     "description": "Text encoding to use if input is string (default: utf-8)"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -192,7 +193,7 @@ class Base64EncodeStep(StepBase):
             "type": "object",
             "properties": {
                 "data": {
-                    "description": "String or bytes to encode (from input_key)"
+                    "description": "String or bytes to encode "
                 }
             },
             "required": ["data"]
@@ -205,7 +206,7 @@ class Base64EncodeStep(StepBase):
             "properties": {
                 "base64": {
                     "type": "string",
-                    "description": "Base64 encoded string (written to output_key)"
+                    "description": "Base64 encoded string "
                 }
             }
         }
@@ -228,7 +229,13 @@ class Base64EncodeStep(StepBase):
         encoded = base64.b64encode(data_bytes).decode('ascii')
 
         # Write to memory
-        memory.write(self.config["output_key"], encoded)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, encoded)
 
 
 class Base64DecodeStep(StepBase):
@@ -248,13 +255,9 @@ class Base64DecodeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing Base64 encoded string"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write decoded data"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "encoding": {
                     "type": "string",
@@ -267,7 +270,7 @@ class Base64DecodeStep(StepBase):
                     "description": "Return raw bytes instead of decoded string"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -277,7 +280,7 @@ class Base64DecodeStep(StepBase):
             "properties": {
                 "base64": {
                     "type": "string",
-                    "description": "Base64 encoded string to decode (from input_key)"
+                    "description": "Base64 encoded string to decode "
                 }
             },
             "required": ["base64"]
@@ -289,7 +292,7 @@ class Base64DecodeStep(StepBase):
             "type": "object",
             "properties": {
                 "decoded": {
-                    "description": "Decoded data as string or bytes (written to output_key)"
+                    "description": "Decoded data as string or bytes "
                 }
             }
         }
@@ -316,4 +319,10 @@ class Base64DecodeStep(StepBase):
                 raise ValueError(f"Cannot decode bytes to string with encoding '{encoding}': {e}")
 
         # Write to memory
-        memory.write(self.config["output_key"], result)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, result)

@@ -4,8 +4,16 @@
     "name": "LLM-Powered Q&A Agent",
     "description": "Agent that uses LLM to answer questions with tool calling support",
     "created": "2025-10-29T00:00:00Z",
-    "framework_hints": ["pydantic_ai", "langgraph"],
-    "tags": ["example", "llm", "tools", "qa"]
+    "framework_hints": [
+      "pydantic_ai",
+      "langgraph"
+    ],
+    "tags": [
+      "example",
+      "llm",
+      "tools",
+      "qa"
+    ]
   },
   "memory": {
     "inputs": {
@@ -57,8 +65,7 @@
       "id": "start_1",
       "type": "start",
       "config": {},
-      "memory_reads": [],
-      "memory_writes": [],
+      "outputs": {},
       "description": "Entry point"
     },
     {
@@ -69,7 +76,7 @@
         "model": "anthropic/claude-3.5-sonnet",
         "api_key_secret": "openrouter_api_key",
         "system_prompt": "You are a helpful assistant that provides accurate, well-researched answers. If you need to look up information, use the available tools.",
-        "user_prompt": "Question: {{user_question}}\n\nContext: {{context}}\n\nPlease provide a detailed answer with sources.",
+        "user_prompt": "Question: {memory.user_question}\n\nContext: {memory.context}\n\nPlease provide a detailed answer with sources.",
         "tools": [
           {
             "type": "function",
@@ -84,7 +91,9 @@
                     "description": "Search query"
                   }
                 },
-                "required": ["query"]
+                "required": [
+                  "query"
+                ]
               }
             }
           },
@@ -101,7 +110,9 @@
                     "description": "Mathematical expression to evaluate"
                   }
                 },
-                "required": ["expression"]
+                "required": [
+                  "expression"
+                ]
               }
             }
           }
@@ -123,16 +134,19 @@
               "description": "Metadata about the response"
             }
           },
-          "required": ["answer", "confidence"]
+          "required": [
+            "answer",
+            "confidence"
+          ]
         },
-        "output_key": "llm_response",
-        "tool_calls_key": "tool_calls",
         "temperature": 0.7,
         "max_tokens": 2000,
         "response_format": "json"
       },
-      "memory_reads": ["user_question", "context"],
-      "memory_writes": ["llm_response", "tool_calls"],
+      "outputs": {
+        "output": "{memory.llm_response}",
+        "tool_calls": "{memory.tool_calls}"
+      },
       "description": "Call LLM with tool support"
     },
     {
@@ -141,11 +155,13 @@
       "config": {
         "operation": "extract_sources",
         "code": "sources = []\nif tool_calls:\n    for call in tool_calls:\n        if 'function' in call and call['function'].get('name') == 'web_search':\n            sources.append(call['function']['arguments'].get('query', 'Unknown'))\nreturn sources if sources else ['Direct knowledge']",
-        "input_keys": ["tool_calls"],
-        "output_key": "sources"
+        "input_keys": [
+          "tool_calls"
+        ]
       },
-      "memory_reads": ["tool_calls"],
-      "memory_writes": ["sources"],
+      "outputs": {
+        "output": "{memory.sources}"
+      },
       "description": "Extract sources from tool calls"
     },
     {
@@ -158,8 +174,11 @@
           "sources": "sources"
         }
       },
-      "memory_reads": ["llm_response", "sources"],
-      "memory_writes": ["answer", "confidence", "sources"],
+      "outputs": {
+        "answer": "{memory.llm_response.answer}",
+        "confidence": "{memory.llm_response.confidence}",
+        "sources": "{memory.sources}"
+      },
       "description": "Map LLM response to outputs"
     }
   ],

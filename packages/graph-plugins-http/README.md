@@ -9,7 +9,7 @@ This is a **separate plugin package** that demonstrates the GraphFlow plugin arc
 - ✅ **HTTP Methods**: GET, POST, PUT, PATCH, DELETE
 - ✅ **Authentication**: Basic Auth, Bearer Token
 - ✅ **Retry Logic**: Exponential backoff on failures
-- ✅ **Template Support**: `{{variable}}` syntax for memory binding
+- ✅ **Template Support**: `{memory.variable}` syntax for memory binding
 - ✅ **SSL Verification**: Configurable certificate verification
 - ✅ **Redirects**: Automatic redirect following
 - ✅ **Timeouts**: Configurable request timeouts
@@ -48,8 +48,8 @@ pip install -e packages/graph-plugins-http
   "config": {
     "url": "https://api.example.com/users",
     "body": {
-      "name": "{{user_name}}",
-      "email": "{{user_email}}"
+      "name": "{memory.user_name}",
+      "email": "{memory.user_email}"
     },
     "headers": {
       "Content-Type": "application/json"
@@ -69,7 +69,7 @@ pip install -e packages/graph-plugins-http
     "url": "https://api.example.com/protected",
     "auth": {
       "type": "bearer",
-      "token": "{{api_token}}"
+      "token": "{memory.api_token}"
     },
     "response_key": "protected_data",
     "status_code_key": "status"
@@ -84,7 +84,7 @@ pip install -e packages/graph-plugins-http
 Perform HTTP GET request to fetch data from a URL.
 
 **Config:**
-- `url` (string, required): Request URL (supports `{{variable}}` template syntax)
+- `url` (string, required): Request URL (supports `{memory.variable}` template syntax)
 - `params` (object): Query parameters as key-value pairs
 - `headers` (object): Request headers as key-value pairs
 - `auth` (object): Authentication configuration
@@ -104,7 +104,7 @@ Perform HTTP GET request to fetch data from a URL.
 {
   "type": "http-get",
   "config": {
-    "url": "https://api.github.com/users/{{username}}",
+    "url": "https://api.github.com/users/{memory.username}",
     "headers": {
       "Accept": "application/json",
       "User-Agent": "GraphFlow"
@@ -130,11 +130,11 @@ Perform HTTP POST request to send data to a URL.
     "url": "https://api.example.com/webhooks",
     "body": {
       "event": "user.created",
-      "data": "{{event_data}}"
+      "data": "{memory.event_data}"
     },
     "headers": {
       "Content-Type": "application/json",
-      "X-API-Key": "{{api_key}}"
+      "X-API-Key": "{memory.api_key}"
     },
     "response_key": "webhook_response"
   }
@@ -152,10 +152,10 @@ Perform HTTP PUT request to update a resource.
 {
   "type": "http-put",
   "config": {
-    "url": "https://api.example.com/users/{{user_id}}",
+    "url": "https://api.example.com/users/{memory.user_id}",
     "body": {
-      "name": "{{updated_name}}",
-      "email": "{{updated_email}}"
+      "name": "{memory.updated_name}",
+      "email": "{memory.updated_email}"
     },
     "response_key": "updated_user"
   }
@@ -173,9 +173,9 @@ Perform HTTP PATCH request for partial updates.
 {
   "type": "http-patch",
   "config": {
-    "url": "https://api.example.com/users/{{user_id}}",
+    "url": "https://api.example.com/users/{memory.user_id}",
     "body": {
-      "email": "{{new_email}}"
+      "email": "{memory.new_email}"
     },
     "response_key": "patched_user"
   }
@@ -193,7 +193,7 @@ Perform HTTP DELETE request to remove a resource.
 {
   "type": "http-delete",
   "config": {
-    "url": "https://api.example.com/users/{{user_id}}",
+    "url": "https://api.example.com/users/{memory.user_id}",
     "response_key": "delete_response",
     "status_code_key": "status"
   }
@@ -266,7 +266,7 @@ Construct a URL from components.
     "host": "api.example.com",
     "path": "/v1/search",
     "params": {
-      "q": "{{search_query}}",
+      "q": "{memory.search_query}",
       "limit": "10"
     },
     "output_key": "api_url"
@@ -507,8 +507,8 @@ Extract data from HTML tables into structured format.
 {
   "auth": {
     "type": "basic",
-    "username": "{{api_username}}",
-    "password": "{{api_password}}"
+    "username": "{memory.api_username}",
+    "password": "{memory.api_password}"
   }
 }
 ```
@@ -519,25 +519,25 @@ Extract data from HTML tables into structured format.
 {
   "auth": {
     "type": "bearer",
-    "token": "{{api_token}}"
+    "token": "{memory.api_token}"
   }
 }
 ```
 
 ## Template Syntax
 
-All string values support `{{variable}}` template syntax for memory binding:
+All string values support `{memory.variable}` template syntax for memory binding:
 
 ```json
 {
-  "url": "https://api.example.com/users/{{user_id}}/posts/{{post_id}}",
+  "url": "https://api.example.com/users/{memory.user_id}/posts/{memory.post_id}",
   "headers": {
-    "Authorization": "Bearer {{token}}",
-    "X-User-ID": "{{user_id}}"
+    "Authorization": "Bearer {memory.token}",
+    "X-User-ID": "{memory.user_id}"
   },
   "body": {
-    "title": "{{post_title}}",
-    "content": "{{post_content}}"
+    "title": "{memory.post_title}",
+    "content": "{memory.post_content}"
   }
 }
 ```
@@ -546,7 +546,7 @@ Nested memory access with dot notation:
 
 ```json
 {
-  "url": "https://api.example.com/{{api.endpoint}}/{{resource.id}}"
+  "url": "https://api.example.com/{memory.api.endpoint}/{memory.resource.id}"
 }
 ```
 
@@ -571,7 +571,7 @@ The plugin handles various error scenarios:
       "type": "http-post",
       "config": {
         "url": "https://api.example.com/items",
-        "body": {"name": "{{item_name}}"},
+        "body": {"name": "{memory.item_name}"},
         "response_key": "created_item"
       }
     },
@@ -579,7 +579,7 @@ The plugin handles various error scenarios:
       "id": "read",
       "type": "http-get",
       "config": {
-        "url": "https://api.example.com/items/{{created_item.id}}",
+        "url": "https://api.example.com/items/{memory.created_item.id}",
         "response_key": "item_data"
       }
     },
@@ -587,8 +587,8 @@ The plugin handles various error scenarios:
       "id": "update",
       "type": "http-put",
       "config": {
-        "url": "https://api.example.com/items/{{created_item.id}}",
-        "body": {"name": "{{updated_name}}"},
+        "url": "https://api.example.com/items/{memory.created_item.id}",
+        "body": {"name": "{memory.updated_name}"},
         "response_key": "updated_item"
       }
     },
@@ -596,7 +596,7 @@ The plugin handles various error scenarios:
       "id": "delete",
       "type": "http-delete",
       "config": {
-        "url": "https://api.example.com/items/{{created_item.id}}",
+        "url": "https://api.example.com/items/{memory.created_item.id}",
         "response_key": "delete_result"
       }
     }

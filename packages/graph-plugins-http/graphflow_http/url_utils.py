@@ -1,4 +1,5 @@
 """URL manipulation step implementations."""
+import re
 from typing import Any, Dict
 from urllib.parse import quote, unquote, urlparse, urlunparse, parse_qs, urlencode
 
@@ -23,13 +24,9 @@ class URLEscapeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing string to URL encode"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write encoded string"
+                    "description": "Input value using {memory.variable} syntax"
                 },
                 "safe": {
                     "type": "string",
@@ -37,7 +34,7 @@ class URLEscapeStep(StepBase):
                     "description": "Characters that should not be encoded (default: empty)"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -47,7 +44,7 @@ class URLEscapeStep(StepBase):
             "properties": {
                 "input": {
                     "type": "string",
-                    "description": "String to URL encode (from input_key)"
+                    "description": "String to URL encode "
                 }
             },
             "required": ["input"]
@@ -60,14 +57,22 @@ class URLEscapeStep(StepBase):
             "properties": {
                 "output": {
                     "type": "string",
-                    "description": "URL encoded string (written to output_key)"
+                    "description": "URL encoded string "
                 }
             }
         }
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute URL escape."""
-        input_value = memory.read(self.config["input_key"])
+        # Extract input from config
+        input_template = self.config.get("input", "")
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = pattern.search(input_template)
+        if match:
+            input_key = match.group(1)
+            input_value = memory.read(input_key)
+        else:
+            raise ValueError(f"{self.__class__.__name__} {self.id}: Invalid input reference")
         safe_chars = self.config.get("safe", "")
 
         # Convert to string if needed
@@ -77,7 +82,13 @@ class URLEscapeStep(StepBase):
         encoded = quote(input_str, safe=safe_chars)
 
         # Write to memory
-        memory.write(self.config["output_key"], encoded)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, encoded)
 
 
 class URLUnescapeStep(StepBase):
@@ -97,16 +108,12 @@ class URLUnescapeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing URL encoded string"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write decoded string"
+                    "description": "Input value using {memory.variable} syntax"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -116,7 +123,7 @@ class URLUnescapeStep(StepBase):
             "properties": {
                 "input": {
                     "type": "string",
-                    "description": "URL encoded string to decode (from input_key)"
+                    "description": "URL encoded string to decode "
                 }
             },
             "required": ["input"]
@@ -129,14 +136,22 @@ class URLUnescapeStep(StepBase):
             "properties": {
                 "output": {
                     "type": "string",
-                    "description": "Decoded string (written to output_key)"
+                    "description": "Decoded string "
                 }
             }
         }
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute URL unescape."""
-        input_value = memory.read(self.config["input_key"])
+        # Extract input from config
+        input_template = self.config.get("input", "")
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = pattern.search(input_template)
+        if match:
+            input_key = match.group(1)
+            input_value = memory.read(input_key)
+        else:
+            raise ValueError(f"{self.__class__.__name__} {self.id}: Invalid input reference")
 
         # Convert to string if needed
         input_str = str(input_value) if input_value is not None else ""
@@ -145,7 +160,13 @@ class URLUnescapeStep(StepBase):
         decoded = unquote(input_str)
 
         # Write to memory
-        memory.write(self.config["output_key"], decoded)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, decoded)
 
 
 class URLBuildStep(StepBase):
@@ -191,10 +212,6 @@ class URLBuildStep(StepBase):
                 "fragment": {
                     "type": "string",
                     "description": "URL fragment/anchor (optional)"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write constructed URL"
                 }
             },
             "required": ["host", "output_key"]
@@ -216,7 +233,7 @@ class URLBuildStep(StepBase):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "Constructed URL (written to output_key)"
+                    "description": "Constructed URL "
                 }
             }
         }
@@ -243,7 +260,13 @@ class URLBuildStep(StepBase):
         url = urlunparse((scheme, netloc, path, "", query, fragment))
 
         # Write to memory
-        memory.write(self.config["output_key"], url)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, url)
 
 
 class URLParseStep(StepBase):
@@ -263,16 +286,12 @@ class URLParseStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "input_key": {
+                "input": {
                     "type": "string",
-                    "description": "Memory key containing URL to parse"
-                },
-                "output_key": {
-                    "type": "string",
-                    "description": "Memory key to write parsed components"
+                    "description": "Input value using {memory.variable} syntax"
                 }
             },
-            "required": ["input_key", "output_key"]
+            "required": ["input"]
         }
 
     @classmethod
@@ -282,7 +301,7 @@ class URLParseStep(StepBase):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "URL to parse (from input_key)"
+                    "description": "URL to parse "
                 }
             },
             "required": ["url"]
@@ -305,7 +324,7 @@ class URLParseStep(StepBase):
                         "query": {"type": "string"},
                         "fragment": {"type": "string"}
                     },
-                    "description": "Parsed URL components (written to output_key)"
+                    "description": "Parsed URL components "
                 }
             }
         }
@@ -349,4 +368,10 @@ class URLParseStep(StepBase):
         }
 
         # Write to memory
-        memory.write(self.config["output_key"], components)
+        # Write output
+        if "output" in self.outputs:
+            output_template = self.outputs["output"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, components)

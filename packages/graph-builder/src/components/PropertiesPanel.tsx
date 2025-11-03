@@ -46,6 +46,20 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
     });
   };
 
+  const handleOutputChange = (outputKey: string, memoryLocation: string) => {
+    // Ensure it's in the {memory.field} format
+    const formattedLocation = memoryLocation.startsWith('{memory.')
+      ? memoryLocation
+      : `{memory.${memoryLocation}}`;
+
+    updateNode(selectedNodeId!, {
+      outputs: {
+        ...(step.outputs || {}),
+        [outputKey]: formattedLocation,
+      },
+    });
+  };
+
   const handleDelete = () => {
     if (confirm(`Delete step "${step.id}"?`)) {
       deleteNode(selectedNodeId!);
@@ -130,11 +144,6 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
           <div className="space-y-3">
             {stepTypeInfo.configSchema && Object.keys(stepTypeInfo.configSchema.properties || {}).length > 0 ? (
               Object.entries(stepTypeInfo.configSchema.properties || {}).map(([key, schema]: [string, any]) => {
-                // Hide *_key config fields as they're now managed in the Outputs section
-                if (key.endsWith('_key')) {
-                  return null;
-                }
-
                 const currentValue = step.config[key] ?? schema.default ?? '';
                 const isBound = isMemoryBinding(currentValue);
 
@@ -258,23 +267,14 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
             </label>
             <div className="space-y-3">
               {Object.entries(stepTypeInfo.outputsSchema.properties).map(([outputKey, outputSchema]: [string, any]) => {
-                // Find the corresponding config key for this output
-                // Convention: output "response" -> config "response_key", "status_code" -> "status_code_key", etc.
-                const configKey = `${outputKey}_key`;
+                // Get the memory location from step.outputs, defaulting to outputKey
+                const outputTemplate = step.outputs?.[outputKey] || `{memory.${outputKey}}`;
 
-                // Get memory key, defaulting to clean output name (without _key suffix)
-                let memoryKey = step.config[configKey] || step.config['output_key'] || outputKey;
-
-                // Strip _key suffix from memory keys (handles both simple strings and templates)
-                if (typeof memoryKey === 'string') {
-                  // Handle template strings like ${memory.http.HTTPGetStep_1.response_key}
-                  if (memoryKey.includes('_key}')) {
-                    memoryKey = memoryKey.replace(/_key}/g, '}');
-                  }
-                  // Handle simple strings like "response_key"
-                  else if (memoryKey.endsWith('_key')) {
-                    memoryKey = memoryKey.slice(0, -4);
-                  }
+                // Extract just the memory key from {memory.field} format
+                let memoryKey = outputKey;
+                const match = outputTemplate.match(/\{memory\.([^}]+)\}/);
+                if (match) {
+                  memoryKey = match[1];
                 }
 
                 // Determine type label
@@ -305,7 +305,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         <input
                           type="text"
                           value={memoryKey}
-                          onChange={(e) => handleConfigChange(configKey, e.target.value)}
+                          onChange={(e) => handleOutputChange(outputKey, e.target.value)}
                           placeholder={outputKey}
                           className="flex-1 px-2 py-1 text-xs border border-green-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
                         />
