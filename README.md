@@ -1,6 +1,6 @@
 # GraphFlow
 
-🚀 **Status**: ✅ **FULLY FUNCTIONAL** - All Phases Complete!
+🚀 **Status**: 🚧 **In Development - Proof of Concept**
 
 A low-code agent builder for creating, compiling, and running AI agents with graph-based workflows.
 
@@ -14,6 +14,9 @@ GraphFlow is a comprehensive agent development platform that lets you:
 
 ## ✨ Key Features
 
+- **Visual Graph Builder**: Drag-and-drop UI with ReactFlow for building agent workflows
+- **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding and usage tracking
+- **Plugin System**: Dynamically load step types from runtime with categorization and search
 - **Decoupled Control & Data Flow**: Edges define control flow, memory store handles data independently
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
 - **10 Built-in Step Types**: start, llm, http, loop, conditional, transform, join, db_query, human_input, output
@@ -30,7 +33,7 @@ GraphFlow consists of four main components:
 | **graph-core** | Shared library with step types, memory management, and graph models | ✅ Complete |
 | **graph-compiler** | Transpiler from graph JSON to Python (Pydantic AI / LangGraph) | ✅ Complete |
 | **graph-runtime** | FastAPI service for executing and managing agents | ✅ Complete |
-| **graph-builder** | React UI for visual graph construction and runtime monitoring | ✅ Complete |
+| **graph-builder** | React UI for visual graph construction and runtime monitoring | 🚧 POC |
 
 ## 🚀 Quick Start
 
@@ -63,8 +66,11 @@ npm install
 npm run dev
 
 # Visit http://localhost:3000
-# - Builder tab: Visual graph editor
-# - Runtime tab: Monitor running agents
+# - Builder tab: Visual graph editor with drag-and-drop steps
+#   - Step Palette: Browse steps by category or plugin
+#   - Properties Panel: Configure step settings and memory bindings
+#   - Memory Schema Panel: Manage inputs, outputs, and intermediate memory
+# - Runtime tab: Monitor running agents (coming soon)
 ```
 
 ### Example 1: Compile and Run Standalone Agent
@@ -153,6 +159,45 @@ See the `examples/` directory for complete graph definitions:
 | `db_query` | Database query | Data retrieval |
 | `human_input` | Wait for human | Human-in-the-loop |
 | `output` | Map to outputs | Final results |
+
+## 🎨 Graph Builder UI Features
+
+The visual graph builder provides an intuitive interface for creating agent workflows:
+
+**Step Palette**
+- Browse steps by category (AI, Integration, Control Flow, etc.) or by plugin
+- Search functionality to quickly find step types
+- Collapsible sections for organized navigation
+- Color-coded step types with icons
+
+**Canvas**
+- Drag-and-drop steps from palette onto canvas
+- Connect steps with edges to define control flow
+- Visual node representation with step info
+- Pan and zoom for large graphs
+
+**Properties Panel**
+- Configure step settings when a node is selected
+- Smart labels: converts `model_name` to "Model Name"
+- Memory binding support with `{memory.field}` syntax
+- Visual badges showing active memory bindings
+- Step behavior info showing inputs/outputs schemas
+- Delete step button
+
+**Memory Schema Panel**
+- Manage three memory namespaces: inputs, intermediate, outputs
+- Add/remove memory fields with type definitions
+- Set default values for memory locations
+- Required field indicators for inputs
+- "Used by" badges showing which steps reference each field
+- Auto-cleanup of unused memory fields
+
+**Memory Binding System**
+- Auto-create memory fields when steps are added
+- Auto-bind config values to `{memory.<step_id>.<field>}` format
+- Change bindings to hardcoded values or different memory locations
+- Visual highlighting of bound fields with blue background
+- Autocomplete suggestions for memory field names
 
 ## 📖 Documentation
 
@@ -254,6 +299,9 @@ graphflow-runtime --reload
 - `GET /api/v1/agents/{id}/runs/{run_id}/memory` - Get memory state
 - `GET /api/v1/agents/{id}/runs/{run_id}/memory/{key}` - Get specific value
 
+**Step Types**:
+- `GET /api/v1/step-types` - List all available step types with schemas
+
 **Health**:
 - `GET /api/v1/health` - Health check
 
@@ -264,16 +312,23 @@ graphflow-runtime --reload
 | Control/Data Separation | ✅ | ❌ | ❌ |
 | Multi-Framework Compile | ✅ | ❌ | ⚠️ |
 | Standalone Generation | ✅ | ❌ | ❌ |
+| Visual Graph Builder | 🚧 POC | ✅ | ✅ |
+| Memory Schema Management | ✅ | ⚠️ | ⚠️ |
 | Memory Inspection | ✅ | ⚠️ | ⚠️ |
 | Runtime API | ✅ | ✅ | ✅ |
 
 ## 🚧 Roadmap
 
-**Phase 4: UI Builder** (Next)
-- React app with ReactFlow
-- Drag-and-drop graph builder
-- Real-time runtime monitoring
-- Graph templates
+**Phase 4: UI Builder** (In Progress - POC)
+- ✅ React app with ReactFlow
+- ✅ Drag-and-drop graph builder
+- ✅ Plugin system with step palette
+- ✅ Memory schema management
+- ✅ Visual memory binding
+- 🚧 Real-time runtime monitoring
+- 🚧 Graph templates
+- 🚧 Save/load graphs
+- 🚧 Compile from UI
 
 **Future**:
 - MCP server integration
@@ -281,6 +336,7 @@ graphflow-runtime --reload
 - Graph versioning
 - Distributed execution
 - Streaming support
+- Collaborative editing
 
 ## 📝 License
 
