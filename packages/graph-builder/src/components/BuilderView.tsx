@@ -8,10 +8,25 @@ import SettingsModal from './SettingsModal';
 
 export default function BuilderView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
+  const [memoryCollapsed, setMemoryCollapsed] = useState(false);
 
   const onDragStart = (event: React.DragEvent, stepType: string) => {
     event.dataTransfer.setData('application/reactflow', stepType);
     event.dataTransfer.effectAllowed = 'move';
+  };
+
+  // Determine height classes based on collapse states
+  const getPropertiesHeight = () => {
+    if (propertiesCollapsed) return 'h-auto';
+    if (memoryCollapsed) return 'flex-1';
+    return 'h-1/2';
+  };
+
+  const getMemoryHeight = () => {
+    if (memoryCollapsed) return 'h-auto';
+    if (propertiesCollapsed) return 'flex-1';
+    return 'h-1/2';
   };
 
   return (
@@ -34,13 +49,19 @@ export default function BuilderView() {
         {/* Right sidebar - Properties and Memory */}
         <div className="w-96 shrink-0 flex flex-col">
           {/* Top: Properties Panel */}
-          <div className="h-1/2 border-b">
-            <PropertiesPanel />
+          <div className={`${getPropertiesHeight()} border-b`}>
+            <PropertiesPanel
+              isCollapsed={propertiesCollapsed}
+              setIsCollapsed={setPropertiesCollapsed}
+            />
           </div>
 
           {/* Bottom: Memory Panel */}
-          <div className="h-1/2">
-            <MemoryPanel />
+          <div className={getMemoryHeight()}>
+            <MemoryPanel
+              isCollapsed={memoryCollapsed}
+              setIsCollapsed={setMemoryCollapsed}
+            />
           </div>
         </div>
       </div>

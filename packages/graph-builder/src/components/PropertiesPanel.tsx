@@ -1,10 +1,13 @@
 import { useGraphStore } from '@/stores/graphStore';
 import { X, Link, ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
 
-export default function PropertiesPanel() {
+interface PropertiesPanelProps {
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean) => void;
+}
+
+export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: PropertiesPanelProps) {
   const { nodes, selectedNodeId, setSelectedNode, updateNode, deleteNode, memory } = useGraphStore();
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 

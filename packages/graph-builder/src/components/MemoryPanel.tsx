@@ -2,10 +2,14 @@ import { useGraphStore } from '@/stores/graphStore';
 import { Plus, X, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-export default function MemoryPanel() {
+interface MemoryPanelProps {
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean) => void;
+}
+
+export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanelProps) {
   const { memory, setMemory, nodes } = useGraphStore();
   const [expandedSection, setExpandedSection] = useState<'inputs' | 'outputs' | 'intermediate'>('inputs');
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Find which steps are using each memory field
   const getStepsUsingMemory = (memoryKey: string): string[] => {
