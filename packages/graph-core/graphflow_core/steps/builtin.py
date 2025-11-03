@@ -380,3 +380,157 @@ class JoinStep(StepBase):
     async def execute(self, memory: MemoryStore) -> None:
         """No-op execution - synchronization is handled by execution engine."""
         pass
+
+
+@StepRegistry.register(category="data", description="Read value from memory")
+class ReadMemoryStep(StepBase):
+    """
+    Read Memory step - read a value from any memory section.
+
+    This step allows copying data from inputs, intermediate, or outputs
+    to another location in memory (typically intermediate).
+
+    Config:
+        source_key: str - Memory key to read from
+        output_key: str - Memory key to write to (defaults to source_key)
+    """
+
+    name = "Read Memory"
+    label = "Read Memory"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "read-memory"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "source_key": {
+                    "type": "string",
+                    "description": "Memory key to read from"
+                }
+            },
+            "required": ["source_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """ReadMemoryStep reads the source_key from memory."""
+        return {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "Value read from source_key"
+                }
+            },
+            "description": "Reads value from the key specified in 'source_key' config"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """ReadMemoryStep writes the value to output_key."""
+        return {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "Value copied from source (written to output_key)"
+                }
+            },
+            "description": "Writes value to intermediate memory"
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Read value from memory."""
+        source_key = self.config.get("source_key")
+
+        if not source_key:
+            raise ValueError(f"ReadMemoryStep {self.id}: source_key not specified")
+
+        try:
+            value = memory.read(source_key)
+            # Output uses same key name by default
+            output_key = self.config.get("value_key", source_key)
+            memory.write(output_key, value)
+        except KeyError as e:
+            raise KeyError(
+                f"ReadMemoryStep {self.id}: Cannot read from {source_key}: {e}"
+            )
+
+
+@StepRegistry.register(category="data", description="Write value to memory")
+class WriteMemoryStep(StepBase):
+    """
+    Write Memory step - write a value to any memory section.
+
+    This step allows moving data from intermediate memory to outputs,
+    or organizing intermediate values.
+
+    Config:
+        source_key: str - Memory key to read from (in intermediate)
+        target_key: str - Memory key to write to (in outputs or intermediate)
+    """
+
+    name = "Write Memory"
+    label = "Write Memory"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "write-memory"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "source_key": {
+                    "type": "string",
+                    "description": "Memory key to read from"
+                }
+            },
+            "required": ["source_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """WriteMemoryStep reads the source_key from memory."""
+        return {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "Value to write (from source_key)"
+                }
+            },
+            "description": "Reads value from the key specified in 'source_key' config"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """WriteMemoryStep writes the value to target location."""
+        return {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "Value written to target (written to target_key)"
+                }
+            },
+            "description": "Writes value to memory location specified in config"
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Write value to memory."""
+        source_key = self.config.get("source_key")
+
+        if not source_key:
+            raise ValueError(f"WriteMemoryStep {self.id}: source_key not specified")
+
+        try:
+            value = memory.read(source_key)
+            # Output to target key
+            target_key = self.config.get("value_key", source_key)
+            memory.write(target_key, value)
+        except KeyError as e:
+            raise KeyError(
+                f"WriteMemoryStep {self.id}: Cannot read from {source_key}: {e}"
+            )

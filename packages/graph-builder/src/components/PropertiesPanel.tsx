@@ -130,6 +130,11 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
           <div className="space-y-3">
             {stepTypeInfo.configSchema && Object.keys(stepTypeInfo.configSchema.properties || {}).length > 0 ? (
               Object.entries(stepTypeInfo.configSchema.properties || {}).map(([key, schema]: [string, any]) => {
+                // Hide *_key config fields as they're now managed in the Outputs section
+                if (key.endsWith('_key')) {
+                  return null;
+                }
+
                 const currentValue = step.config[key] ?? schema.default ?? '';
                 const isBound = isMemoryBinding(currentValue);
 
@@ -244,6 +249,63 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
             )}
           </div>
         </div>
+
+        {/* Outputs */}
+        {stepTypeInfo.outputsSchema?.properties && Object.keys(stepTypeInfo.outputsSchema.properties).length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Outputs
+            </label>
+            <div className="space-y-3">
+              {Object.entries(stepTypeInfo.outputsSchema.properties).map(([outputKey, outputSchema]: [string, any]) => {
+                // Find the corresponding config key for this output
+                // Convention: output "response" -> config "response_key", "status_code" -> "status_code_key", etc.
+                const configKey = `${outputKey}_key`;
+                const memoryKey = step.config[configKey] || step.config['output_key'] || outputKey;
+
+                // Determine type label
+                const typeLabel = outputSchema.type || 'any';
+
+                return (
+                  <div key={outputKey} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-green-900">
+                            {outputKey}
+                          </span>
+                          <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                            {typeLabel}
+                          </span>
+                        </div>
+                        {outputSchema.description && (
+                          <p className="text-xs text-green-700 mt-1">
+                            {outputSchema.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-green-200">
+                      <div className="flex items-center gap-2">
+                        <Link className="w-3 h-3 text-green-600 flex-shrink-0" />
+                        <input
+                          type="text"
+                          value={memoryKey}
+                          onChange={(e) => handleConfigChange(configKey, e.target.value)}
+                          placeholder={outputKey}
+                          className="flex-1 px-2 py-1 text-xs border border-green-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+                        />
+                      </div>
+                      <p className="text-xs text-green-700 mt-1 ml-5">
+                        Memory location where this output will be written
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Delete button */}
         <div className="pt-4 border-t border-gray-200">
