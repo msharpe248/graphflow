@@ -261,7 +261,21 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                 // Find the corresponding config key for this output
                 // Convention: output "response" -> config "response_key", "status_code" -> "status_code_key", etc.
                 const configKey = `${outputKey}_key`;
-                const memoryKey = step.config[configKey] || step.config['output_key'] || outputKey;
+
+                // Get memory key, defaulting to clean output name (without _key suffix)
+                let memoryKey = step.config[configKey] || step.config['output_key'] || outputKey;
+
+                // Strip _key suffix from memory keys (handles both simple strings and templates)
+                if (typeof memoryKey === 'string') {
+                  // Handle template strings like ${memory.http.HTTPGetStep_1.response_key}
+                  if (memoryKey.includes('_key}')) {
+                    memoryKey = memoryKey.replace(/_key}/g, '}');
+                  }
+                  // Handle simple strings like "response_key"
+                  else if (memoryKey.endsWith('_key')) {
+                    memoryKey = memoryKey.slice(0, -4);
+                  }
+                }
 
                 // Determine type label
                 const typeLabel = outputSchema.type || 'any';
