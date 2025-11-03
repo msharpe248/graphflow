@@ -46,16 +46,11 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
     });
   };
 
-  const handleOutputChange = (outputKey: string, memoryLocation: string) => {
-    // Ensure it's in the {memory.field} format
-    const formattedLocation = memoryLocation.startsWith('{memory.')
-      ? memoryLocation
-      : `{memory.${memoryLocation}}`;
-
+  const handleOutputChange = (outputKey: string, value: string) => {
     updateNode(selectedNodeId!, {
       outputs: {
         ...(step.outputs || {}),
-        [outputKey]: formattedLocation,
+        [outputKey]: value,
       },
     });
   };
@@ -193,20 +188,26 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                           ))}
                         </datalist>
                       </div>
-                    ) : schema.type === 'number' ? (
+                    ) : schema.type === 'number' || schema.type === 'integer' ? (
                       <input
                         type="text"
                         value={currentValue}
                         onChange={(e) => {
                           const val = e.target.value;
                           // If it's a memory binding, keep as string; otherwise parse as number
-                          handleConfigChange(key, val.startsWith('{memory.') ? val : (val === '' ? '' : parseFloat(val)));
+                          if (val.startsWith('{memory.')) {
+                            handleConfigChange(key, val);
+                          } else if (val === '') {
+                            handleConfigChange(key, '');
+                          } else {
+                            const parsed = schema.type === 'integer' ? parseInt(val, 10) : parseFloat(val);
+                            handleConfigChange(key, isNaN(parsed) ? val : parsed);
+                          }
                         }}
-                        placeholder="e.g., 0.7 or {memory.field_name}"
+                        placeholder={`e.g., ${schema.type === 'integer' ? '30' : '0.7'} or {memory.field_name}`}
                         className={`w-full px-3 py-2 border rounded-md text-sm ${
                           isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
                         }`}
-                        list={`${key}-memory-options`}
                       />
                     ) : schema.type === 'object' || schema.type === 'array' ? (
                       <textarea
@@ -237,11 +238,11 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         }`}
                       />
                     ) : (
-                      <textarea
+                      <input
+                        type="text"
                         value={currentValue}
                         onChange={(e) => handleConfigChange(key, e.target.value)}
                         placeholder="Enter value or {memory.field_name}"
-                        rows={3}
                         className={`w-full px-3 py-2 border rounded-md text-sm ${
                           isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
                         }`}
@@ -268,14 +269,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
             <div className="space-y-3">
               {Object.entries(stepTypeInfo.outputsSchema.properties).map(([outputKey, outputSchema]: [string, any]) => {
                 // Get the memory location from step.outputs, defaulting to outputKey
-                const outputTemplate = step.outputs?.[outputKey] || `{memory.${outputKey}}`;
-
-                // Extract just the memory key from {memory.field} format
-                let memoryKey = outputKey;
-                const match = outputTemplate.match(/\{memory\.([^}]+)\}/);
-                if (match) {
-                  memoryKey = match[1];
-                }
+                const outputValue = step.outputs?.[outputKey] || `{memory.${outputKey}}`;
 
                 // Determine type label
                 const typeLabel = outputSchema.type || 'any';
@@ -304,14 +298,14 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         <Link className="w-3 h-3 text-green-600 flex-shrink-0" />
                         <input
                           type="text"
-                          value={memoryKey}
+                          value={outputValue}
                           onChange={(e) => handleOutputChange(outputKey, e.target.value)}
-                          placeholder={outputKey}
+                          placeholder={`{memory.${outputKey}}`}
                           className="flex-1 px-2 py-1 text-xs border border-green-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
                         />
                       </div>
                       <p className="text-xs text-green-700 mt-1 ml-5">
-                        Memory location where this output will be written
+                        Memory location where this output will be written (use {'{memory.field}'} syntax)
                       </p>
                     </div>
                   </div>

@@ -121,11 +121,29 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       });
     }
 
+    // Auto-create outputs object with memory bindings
+    const outputs: Record<string, string> = {};
+
+    if (stepTypeInfo.outputsSchema?.properties) {
+      Object.entries(stepTypeInfo.outputsSchema.properties).forEach(([outputKey, outputSchema]: [string, any]) => {
+        // Create memory field for this output
+        const memoryKey = `${id}.${outputKey}`;
+        newMemoryFields[memoryKey] = {
+          type: (outputSchema as any).type || 'string',
+          description: (outputSchema as any).description || `${outputKey} output from ${id}`,
+          required: false,
+        };
+
+        // Auto-bind output to memory location
+        outputs[outputKey] = `{memory.${memoryKey}}`;
+      });
+    }
+
     const step: Step = {
       id,
       type: stepType,
       config,
-      outputs: {},
+      outputs,
     };
 
     const newNode: Node<NodeData> = {
