@@ -15,18 +15,23 @@ GraphFlow is a comprehensive agent development platform that lets you:
 ## ✨ Key Features
 
 - **Visual Graph Builder**: Drag-and-drop UI with ReactFlow for building agent workflows
-- **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding and usage tracking
-- **Plugin System**: Dynamically load step types from runtime with categorization and search
+- **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding, usage tracking, and editable outputs
+- **Plugin System**: Extensible architecture with dynamically loaded step types, categorization, and search
 - **Decoupled Control & Data Flow**: Edges define control flow, memory store handles data independently
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
-- **10 Built-in Step Types**: start, llm, http, loop, conditional, transform, join, db_query, human_input, output
+- **Comprehensive Step Library**:
+  - 10+ built-in steps (control flow, AI, data transformation)
+  - 17 HTTP plugin steps (requests, URL utils, data transforms, HTML processing)
+  - Memory manipulation steps (read-memory, write-memory)
 - **Runtime Environment**: Long-running agents with queryable memory and full lifecycle management
 - **CLI Tools**: `graphflow-compile` and `graphflow-runtime`
 - **REST API**: 15+ endpoints for complete agent lifecycle management
 
 ## 🏗️ Architecture
 
-GraphFlow consists of four main components:
+GraphFlow consists of four main components plus an extensible plugin system:
+
+### Core Components
 
 | Component | Description | Status |
 |-----------|-------------|--------|
@@ -34,6 +39,13 @@ GraphFlow consists of four main components:
 | **graph-compiler** | Transpiler from graph JSON to Python (Pydantic AI / LangGraph) | ✅ Complete |
 | **graph-runtime** | FastAPI service for executing and managing agents | ✅ Complete |
 | **graph-builder** | React UI for visual graph construction and runtime monitoring | 🚧 POC |
+
+### Plugin Packages
+
+| Plugin | Description | Steps | Status |
+|--------|-------------|-------|--------|
+| **[graph-plugins-http](packages/graph-plugins-http/README.md)** | Comprehensive HTTP client with request handling, URL utilities, data transforms, and HTML processing | 17 steps | ✅ Complete |
+| **[graphflow-plugin-example](packages/graphflow-plugin-example/README.md)** | Example plugin demonstrating notification steps (Email, Slack) | 2 steps | ✅ Reference |
 
 ## 🚀 Quick Start
 
@@ -48,10 +60,14 @@ cd graphflow
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install all packages
+# Install core packages
 pip install -e packages/graph-core
 pip install -e packages/graph-compiler
 pip install -e packages/graph-runtime
+
+# Install plugin packages (optional)
+pip install -e packages/graph-plugins-http  # HTTP client with 17 steps
+pip install -e packages/graphflow-plugin-example  # Example plugin
 ```
 
 ### Visual UI (Recommended)
@@ -145,20 +161,41 @@ See the `examples/` directory for complete graph definitions:
 3. **llm_agent.json** - LLM with tools and structured output
 4. **advanced_research_agent.json** - Complex multi-step with loops, HTTP, LLM, and human review
 
-## 🛠️ Built-in Step Types
+## 🛠️ Step Types
 
-| Step | Description | Use Case |
-|------|-------------|----------|
-| `start` | Entry point | Begin execution |
-| `llm` | LLM call with tools | AI reasoning, analysis |
-| `http` | HTTP request | API calls, web scraping |
-| `loop` | Iterate over collection | Process lists, batch operations |
-| `conditional` | Branching logic | If/else flows |
-| `transform` | Python code execution | Data transformation |
-| `join` | Synchronization point | Merge parallel branches |
-| `db_query` | Database query | Data retrieval |
-| `human_input` | Wait for human | Human-in-the-loop |
-| `output` | Map to outputs | Final results |
+GraphFlow provides a rich ecosystem of step types organized by category:
+
+### Built-in Steps (graph-core)
+
+| Category | Step | Description |
+|----------|------|-------------|
+| **Control** | `start` | Entry point for workflow execution |
+| | `conditional` | Branching logic for if/else flows |
+| | `loop` | Iterate over collections |
+| | `join` | Synchronization point to merge parallel branches |
+| **AI** | `llm` | LLM call with tools and structured output |
+| **Data** | `transform` | Execute Python code for data transformation |
+| | `read-memory` | Copy values from any memory section |
+| | `write-memory` | Write values to any memory section |
+| | `output` | Map intermediate values to final outputs |
+| **Integration** | `http` | Basic HTTP request step |
+| | `db_query` | Database query execution |
+| **Human** | `human_input` | Wait for human review/input |
+
+### HTTP Plugin Steps (graph-plugins-http)
+
+See **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **HTTP Requests** | `http-get`, `http-post`, `http-put`, `http-patch`, `http-delete` | Full HTTP method support with auth, retries, SSL config |
+| **URL Utilities** | `url-parse`, `url-build`, `url-escape`, `url-unescape` | URL manipulation and construction |
+| **Data Transform** | `json-parse`, `json-stringify`, `base64-encode`, `base64-decode` | Data format conversions |
+| **HTML Processing** | `html-strip`, `html-parse`, `html-find-links`, `html-table-extract` | Extract data from HTML content |
+
+### Creating Custom Steps
+
+See **[Plugin Example](packages/graphflow-plugin-example/README.md)** to learn how to create your own plugin packages with custom step types.
 
 ## 🎨 Graph Builder UI Features
 
@@ -181,6 +218,10 @@ The visual graph builder provides an intuitive interface for creating agent work
 - Smart labels: converts `model_name` to "Model Name"
 - Memory binding support with `{memory.field}` syntax
 - Visual badges showing active memory bindings
+- **Outputs Section**: View and edit all step outputs with:
+  - Output name and type badges
+  - Editable memory locations (clean names without `_key` suffixes)
+  - Descriptions from output schemas
 - Step behavior info showing inputs/outputs schemas
 - Delete step button
 
@@ -199,12 +240,45 @@ The visual graph builder provides an intuitive interface for creating agent work
 - Visual highlighting of bound fields with blue background
 - Autocomplete suggestions for memory field names
 
+## 🔌 Plugin System
+
+GraphFlow features an extensible plugin architecture that allows you to create custom step types:
+
+**How Plugins Work:**
+- Plugins are Python packages with a `graphflow.plugins` entry point
+- The runtime automatically discovers and loads all installed plugins
+- Each plugin provides a `manifest.json` listing its step types
+- Steps appear in the UI palette with plugin namespacing (e.g., `http.HTTPGetStep`)
+
+**Creating a Plugin:**
+1. Create a Python package with `pyproject.toml` defining the entry point
+2. Add a `manifest.json` describing your plugin and step types
+3. Implement step classes inheriting from `StepBase`
+4. Define configuration schemas, labels, categories, and execute logic
+5. Install with `pip install -e .` and restart the runtime
+
+**Example Plugins:**
+- **[graph-plugins-http](packages/graph-plugins-http/README.md)**: Production-ready HTTP client with 17 steps
+- **[graphflow-plugin-example](packages/graphflow-plugin-example/README.md)**: Reference implementation with notification steps
+
+See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.md) for a complete guide on creating custom plugins.
+
 ## 📖 Documentation
 
+### Core Documentation
 - **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - Complete technical specification
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What we built and how it works
-- **Per-package READMEs** - Detailed docs for each component
 - **API Docs** - Visit http://localhost:8000/docs when runtime is running
+
+### Component Documentation
+- **[graph-core](packages/graph-core/README.md)** - Core library with step types and memory management
+- **[graph-compiler](packages/graph-compiler/README.md)** - Transpiler from graph JSON to Python code
+- **[graph-runtime](packages/graph-runtime/README.md)** - FastAPI service for agent execution
+- **[graph-builder](packages/graph-builder/README.md)** - React UI for visual graph construction (if available)
+
+### Plugin Documentation
+- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - 17 steps for HTTP requests, URL utilities, data transforms, and HTML processing
+- **[Example Plugin](packages/graphflow-plugin-example/README.md)** - Reference implementation for creating custom plugins
 
 ## 🧪 Testing
 
@@ -325,18 +399,22 @@ graphflow-runtime --reload
 - ✅ Plugin system with step palette
 - ✅ Memory schema management
 - ✅ Visual memory binding
+- ✅ Editable outputs section with clean memory locations
+- ✅ HTTP plugin with 17 production-ready steps
+- ✅ Memory manipulation steps (read-memory, write-memory)
 - 🚧 Real-time runtime monitoring
 - 🚧 Graph templates
 - 🚧 Save/load graphs
 - 🚧 Compile from UI
 
 **Future**:
+- Plugin marketplace/registry
 - MCP server integration
-- Tool marketplace
 - Graph versioning
 - Distributed execution
 - Streaming support
 - Collaborative editing
+- More plugin packages (Database, Cloud Services, Notifications, etc.)
 
 ## 📝 License
 
@@ -353,4 +431,13 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 
 ---
 
-**Built with**: Python, FastAPI, Pydantic, SQLAlchemy, Jinja2, and ❤️
+## 🔗 Quick Links
+
+- **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** - 17 steps for web APIs and data processing
+- **[Plugin Development Guide](packages/graphflow-plugin-example/README.md)** - Create your own custom steps
+- **[Core Documentation](packages/graph-core/README.md)** - Step types and memory management
+- **[Runtime API](http://localhost:8000/docs)** - FastAPI documentation (when server is running)
+
+---
+
+**Built with**: Python, FastAPI, Pydantic, SQLAlchemy, React, ReactFlow, TypeScript, and ❤️

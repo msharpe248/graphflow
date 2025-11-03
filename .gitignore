@@ -108,3 +108,6 @@ Thumbs.db
 
 # Misc
 .cache/
+
+# Session notes
+SESSION_NOTES.md
