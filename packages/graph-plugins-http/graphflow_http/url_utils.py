@@ -1,0 +1,352 @@
+"""URL manipulation step implementations."""
+from typing import Any, Dict
+from urllib.parse import quote, unquote, urlparse, urlunparse, parse_qs, urlencode
+
+from graphflow_core.memory import MemoryStore
+from graphflow_core.steps.base import StepBase
+
+
+class URLEscapeStep(StepBase):
+    """URL encode/escape string step."""
+
+    name = "URL Escape"
+    label = "URL Escape"
+    description = "URL encode a string for safe use in URLs"
+    category = "http"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "url-escape"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input_key": {
+                    "type": "string",
+                    "description": "Memory key containing string to URL encode"
+                },
+                "output_key": {
+                    "type": "string",
+                    "description": "Memory key to write encoded string"
+                },
+                "safe": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Characters that should not be encoded (default: empty)"
+                }
+            },
+            "required": ["input_key", "output_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "String to URL encode (from input_key)"
+                }
+            },
+            "required": ["input"]
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "output": {
+                    "type": "string",
+                    "description": "URL encoded string (written to output_key)"
+                }
+            }
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Execute URL escape."""
+        input_value = memory.read(self.config["input_key"])
+        safe_chars = self.config.get("safe", "")
+
+        # Convert to string if needed
+        input_str = str(input_value) if input_value is not None else ""
+
+        # URL encode
+        encoded = quote(input_str, safe=safe_chars)
+
+        # Write to memory
+        memory.write(self.config["output_key"], encoded)
+
+
+class URLUnescapeStep(StepBase):
+    """URL decode/unescape string step."""
+
+    name = "URL Unescape"
+    label = "URL Unescape"
+    description = "URL decode a percent-encoded string"
+    category = "http"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "url-unescape"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input_key": {
+                    "type": "string",
+                    "description": "Memory key containing URL encoded string"
+                },
+                "output_key": {
+                    "type": "string",
+                    "description": "Memory key to write decoded string"
+                }
+            },
+            "required": ["input_key", "output_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "URL encoded string to decode (from input_key)"
+                }
+            },
+            "required": ["input"]
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "output": {
+                    "type": "string",
+                    "description": "Decoded string (written to output_key)"
+                }
+            }
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Execute URL unescape."""
+        input_value = memory.read(self.config["input_key"])
+
+        # Convert to string if needed
+        input_str = str(input_value) if input_value is not None else ""
+
+        # URL decode
+        decoded = unquote(input_str)
+
+        # Write to memory
+        memory.write(self.config["output_key"], decoded)
+
+
+class URLBuildStep(StepBase):
+    """Build URL from components step."""
+
+    name = "URL Build"
+    label = "URL Build"
+    description = "Construct a URL from components (scheme, host, path, params, etc.)"
+    category = "http"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "url-build"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "scheme": {
+                    "type": "string",
+                    "default": "https",
+                    "description": "URL scheme (http, https, etc.)"
+                },
+                "host": {
+                    "type": "string",
+                    "description": "Hostname (e.g., api.example.com)"
+                },
+                "port": {
+                    "type": "integer",
+                    "description": "Port number (optional)"
+                },
+                "path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "URL path (e.g., /api/users)"
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "description": "Query parameters as key-value pairs"
+                },
+                "fragment": {
+                    "type": "string",
+                    "description": "URL fragment/anchor (optional)"
+                },
+                "output_key": {
+                    "type": "string",
+                    "description": "Memory key to write constructed URL"
+                }
+            },
+            "required": ["host", "output_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "Can read scheme, host, port, path, params, fragment from memory if specified as keys"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Constructed URL (written to output_key)"
+                }
+            }
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Execute URL build."""
+        scheme = self.config.get("scheme", "https")
+        host = self.config["host"]
+        port = self.config.get("port")
+        path = self.config.get("path", "")
+        params = self.config.get("params", {})
+        fragment = self.config.get("fragment", "")
+
+        # Build netloc (host:port)
+        if port:
+            netloc = f"{host}:{port}"
+        else:
+            netloc = host
+
+        # Encode query parameters
+        query = urlencode(params) if params else ""
+
+        # Construct URL using urlunparse
+        url = urlunparse((scheme, netloc, path, "", query, fragment))
+
+        # Write to memory
+        memory.write(self.config["output_key"], url)
+
+
+class URLParseStep(StepBase):
+    """Parse URL into components step."""
+
+    name = "URL Parse"
+    label = "URL Parse"
+    description = "Extract components from a URL (scheme, host, path, params, etc.)"
+    category = "http"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "url-parse"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input_key": {
+                    "type": "string",
+                    "description": "Memory key containing URL to parse"
+                },
+                "output_key": {
+                    "type": "string",
+                    "description": "Memory key to write parsed components"
+                }
+            },
+            "required": ["input_key", "output_key"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to parse (from input_key)"
+                }
+            },
+            "required": ["url"]
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "components": {
+                    "type": "object",
+                    "properties": {
+                        "scheme": {"type": "string"},
+                        "netloc": {"type": "string"},
+                        "host": {"type": "string"},
+                        "port": {"type": "integer"},
+                        "path": {"type": "string"},
+                        "params": {"type": "object"},
+                        "query": {"type": "string"},
+                        "fragment": {"type": "string"}
+                    },
+                    "description": "Parsed URL components (written to output_key)"
+                }
+            }
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Execute URL parse."""
+        url = memory.read(self.config["input_key"])
+
+        # Parse URL
+        parsed = urlparse(str(url))
+
+        # Extract host and port from netloc
+        netloc = parsed.netloc
+        host = netloc
+        port = None
+
+        if ':' in netloc:
+            host, port_str = netloc.rsplit(':', 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                host = netloc  # Not a valid port, keep full netloc
+
+        # Parse query parameters
+        params = {}
+        if parsed.query:
+            # parse_qs returns lists for each value, simplify to single values
+            parsed_params = parse_qs(parsed.query)
+            params = {k: v[0] if len(v) == 1 else v for k, v in parsed_params.items()}
+
+        # Build components dict
+        components = {
+            "scheme": parsed.scheme,
+            "netloc": parsed.netloc,
+            "host": host,
+            "port": port,
+            "path": parsed.path,
+            "params": params,
+            "query": parsed.query,
+            "fragment": parsed.fragment,
+        }
+
+        # Write to memory
+        memory.write(self.config["output_key"], components)

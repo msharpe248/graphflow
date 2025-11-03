@@ -1,0 +1,28 @@
+{
+  "name": "http",
+  "version": "1.0.0",
+  "description": "HTTP client and web utilities for API integration",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["http", "api", "web", "rest", "url", "json", "base64", "html", "scraping"],
+  "steps": [
+    "HTTPGetStep",
+    "HTTPPostStep",
+    "HTTPPutStep",
+    "HTTPPatchStep",
+    "HTTPDeleteStep",
+    "URLEscapeStep",
+    "URLUnescapeStep",
+    "URLBuildStep",
+    "URLParseStep",
+    "JSONParseStep",
+    "JSONStringifyStep",
+    "Base64EncodeStep",
+    "Base64DecodeStep",
+    "HTMLStripStep",
+    "HTMLParseStep",
+    "HTMLFindLinksStep",
+    "HTMLTableExtractStep"
+  ],
+  "ui_components": {}
+}
