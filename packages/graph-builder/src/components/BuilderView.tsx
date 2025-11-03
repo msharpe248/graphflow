@@ -3,6 +3,7 @@ import Toolbar from './Toolbar';
 import StepPalette from './StepPalette';
 import GraphCanvas from './GraphCanvas';
 import PropertiesPanel from './PropertiesPanel';
+import MemoryPanel from './MemoryPanel';
 import SettingsModal from './SettingsModal';
 
 export default function BuilderView() {
@@ -30,9 +31,17 @@ export default function BuilderView() {
           <GraphCanvas />
         </div>
 
-        {/* Right sidebar - Properties */}
-        <div className="w-80 shrink-0">
-          <PropertiesPanel />
+        {/* Right sidebar - Properties and Memory */}
+        <div className="w-96 shrink-0 flex flex-col">
+          {/* Top: Properties Panel */}
+          <div className="h-1/2 border-b">
+            <PropertiesPanel />
+          </div>
+
+          {/* Bottom: Memory Panel */}
+          <div className="h-1/2">
+            <MemoryPanel />
+          </div>
         </div>
       </div>
 

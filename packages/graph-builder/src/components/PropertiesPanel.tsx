@@ -1,9 +1,10 @@
 import { useGraphStore } from '@/stores/graphStore';
-import { Step } from '@/types/graph';
-import { X } from 'lucide-react';
+import { X, Link, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 
 export default function PropertiesPanel() {
-  const { nodes, selectedNodeId, setSelectedNode, updateNode, deleteNode } = useGraphStore();
+  const { nodes, selectedNodeId, setSelectedNode, updateNode, deleteNode, memory } = useGraphStore();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -19,24 +20,26 @@ export default function PropertiesPanel() {
 
   const { step, stepTypeInfo } = selectedNode.data;
 
+  // Helper to check if a value is a memory binding
+  const isMemoryBinding = (value: any): boolean => {
+    return typeof value === 'string' && value.startsWith('{memory.') && value.endsWith('}');
+  };
+
+  // Get all available memory fields
+  const getAllMemoryFields = (): string[] => {
+    const fields: string[] = [];
+    Object.keys(memory.inputs).forEach(k => fields.push(`{memory.${k}}`));
+    Object.keys(memory.intermediate).forEach(k => fields.push(`{memory.${k}}`));
+    Object.keys(memory.outputs).forEach(k => fields.push(`{memory.${k}}`));
+    return fields;
+  };
+
   const handleConfigChange = (key: string, value: any) => {
     updateNode(selectedNodeId!, {
       config: {
         ...step.config,
         [key]: value,
       },
-    });
-  };
-
-  const handleMemoryReadsChange = (value: string) => {
-    updateNode(selectedNodeId!, {
-      memory_reads: value.split(',').map((s) => s.trim()).filter(Boolean),
-    });
-  };
-
-  const handleMemoryWritesChange = (value: string) => {
-    updateNode(selectedNodeId!, {
-      memory_writes: value.split(',').map((s) => s.trim()).filter(Boolean),
     });
   };
 
@@ -47,10 +50,20 @@ export default function PropertiesPanel() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 border-l border-gray-200">
+    <div className="h-full flex flex-col bg-gray-50 border-l border-gray-200">
       {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Properties</h2>
+      <div className="sticky top-0 bg-white border-b border-gray-200 p-3 flex items-center justify-between">
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 hover:bg-gray-50 transition-colors flex-1 text-left -m-3 p-3"
+        >
+          {isCollapsed ? (
+            <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          )}
+          <h2 className="text-sm font-bold text-gray-900">Properties</h2>
+        </button>
         <button
           onClick={() => setSelectedNode(null)}
           className="p-1 hover:bg-gray-100 rounded"
@@ -59,7 +72,8 @@ export default function PropertiesPanel() {
         </button>
       </div>
 
-      <div className="p-4 space-y-6">
+      {!isCollapsed && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* Step info */}
         <div>
           <div
@@ -84,35 +98,26 @@ export default function PropertiesPanel() {
           />
         </div>
 
-        {/* Memory reads */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Memory Reads
-          </label>
-          <input
-            type="text"
-            value={step.memory_reads?.join(', ') || ''}
-            onChange={(e) => handleMemoryReadsChange(e.target.value)}
-            placeholder="key1, key2, key3"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-          <p className="text-xs text-gray-500 mt-1">Comma-separated memory keys to read</p>
-        </div>
-
-        {/* Memory writes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Memory Writes
-          </label>
-          <input
-            type="text"
-            value={step.memory_writes?.join(', ') || ''}
-            onChange={(e) => handleMemoryWritesChange(e.target.value)}
-            placeholder="key1, key2, key3"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-          <p className="text-xs text-gray-500 mt-1">Comma-separated memory keys to write</p>
-        </div>
+        {/* Step Inputs/Outputs Schema Info */}
+        {(stepTypeInfo.inputsSchema?.description || stepTypeInfo.outputsSchema?.description) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <h4 className="text-xs font-semibold text-blue-900 mb-2">Step Behavior</h4>
+            {stepTypeInfo.inputsSchema?.description && (
+              <div className="mb-2">
+                <p className="text-xs text-blue-800">
+                  <strong>Inputs:</strong> {stepTypeInfo.inputsSchema.description}
+                </p>
+              </div>
+            )}
+            {stepTypeInfo.outputsSchema?.description && (
+              <div>
+                <p className="text-xs text-blue-800">
+                  <strong>Outputs:</strong> {stepTypeInfo.outputsSchema.description}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Config */}
         <div>
@@ -120,71 +125,117 @@ export default function PropertiesPanel() {
             Configuration
           </label>
           <div className="space-y-3">
-            {stepTypeInfo.configSchema && Object.keys(stepTypeInfo.configSchema).length > 0 ? (
-              Object.entries(stepTypeInfo.configSchema).map(([key, schema]: [string, any]) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    {key}
-                  </label>
-                  {schema.type === 'boolean' ? (
-                    <input
-                      type="checkbox"
-                      checked={step.config[key] ?? schema.default ?? false}
-                      onChange={(e) => handleConfigChange(key, e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                  ) : schema.enum ? (
-                    <select
-                      value={step.config[key] ?? schema.default ?? ''}
-                      onChange={(e) => handleConfigChange(key, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    >
-                      <option value="">Select...</option>
-                      {schema.enum.map((opt: string) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  ) : schema.type === 'number' ? (
-                    <input
-                      type="number"
-                      value={step.config[key] ?? schema.default ?? ''}
-                      onChange={(e) => handleConfigChange(key, parseFloat(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    />
-                  ) : schema.type === 'object' || schema.type === 'array' ? (
-                    <textarea
-                      value={
-                        step.config[key]
-                          ? JSON.stringify(step.config[key], null, 2)
-                          : ''
-                      }
-                      onChange={(e) => {
-                        try {
-                          const parsed = JSON.parse(e.target.value);
-                          handleConfigChange(key, parsed);
-                        } catch {
-                          // Invalid JSON, don't update
+            {stepTypeInfo.configSchema && Object.keys(stepTypeInfo.configSchema.properties || {}).length > 0 ? (
+              Object.entries(stepTypeInfo.configSchema.properties || {}).map(([key, schema]: [string, any]) => {
+                const currentValue = step.config[key] ?? schema.default ?? '';
+                const isBound = isMemoryBinding(currentValue);
+
+                // Generate a better label from the key or use title from schema
+                const label = schema.title || key.split('_').map((word: string) =>
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ');
+
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-gray-600">
+                        {label}
+                      </label>
+                      {isBound && (
+                        <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          <Link className="w-3 h-3" />
+                          Bound to {currentValue}
+                        </span>
+                      )}
+                    </div>
+                    {schema.type === 'boolean' ? (
+                      <input
+                        type="checkbox"
+                        checked={step.config[key] ?? schema.default ?? false}
+                        onChange={(e) => handleConfigChange(key, e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                    ) : schema.enum ? (
+                      <div>
+                        <input
+                          type="text"
+                          value={currentValue}
+                          onChange={(e) => handleConfigChange(key, e.target.value)}
+                          placeholder={`e.g., ${schema.enum[0]} or {memory.field_name}`}
+                          className={`w-full px-3 py-2 border rounded-md text-sm ${
+                            isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                          }`}
+                          list={`${key}-options`}
+                        />
+                        <datalist id={`${key}-options`}>
+                          {schema.enum.map((opt: string) => (
+                            <option key={opt} value={opt} />
+                          ))}
+                          {getAllMemoryFields().map((field) => (
+                            <option key={field} value={field} />
+                          ))}
+                        </datalist>
+                      </div>
+                    ) : schema.type === 'number' ? (
+                      <input
+                        type="text"
+                        value={currentValue}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          // If it's a memory binding, keep as string; otherwise parse as number
+                          handleConfigChange(key, val.startsWith('{memory.') ? val : (val === '' ? '' : parseFloat(val)));
+                        }}
+                        placeholder="e.g., 0.7 or {memory.field_name}"
+                        className={`w-full px-3 py-2 border rounded-md text-sm ${
+                          isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                        }`}
+                        list={`${key}-memory-options`}
+                      />
+                    ) : schema.type === 'object' || schema.type === 'array' ? (
+                      <textarea
+                        value={
+                          typeof step.config[key] === 'string' ? step.config[key] :
+                          step.config[key]
+                            ? JSON.stringify(step.config[key], null, 2)
+                            : ''
                         }
-                      }}
-                      placeholder={schema.type === 'object' ? '{}' : '[]'}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-                    />
-                  ) : (
-                    <textarea
-                      value={step.config[key] ?? schema.default ?? ''}
-                      onChange={(e) => handleConfigChange(key, e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    />
-                  )}
-                  {schema.description && (
-                    <p className="text-xs text-gray-500 mt-1">{schema.description}</p>
-                  )}
-                </div>
-              ))
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith('{memory.')) {
+                            handleConfigChange(key, val);
+                          } else {
+                            try {
+                              const parsed = JSON.parse(val);
+                              handleConfigChange(key, parsed);
+                            } catch {
+                              // Invalid JSON, keep as string (might be incomplete)
+                              handleConfigChange(key, val);
+                            }
+                          }
+                        }}
+                        placeholder={`${schema.type === 'object' ? '{}' : '[]'} or {memory.field_name}`}
+                        rows={3}
+                        className={`w-full px-3 py-2 border rounded-md text-sm font-mono ${
+                          isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                        }`}
+                      />
+                    ) : (
+                      <textarea
+                        value={currentValue}
+                        onChange={(e) => handleConfigChange(key, e.target.value)}
+                        placeholder="Enter value or {memory.field_name}"
+                        rows={3}
+                        className={`w-full px-3 py-2 border rounded-md text-sm ${
+                          isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                        }`}
+                      />
+                    )}
+                    {schema.description && (
+                      <p className="text-xs text-gray-500 mt-1">{schema.description}</p>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <p className="text-xs text-gray-500">No configuration required</p>
             )}
@@ -201,6 +252,7 @@ export default function PropertiesPanel() {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -11,7 +11,7 @@ interface StepPaletteProps {
 type ViewMode = 'category' | 'plugin';
 
 export default function StepPalette({ onDragStart }: StepPaletteProps) {
-  const { stepTypes, isLoading, error, fetchStepTypes, getStepTypesByCategory, getStepTypesByPlugin } = usePluginStore();
+  const { isLoading, error, fetchStepTypes, getStepTypesByCategory, getStepTypesByPlugin } = usePluginStore();
 
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [searchQuery, setSearchQuery] = useState('');

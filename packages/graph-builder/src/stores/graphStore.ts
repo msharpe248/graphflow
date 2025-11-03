@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
+import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, MarkerType } from 'reactflow';
 import { GraphDefinition, Step, Metadata, MemorySchema, NodeData } from '@/types/graph';
 import { usePluginStore } from './pluginStore';
 
@@ -38,6 +38,30 @@ interface GraphStore {
 
 let nodeIdCounter = 1;
 
+// Helper function to find all memory bindings in use
+function findUsedMemoryBindings(nodes: Node<NodeData>[]): Set<string> {
+  const used = new Set<string>();
+
+  nodes.forEach((node) => {
+    const { step } = node.data;
+
+    // Check config values for memory bindings
+    Object.values(step.config).forEach((value) => {
+      if (typeof value === 'string' && value.startsWith('{memory.') && value.endsWith('}')) {
+        // Extract the memory key (remove '{memory.' prefix and '}' suffix)
+        const memoryKey = value.substring(8, value.length - 1);
+        used.add(memoryKey);
+      }
+    });
+
+    // Check memory_reads and memory_writes
+    step.memory_reads?.forEach((key) => used.add(key));
+    step.memory_writes?.forEach((key) => used.add(key));
+  });
+
+  return used;
+}
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   // Initial state
   metadata: {
@@ -73,10 +97,30 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     if (!stepTypeInfo) return;
 
     const id = `${stepType}_${nodeIdCounter++}`;
+
+    // Auto-create memory fields and bindings for config properties
+    const config: Record<string, any> = {};
+    const newMemoryFields: Record<string, any> = {};
+
+    if (stepTypeInfo.configSchema?.properties) {
+      Object.entries(stepTypeInfo.configSchema.properties).forEach(([key, schema]: [string, any]) => {
+        // Create memory field for this config property
+        const memoryKey = `${id}.${key}`;
+        newMemoryFields[memoryKey] = {
+          type: schema.type || 'string',
+          description: schema.description || `${key} for ${id}`,
+          required: false,
+        };
+
+        // Auto-bind config to memory location
+        config[key] = `{memory.${memoryKey}}`;
+      });
+    }
+
     const step: Step = {
       id,
       type: stepType,
-      config: {},
+      config,
       memory_reads: [],
       memory_writes: [],
     };
@@ -94,12 +138,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
     set((state) => ({
       nodes: [...state.nodes, newNode],
+      memory: {
+        ...state.memory,
+        intermediate: {
+          ...state.memory.intermediate,
+          ...newMemoryFields,
+        },
+      },
     }));
   },
 
   updateNode: (nodeId, stepUpdate) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) => {
+    set((state) => {
+      // Update the node
+      const updatedNodes = state.nodes.map((node) => {
         if (node.id === nodeId) {
           return {
             ...node,
@@ -110,15 +162,58 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
           };
         }
         return node;
-      }),
-    })),
+      });
+
+      // Find all memory bindings still in use
+      const usedBindings = findUsedMemoryBindings(updatedNodes);
+
+      // Clean up unused memory fields from intermediate namespace
+      // (only auto-created fields that match pattern <step_id>.<config_key>)
+      const cleanedIntermediate: Record<string, any> = {};
+      Object.entries(state.memory.intermediate).forEach(([key, value]) => {
+        // Keep the field if it's used OR if it doesn't match auto-created pattern
+        if (usedBindings.has(key) || !key.includes('.')) {
+          cleanedIntermediate[key] = value;
+        }
+      });
+
+      return {
+        nodes: updatedNodes,
+        memory: {
+          ...state.memory,
+          intermediate: cleanedIntermediate,
+        },
+      };
+    }),
 
   deleteNode: (nodeId) =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== nodeId),
-      edges: state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
-      selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
-    })),
+    set((state) => {
+      // Remove the node and its edges
+      const updatedNodes = state.nodes.filter((n) => n.id !== nodeId);
+      const updatedEdges = state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+
+      // Find all memory bindings still in use
+      const usedBindings = findUsedMemoryBindings(updatedNodes);
+
+      // Clean up unused memory fields from intermediate namespace
+      const cleanedIntermediate: Record<string, any> = {};
+      Object.entries(state.memory.intermediate).forEach(([key, value]) => {
+        // Keep the field if it's used OR if it doesn't match auto-created pattern
+        if (usedBindings.has(key) || !key.includes('.')) {
+          cleanedIntermediate[key] = value;
+        }
+      });
+
+      return {
+        nodes: updatedNodes,
+        edges: updatedEdges,
+        selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+        memory: {
+          ...state.memory,
+          intermediate: cleanedIntermediate,
+        },
+      };
+    }),
 
   setSelectedNode: (nodeId) =>
     set({ selectedNodeId: nodeId }),
@@ -142,7 +237,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         type: 'default',
         deletable: true,
         markerEnd: {
-          type: 'arrowclosed',
+          type: MarkerType.ArrowClosed,
           width: 25,
           height: 25,
           color: '#374151',
@@ -161,6 +256,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   loadGraph: (graph) => {
     const nodes: Node<NodeData>[] = graph.steps.map((step, index) => {
       const stepTypeInfo = usePluginStore.getState().getStepType(step.type);
+      if (!stepTypeInfo) {
+        throw new Error(`Step type "${step.type}" not found`);
+      }
       return {
         id: step.id,
         type: 'custom',
@@ -177,7 +275,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       type: 'default',
       deletable: true,
       markerEnd: {
-        type: 'arrowclosed',
+        type: MarkerType.ArrowClosed,
         width: 25,
         height: 25,
         color: '#374151',
