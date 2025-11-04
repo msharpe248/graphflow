@@ -42,7 +42,6 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
   const StatusIcon = statusConfig.icon;
 
   const formatDuration = () => {
-    if (!run.started_at) return 'Not started';
     const start = new Date(run.started_at);
     const end = run.completed_at ? new Date(run.completed_at) : new Date();
     const duration = end.getTime() - start.getTime();
@@ -113,20 +112,24 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Timeline</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Created:</span>
-                  <span className="text-gray-900">{new Date(run.created_at).toLocaleString()}</span>
+                  <span className="text-gray-600">Started:</span>
+                  <span className="text-gray-900">{new Date(run.started_at).toLocaleString()}</span>
                 </div>
-                {run.started_at && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Started:</span>
-                    <span className="text-gray-900">{new Date(run.started_at).toLocaleString()}</span>
-                  </div>
-                )}
                 {run.completed_at && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Completed:</span>
-                    <span className="text-gray-900">{new Date(run.completed_at).toLocaleString()}</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Completed:</span>
+                      <span className="text-gray-900">{new Date(run.completed_at).toLocaleString()}</span>
+                    </div>
+                    {run.started_at && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Duration:</span>
+                        <span className="text-gray-900">
+                          {Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)}s
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

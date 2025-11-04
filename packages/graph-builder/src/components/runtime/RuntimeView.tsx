@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, AlertCircle } from 'lucide-react';
-import { useHealth } from '@/hooks/useRuntime';
+import { useHealth, useAgent, useRun } from '@/hooks/useRuntime';
+import { useAppStore } from '@/stores/appStore';
 import { Agent, AgentRun } from '@/types/runtime';
 import AgentsList from './AgentsList';
 import RunsList from './RunsList';
@@ -8,8 +9,29 @@ import RunDetail from './RunDetail';
 
 export default function RuntimeView() {
   const { data: health, error: healthError } = useHealth();
+  const { runtimeContext } = useAppStore();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null);
+
+  // Fetch agent and run from context if provided
+  const { data: contextAgent } = useAgent(runtimeContext?.agentId || null);
+  const { data: contextRun } = useRun(
+    runtimeContext?.agentId || null,
+    runtimeContext?.runId || null
+  );
+
+  // Auto-select agent and run when context is provided
+  useEffect(() => {
+    if (contextAgent) {
+      setSelectedAgent(contextAgent);
+    }
+  }, [contextAgent]);
+
+  useEffect(() => {
+    if (contextRun) {
+      setSelectedRun(contextRun);
+    }
+  }, [contextRun]);
 
   // Show error if runtime is not available
   if (healthError) {

@@ -5,7 +5,7 @@ export interface Agent {
   name: string;
   description?: string;
   framework: 'pydantic_ai' | 'langgraph';
-  graph_definition: any;
+  graph_definition: any;  // GraphDefinition from @/types/graph
   created_at: string;
   updated_at: string;
 }
@@ -17,9 +17,8 @@ export interface AgentRun {
   inputs: Record<string, any>;
   outputs?: Record<string, any>;
   error?: string;
-  created_at: string;
-  started_at?: string;
-  completed_at?: string;
+  started_at: string;        // Always present, set when run is created
+  completed_at?: string;      // Optional, set when run finishes
 }
 
 export interface MemoryState {

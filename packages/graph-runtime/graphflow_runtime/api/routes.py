@@ -30,6 +30,7 @@ class AgentResponse(BaseModel):
     name: str
     description: Optional[str]
     framework: str
+    graph_definition: dict
     created_at: datetime
     updated_at: datetime
 

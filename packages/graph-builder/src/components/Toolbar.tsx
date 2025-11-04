@@ -17,7 +17,6 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showRunModal, setShowRunModal] = useState(false);
   const [validationResult, setValidationResult] = useState<any>(null);
-  const [pendingAgentId, setPendingAgentId] = useState<string | null>(null);
 
   const handleExport = () => {
     const graph = exportGraph();

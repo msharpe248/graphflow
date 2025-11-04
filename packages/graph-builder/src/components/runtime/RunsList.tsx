@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Play, Square, Trash2, Eye, Loader2, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { useRuns, useCreateRun, useStopRun, useDeleteRun } from '@/hooks/useRuntime';
+import { Square, Trash2, Eye, Loader2, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { useRuns, useStopRun, useDeleteRun } from '@/hooks/useRuntime';
 import { Agent, AgentRun } from '@/types/runtime';
 
 interface RunsListProps {
@@ -27,23 +26,8 @@ const STATUS_COLORS = {
 
 export default function RunsList({ agent, onSelectRun, selectedRunId }: RunsListProps) {
   const { data: runs, isLoading } = useRuns(agent.id);
-  const createRun = useCreateRun();
   const stopRun = useStopRun();
   const deleteRun = useDeleteRun();
-  const [inputs, setInputs] = useState('{}');
-
-  const handleCreateRun = () => {
-    try {
-      const inputsObj = JSON.parse(inputs);
-      createRun.mutate({
-        agentId: agent.id,
-        data: { inputs: inputsObj },
-      });
-      setInputs('{}');
-    } catch (error) {
-      alert('Invalid JSON in inputs');
-    }
-  };
 
   const handleStop = (runId: string) => {
     stopRun.mutate({ agentId: agent.id, runId });
@@ -59,37 +43,9 @@ export default function RunsList({ agent, onSelectRun, selectedRunId }: RunsList
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{agent.name}</h2>
-            <p className="text-xs text-gray-500 mt-1">{agent.description}</p>
-          </div>
-        </div>
-
-        {/* Create run form */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Run Inputs (JSON)
-          </label>
-          <textarea
-            value={inputs}
-            onChange={(e) => setInputs(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-            placeholder='{"input_key": "value"}'
-          />
-          <button
-            onClick={handleCreateRun}
-            disabled={createRun.isPending}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-          >
-            {createRun.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4" />
-            )}
-            Start New Run
-          </button>
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{agent.name}</h2>
+          <p className="text-xs text-gray-500 mt-1">{agent.description}</p>
         </div>
       </div>
 
@@ -135,7 +91,13 @@ export default function RunsList({ agent, onSelectRun, selectedRunId }: RunsList
                       </span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      Started: {new Date(run.created_at).toLocaleString()}
+                      Started: {new Date(run.started_at).toLocaleString()}
+                      {run.completed_at && (
+                        <>
+                          {' • '}
+                          Duration: {Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)}s
+                        </>
+                      )}
                     </div>
                     {run.error && (
                       <div className="text-xs text-red-600 mt-1 line-clamp-2">

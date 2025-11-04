@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Trash2, Play, Upload, Loader2 } from 'lucide-react';
-import { useAgents, useDeleteAgent, useCreateAgent } from '@/hooks/useRuntime';
+import { useAgents, useDeleteAgent, useCreateAgent, useCreateRun } from '@/hooks/useRuntime';
 import { useGraphStore } from '@/stores/graphStore';
 import { Agent } from '@/types/runtime';
+import RunInputModal from '../RunInputModal';
+import { GraphDefinition } from '@/types/graph';
 
 interface AgentsListProps {
   onSelectAgent: (agent: Agent) => void;
@@ -13,8 +15,11 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
   const { data: agents, isLoading, error } = useAgents();
   const deleteAgent = useDeleteAgent();
   const createAgent = useCreateAgent();
+  const createRun = useCreateRun();
   const exportGraph = useGraphStore((state) => state.exportGraph);
   const [framework, setFramework] = useState<'pydantic_ai' | 'langgraph'>('pydantic_ai');
+  const [showRunModal, setShowRunModal] = useState(false);
+  const [agentToRun, setAgentToRun] = useState<Agent | null>(null);
 
   const handleDelete = (agentId: string, agentName: string) => {
     if (confirm(`Delete agent "${agentName}"?`)) {
@@ -30,6 +35,30 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
       framework,
       graph_definition: graph,
     });
+  };
+
+  const handleStartRun = (agent: Agent) => {
+    setAgentToRun(agent);
+    setShowRunModal(true);
+  };
+
+  const handleRunWithInputs = async (inputs: Record<string, any>) => {
+    if (!agentToRun) return;
+
+    try {
+      await createRun.mutateAsync({
+        agentId: agentToRun.id,
+        data: { inputs },
+      });
+
+      // Close modal and select agent to view the new run
+      setShowRunModal(false);
+      setAgentToRun(null);
+      onSelectAgent(agentToRun);
+    } catch (error) {
+      console.error('Failed to create run:', error);
+      alert(`Failed to start run: ${(error as Error).message}`);
+    }
   };
 
   if (isLoading) {
@@ -126,10 +155,10 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSelectAgent(agent);
+                      handleStartRun(agent);
                     }}
                     className="p-1.5 hover:bg-green-50 text-green-600 rounded transition-colors"
-                    title="View runs"
+                    title="Start new run"
                   >
                     <Play className="w-4 h-4" />
                   </button>
@@ -156,6 +185,21 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
           </div>
         )}
       </div>
+
+      {/* Run Input Modal */}
+      {agentToRun && (
+        <RunInputModal
+          isOpen={showRunModal}
+          onClose={() => {
+            setShowRunModal(false);
+            setAgentToRun(null);
+          }}
+          onRun={handleRunWithInputs}
+          graphName={agentToRun.name}
+          memory={(agentToRun.graph_definition as GraphDefinition).memory}
+          validation={{ isValid: true, errors: [], warnings: [], hasIssues: false }}
+        />
+      )}
     </div>
   );
 }
