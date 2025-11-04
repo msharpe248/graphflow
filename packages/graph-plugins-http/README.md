@@ -33,8 +33,10 @@ pip install -e packages/graph-plugins-http
   "id": "fetch_data",
   "type": "http-get",
   "config": {
-    "url": "https://api.example.com/users",
-    "response_key": "users_data"
+    "url": "https://api.example.com/users"
+  },
+  "outputs": {
+    "response": "{memory.users_data}"
   }
 }
 ```
@@ -53,8 +55,10 @@ pip install -e packages/graph-plugins-http
     },
     "headers": {
       "Content-Type": "application/json"
-    },
-    "response_key": "created_user"
+    }
+  },
+  "outputs": {
+    "response": "{memory.created_user}"
   }
 }
 ```
@@ -70,9 +74,11 @@ pip install -e packages/graph-plugins-http
     "auth": {
       "type": "bearer",
       "token": "{memory.api_token}"
-    },
-    "response_key": "protected_data",
-    "status_code_key": "status"
+    }
+  },
+  "outputs": {
+    "response": "{memory.protected_data}",
+    "status_code": "{memory.status}"
   }
 }
 ```
@@ -95,22 +101,27 @@ Perform HTTP GET request to fetch data from a URL.
 - `retries` (integer, default: 2): Number of retry attempts
 - `verify_ssl` (boolean, default: true): Verify SSL certificates
 - `follow_redirects` (boolean, default: true): Follow HTTP redirects
-- `response_key` (string, required): Memory key for response body
-- `status_code_key` (string): Memory key for status code (optional)
-- `headers_key` (string): Memory key for response headers (optional)
+
+**Outputs:**
+- `response`: HTTP response body
+- `status_code`: HTTP status code
+- `headers`: Response headers
 
 **Example:**
 ```json
 {
+  "id": "fetch_user",
   "type": "http-get",
   "config": {
     "url": "https://api.github.com/users/{memory.username}",
     "headers": {
       "Accept": "application/json",
       "User-Agent": "GraphFlow"
-    },
-    "response_key": "github_user",
-    "status_code_key": "status"
+    }
+  },
+  "outputs": {
+    "response": "{memory.github_user}",
+    "status_code": "{memory.status}"
   }
 }
 ```
@@ -122,9 +133,12 @@ Perform HTTP POST request to send data to a URL.
 **Config:** Same as `http-get`, plus:
 - `body` (any): Request body (JSON object, string, or template)
 
+**Outputs:** Same as `http-get`
+
 **Example:**
 ```json
 {
+  "id": "send_webhook",
   "type": "http-post",
   "config": {
     "url": "https://api.example.com/webhooks",
@@ -135,8 +149,10 @@ Perform HTTP POST request to send data to a URL.
     "headers": {
       "Content-Type": "application/json",
       "X-API-Key": "{memory.api_key}"
-    },
-    "response_key": "webhook_response"
+    }
+  },
+  "outputs": {
+    "response": "{memory.webhook_response}"
   }
 }
 ```
@@ -147,17 +163,22 @@ Perform HTTP PUT request to update a resource.
 
 **Config:** Same as `http-post`
 
+**Outputs:** Same as `http-get`
+
 **Example:**
 ```json
 {
+  "id": "update_user",
   "type": "http-put",
   "config": {
     "url": "https://api.example.com/users/{memory.user_id}",
     "body": {
       "name": "{memory.updated_name}",
       "email": "{memory.updated_email}"
-    },
-    "response_key": "updated_user"
+    }
+  },
+  "outputs": {
+    "response": "{memory.updated_user}"
   }
 }
 ```
@@ -168,16 +189,21 @@ Perform HTTP PATCH request for partial updates.
 
 **Config:** Same as `http-post`
 
+**Outputs:** Same as `http-get`
+
 **Example:**
 ```json
 {
+  "id": "patch_user",
   "type": "http-patch",
   "config": {
     "url": "https://api.example.com/users/{memory.user_id}",
     "body": {
       "email": "{memory.new_email}"
-    },
-    "response_key": "patched_user"
+    }
+  },
+  "outputs": {
+    "response": "{memory.patched_user}"
   }
 }
 ```
@@ -188,14 +214,19 @@ Perform HTTP DELETE request to remove a resource.
 
 **Config:** Same as `http-get`
 
+**Outputs:** Same as `http-get`
+
 **Example:**
 ```json
 {
+  "id": "delete_user",
   "type": "http-delete",
   "config": {
-    "url": "https://api.example.com/users/{memory.user_id}",
-    "response_key": "delete_response",
-    "status_code_key": "status"
+    "url": "https://api.example.com/users/{memory.user_id}"
+  },
+  "outputs": {
+    "response": "{memory.delete_response}",
+    "status_code": "{memory.status}"
   }
 }
 ```
@@ -209,18 +240,23 @@ Perform HTTP DELETE request to remove a resource.
 URL encode a string for safe use in URLs.
 
 **Config:**
-- `input_key` (string, required): Memory key containing string to encode
-- `output_key` (string, required): Memory key to write encoded string
+- `input` (string, required): Value to encode (supports `{memory.variable}` syntax)
 - `safe` (string, optional): Characters that should not be encoded (default: empty)
+
+**Outputs:**
+- `output`: URL encoded string
 
 **Example:**
 ```json
 {
+  "id": "encode_param",
   "type": "url-escape",
   "config": {
-    "input_key": "user_input",
-    "output_key": "encoded_input",
+    "input": "{memory.user_input}",
     "safe": "/"
+  },
+  "outputs": {
+    "output": "{memory.encoded_input}"
   }
 }
 ```
@@ -230,16 +266,21 @@ URL encode a string for safe use in URLs.
 URL decode a percent-encoded string.
 
 **Config:**
-- `input_key` (string, required): Memory key containing URL encoded string
-- `output_key` (string, required): Memory key to write decoded string
+- `input` (string, required): URL encoded string to decode
+
+**Outputs:**
+- `output`: Decoded string
 
 **Example:**
 ```json
 {
+  "id": "decode_param",
   "type": "url-unescape",
   "config": {
-    "input_key": "encoded_param",
-    "output_key": "decoded_param"
+    "input": "{memory.encoded_param}"
+  },
+  "outputs": {
+    "output": "{memory.decoded_param}"
   }
 }
 ```
@@ -255,11 +296,14 @@ Construct a URL from components.
 - `path` (string, default: ""): URL path (e.g., /api/users)
 - `params` (object, optional): Query parameters as key-value pairs
 - `fragment` (string, optional): URL fragment/anchor
-- `output_key` (string, required): Memory key to write constructed URL
+
+**Outputs:**
+- `output`: Constructed URL string
 
 **Example:**
 ```json
 {
+  "id": "build_api_url",
   "type": "url-build",
   "config": {
     "scheme": "https",
@@ -268,8 +312,10 @@ Construct a URL from components.
     "params": {
       "q": "{memory.search_query}",
       "limit": "10"
-    },
-    "output_key": "api_url"
+    }
+  },
+  "outputs": {
+    "output": "{memory.api_url}"
   }
 }
 ```
@@ -279,26 +325,29 @@ Construct a URL from components.
 Extract components from a URL.
 
 **Config:**
-- `input_key` (string, required): Memory key containing URL to parse
-- `output_key` (string, required): Memory key to write parsed components
+- `input` (string, required): URL to parse
 
-**Output:** Object with fields:
-- `scheme`: URL scheme (http, https, etc.)
-- `netloc`: Full network location (host:port)
-- `host`: Hostname only
-- `port`: Port number (if present)
-- `path`: URL path
-- `params`: Query parameters as object
-- `query`: Raw query string
-- `fragment`: URL fragment/anchor
+**Outputs:**
+- `output`: Object with fields:
+  - `scheme`: URL scheme (http, https, etc.)
+  - `netloc`: Full network location (host:port)
+  - `host`: Hostname only
+  - `port`: Port number (if present)
+  - `path`: URL path
+  - `params`: Query parameters as object
+  - `query`: Raw query string
+  - `fragment`: URL fragment/anchor
 
 **Example:**
 ```json
 {
+  "id": "parse_url",
   "type": "url-parse",
   "config": {
-    "input_key": "full_url",
-    "output_key": "url_components"
+    "input": "{memory.full_url}"
+  },
+  "outputs": {
+    "output": "{memory.url_components}"
   }
 }
 ```
@@ -312,16 +361,21 @@ Extract components from a URL.
 Parse a JSON string into a Python object/dict.
 
 **Config:**
-- `input_key` (string, required): Memory key containing JSON string
-- `output_key` (string, required): Memory key to write parsed object
+- `input` (string, required): JSON string to parse
+
+**Outputs:**
+- `output`: Parsed object/dict
 
 **Example:**
 ```json
 {
+  "id": "parse_json",
   "type": "json-parse",
   "config": {
-    "input_key": "json_response",
-    "output_key": "parsed_data"
+    "input": "{memory.json_response}"
+  },
+  "outputs": {
+    "output": "{memory.parsed_data}"
   }
 }
 ```
@@ -331,20 +385,25 @@ Parse a JSON string into a Python object/dict.
 Convert a Python object/dict to a JSON string.
 
 **Config:**
-- `input_key` (string, required): Memory key containing object to stringify
-- `output_key` (string, required): Memory key to write JSON string
+- `input` (any, required): Object to convert to JSON
 - `indent` (integer, optional): Number of spaces for indentation (for pretty printing)
 - `sort_keys` (boolean, default: false): Sort dictionary keys in output
+
+**Outputs:**
+- `output`: JSON string
 
 **Example:**
 ```json
 {
+  "id": "stringify_object",
   "type": "json-stringify",
   "config": {
-    "input_key": "data_object",
-    "output_key": "json_string",
+    "input": "{memory.data_object}",
     "indent": 2,
     "sort_keys": true
+  },
+  "outputs": {
+    "output": "{memory.json_string}"
   }
 }
 ```
@@ -354,17 +413,22 @@ Convert a Python object/dict to a JSON string.
 Encode a string or bytes to Base64.
 
 **Config:**
-- `input_key` (string, required): Memory key containing data to encode
-- `output_key` (string, required): Memory key to write Base64 encoded string
+- `input` (string, required): Data to encode
 - `encoding` (string, default: "utf-8"): Text encoding to use if input is string
+
+**Outputs:**
+- `output`: Base64 encoded string
 
 **Example:**
 ```json
 {
+  "id": "encode_text",
   "type": "base64-encode",
   "config": {
-    "input_key": "plain_text",
-    "output_key": "encoded_text"
+    "input": "{memory.plain_text}"
+  },
+  "outputs": {
+    "output": "{memory.encoded_text}"
   }
 }
 ```
@@ -374,18 +438,23 @@ Encode a string or bytes to Base64.
 Decode a Base64 encoded string.
 
 **Config:**
-- `input_key` (string, required): Memory key containing Base64 encoded string
-- `output_key` (string, required): Memory key to write decoded data
+- `input` (string, required): Base64 encoded string to decode
 - `encoding` (string, default: "utf-8"): Text encoding to use for output string
 - `as_bytes` (boolean, default: false): Return raw bytes instead of decoded string
+
+**Outputs:**
+- `output`: Decoded data
 
 **Example:**
 ```json
 {
+  "id": "decode_text",
   "type": "base64-decode",
   "config": {
-    "input_key": "encoded_data",
-    "output_key": "decoded_text"
+    "input": "{memory.encoded_data}"
+  },
+  "outputs": {
+    "output": "{memory.decoded_text}"
   }
 }
 ```
@@ -399,20 +468,25 @@ Decode a Base64 encoded string.
 Remove HTML tags from content, leaving only plain text.
 
 **Config:**
-- `input_key` (string, required): Memory key containing HTML content to strip
-- `output_key` (string, required): Memory key to write plain text
+- `input` (string, required): HTML content to strip
 - `separator` (string, default: " "): Separator to use between text elements
 - `strip_whitespace` (boolean, default: true): Remove excess whitespace from output
+
+**Outputs:**
+- `output`: Plain text
 
 **Example:**
 ```json
 {
+  "id": "strip_html",
   "type": "html-strip",
   "config": {
-    "input_key": "html_response",
-    "output_key": "plain_text",
+    "input": "{memory.html_response}",
     "separator": " ",
     "strip_whitespace": true
+  },
+  "outputs": {
+    "output": "{memory.plain_text}"
   }
 }
 ```
@@ -422,27 +496,32 @@ Remove HTML tags from content, leaving only plain text.
 Extract data from HTML using CSS selectors (powered by BeautifulSoup).
 
 **Config:**
-- `input_key` (string, required): Memory key containing HTML content to parse
-- `output_key` (string, required): Memory key to write extracted data
+- `input` (string, required): HTML content to parse
 - `selectors` (object, required): CSS selectors to extract data. Each key maps to a selector config with:
   - `selector` (string): CSS selector to find element(s)
   - `attribute` (string, optional): Extract attribute value instead of text
   - `multiple` (boolean, default: false): Find all matches instead of just first
 - `parser` (string, default: "lxml"): HTML parser to use (lxml, html.parser, html5lib)
 
+**Outputs:**
+- `output`: Extracted data as object
+
 **Example:**
 ```json
 {
+  "id": "parse_html",
   "type": "html-parse",
   "config": {
-    "input_key": "html_page",
-    "output_key": "extracted_data",
+    "input": "{memory.html_page}",
     "selectors": {
       "title": {"selector": "h1"},
       "description": {"selector": "meta[name='description']", "attribute": "content"},
       "articles": {"selector": "article h2", "multiple": true},
       "first_link": {"selector": "a", "attribute": "href"}
     }
+  },
+  "outputs": {
+    "output": "{memory.extracted_data}"
   }
 }
 ```
@@ -452,20 +531,25 @@ Extract data from HTML using CSS selectors (powered by BeautifulSoup).
 Extract all links (URLs) from HTML content.
 
 **Config:**
-- `input_key` (string, required): Memory key containing HTML content
-- `output_key` (string, required): Memory key to write list of links
+- `input` (string, required): HTML content
 - `absolute_only` (boolean, default: false): Only return absolute URLs (starting with http/https)
 - `unique` (boolean, default: true): Remove duplicate URLs
+
+**Outputs:**
+- `output`: List of links
 
 **Example:**
 ```json
 {
+  "id": "extract_links",
   "type": "html-find-links",
   "config": {
-    "input_key": "webpage_html",
-    "output_key": "all_links",
+    "input": "{memory.webpage_html}",
     "absolute_only": true,
     "unique": true
+  },
+  "outputs": {
+    "output": "{memory.all_links}"
   }
 }
 ```
@@ -475,24 +559,27 @@ Extract all links (URLs) from HTML content.
 Extract data from HTML tables into structured format.
 
 **Config:**
-- `input_key` (string, required): Memory key containing HTML content with tables
-- `output_key` (string, required): Memory key to write extracted table data
+- `input` (string, required): HTML content with tables
 - `table_selector` (string, default: "table"): CSS selector to find table
 - `headers` (boolean, default: true): First row contains headers (creates dict rows)
 - `skip_rows` (integer, default: 0): Number of rows to skip at start
 
-**Output:** When `headers=true`, returns array of dicts with column names as keys. When `headers=false`, returns array of arrays.
+**Outputs:**
+- `output`: Extracted table data (array of dicts when headers=true, array of arrays when headers=false)
 
 **Example:**
 ```json
 {
+  "id": "extract_table",
   "type": "html-table-extract",
   "config": {
-    "input_key": "html_with_table",
-    "output_key": "table_data",
+    "input": "{memory.html_with_table}",
     "table_selector": "table.data-table",
     "headers": true,
     "skip_rows": 0
+  },
+  "outputs": {
+    "output": "{memory.table_data}"
   }
 }
 ```
@@ -571,16 +658,20 @@ The plugin handles various error scenarios:
       "type": "http-post",
       "config": {
         "url": "https://api.example.com/items",
-        "body": {"name": "{memory.item_name}"},
-        "response_key": "created_item"
+        "body": {"name": "{memory.item_name}"}
+      },
+      "outputs": {
+        "response": "{memory.created_item}"
       }
     },
     {
       "id": "read",
       "type": "http-get",
       "config": {
-        "url": "https://api.example.com/items/{memory.created_item.id}",
-        "response_key": "item_data"
+        "url": "https://api.example.com/items/{memory.created_item.id}"
+      },
+      "outputs": {
+        "response": "{memory.item_data}"
       }
     },
     {
@@ -588,16 +679,20 @@ The plugin handles various error scenarios:
       "type": "http-put",
       "config": {
         "url": "https://api.example.com/items/{memory.created_item.id}",
-        "body": {"name": "{memory.updated_name}"},
-        "response_key": "updated_item"
+        "body": {"name": "{memory.updated_name}"}
+      },
+      "outputs": {
+        "response": "{memory.updated_item}"
       }
     },
     {
       "id": "delete",
       "type": "http-delete",
       "config": {
-        "url": "https://api.example.com/items/{memory.created_item.id}",
-        "response_key": "delete_result"
+        "url": "https://api.example.com/items/{memory.created_item.id}"
+      },
+      "outputs": {
+        "response": "{memory.delete_result}"
       }
     }
   ]
@@ -613,8 +708,10 @@ The plugin handles various error scenarios:
   "config": {
     "url": "https://flaky-api.example.com/data",
     "timeout": 60,
-    "retries": 5,
-    "response_key": "data"
+    "retries": 5
+  },
+  "outputs": {
+    "response": "{memory.data}"
   }
 }
 ```
@@ -626,8 +723,10 @@ The plugin handles various error scenarios:
   "id": "download_file",
   "type": "http-get",
   "config": {
-    "url": "https://example.com/files/document.pdf",
-    "response_key": "file_content"
+    "url": "https://example.com/files/document.pdf"
+  },
+  "outputs": {
+    "response": "{memory.file_content}"
   }
 }
 ```
@@ -664,9 +763,8 @@ from graphflow_http import HTTPGetStep, HTTPPostStep, HTTPPutStep, HTTPPatchStep
 # All step classes are available for direct instantiation
 step = HTTPGetStep(
     id="fetch_api",
-    config={"url": "https://api.example.com", "response_key": "data"},
-    memory_reads=[],
-    memory_writes=["data"]
+    config={"url": "https://api.example.com"},
+    outputs={"response": "{memory.data}"}
 )
 ```
 
@@ -705,7 +803,11 @@ mypy graphflow_http/
   - [x] html-parse - Extract data with CSS selectors
   - [x] html-find-links - Extract all links from HTML
   - [x] html-table-extract - Extract data from HTML tables
-- [ ] Phase 4: Advanced Features
+- [x] Phase 4: Memory Reference Refactor
+  - [x] Unified `{memory.variable}` syntax throughout
+  - [x] Removed `*_key` config fields in favor of outputs object
+  - [x] Consistent input/output patterns across all steps
+- [ ] Phase 5: Advanced Features
   - [ ] Cookie jar management
   - [ ] Session persistence
   - [ ] Request/response middleware

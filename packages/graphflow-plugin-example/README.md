@@ -71,6 +71,8 @@ List your step types:
 Create step classes that inherit from `StepBase`:
 
 ```python
+import re
+from typing import Any, Dict
 from graphflow_core.steps.base import StepBase
 from graphflow_core.memory.store import MemoryStore
 
@@ -85,22 +87,74 @@ class MyCustomStep(StepBase):
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
+        """Configuration schema - parameters that control step behavior."""
         return {
             "type": "object",
             "properties": {
-                "my_config": {
+                "input": {
                     "type": "string",
-                    "description": "Configuration parameter"
+                    "description": "Input value using {memory.variable} syntax"
+                },
+                "param": {
+                    "type": "string",
+                    "description": "A configuration parameter"
+                }
+            },
+            "required": ["input"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """Describes what this step reads from memory."""
+        return {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "string",
+                    "description": "Input data to process"
+                }
+            },
+            "required": ["data"]
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """Describes what this step writes to memory."""
+        return {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "object",
+                    "description": "Processing result"
                 }
             }
         }
 
     async def execute(self, memory: MemoryStore) -> None:
-        # Your step logic here
-        value = self.config.get("my_config")
-        # ...
-        if self.memory_writes:
-            memory.write(self.memory_writes[0], result)
+        """Execute step logic."""
+        # Parse memory references from config
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        # Read input from memory
+        input_config = self.config.get("input", "")
+        match = pattern.search(input_config)
+        if match:
+            input_key = match.group(1)
+            input_value = memory.read(input_key)
+
+        # Process data
+        result = {
+            "status": "success",
+            "data": input_value
+        }
+
+        # Write output to memory
+        if "result" in self.outputs:
+            output_template = self.outputs["result"]
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, result)
 ```
 
 ## Step Metadata
