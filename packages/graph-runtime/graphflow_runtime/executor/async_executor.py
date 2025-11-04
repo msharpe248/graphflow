@@ -91,8 +91,8 @@ class AsyncExecutor:
             sys.modules[f"agent_{run_id}"] = module
             spec.loader.exec_module(module)
 
-            # Create agent instance
-            agent = module.GeneratedAgent()
+            # Create agent instance with logging enabled
+            agent = module.GeneratedAgent(use_logging=True)
 
             # Store memory reference for inspection
             self._memory_stores[run_id] = agent.memory
@@ -100,9 +100,12 @@ class AsyncExecutor:
             # Run agent
             outputs = await agent.run(inputs)
 
-            # Call completion callback
+            # Get execution log
+            execution_log = agent.get_execution_log() if hasattr(agent, 'get_execution_log') else []
+
+            # Call completion callback with outputs and log
             if on_complete:
-                await on_complete(run_id, outputs)
+                await on_complete(run_id, outputs, execution_log)
 
         except asyncio.CancelledError:
             # Task was cancelled (stopped by user)

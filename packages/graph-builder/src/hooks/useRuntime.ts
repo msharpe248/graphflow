@@ -48,8 +48,12 @@ export const useDeleteAgent = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (agentId: string) => runtime.deleteAgent(agentId),
-    onSuccess: () => {
+    onSuccess: (_, agentId) => {
+      // Invalidate the agents list
       queryClient.invalidateQueries({ queryKey: keys.agents });
+      // Remove all cached data for this specific agent
+      queryClient.removeQueries({ queryKey: keys.agent(agentId) });
+      queryClient.removeQueries({ queryKey: keys.runs(agentId) });
     },
   });
 };

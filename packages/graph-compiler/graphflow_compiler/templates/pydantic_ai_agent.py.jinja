@@ -5,9 +5,13 @@ class GeneratedAgent:
     {{ graph.metadata.description or '' }}
     """
 
-    def __init__(self):
+    def __init__(self, use_logging=True):
         """Initialize agent with memory store."""
-        self.memory = MemoryStore(schema=MEMORY_SCHEMA)
+        if use_logging:
+            from graphflow_runtime.executor.logging_memory import LoggingMemoryStore
+            self.memory = LoggingMemoryStore(schema=MEMORY_SCHEMA)
+        else:
+            self.memory = MemoryStore(schema=MEMORY_SCHEMA)
 
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -24,6 +28,10 @@ class GeneratedAgent:
 
         # Execute steps in order
 {% for step_id in execution_order %}
+{% set step = graph.steps | selectattr('id', 'equalto', step_id) | first %}
+        # Set current step for logging
+        if hasattr(self.memory, 'set_current_step'):
+            self.memory.set_current_step("{{ step.id }}", "{{ step.label }}")
         await self._execute_{{ step_id | pythonize }}()
 {% endfor %}
 
@@ -43,3 +51,9 @@ class GeneratedAgent:
     def get_memory_state(self) -> Dict[str, Any]:
         """Get current memory state as dictionary."""
         return self.memory.to_dict()
+
+    def get_execution_log(self) -> list:
+        """Get execution log if using LoggingMemoryStore."""
+        if hasattr(self.memory, 'get_log'):
+            return self.memory.get_log()
+        return []

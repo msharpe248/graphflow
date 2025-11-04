@@ -49,6 +49,7 @@ class RunResponse(BaseModel):
     inputs: dict
     outputs: Optional[dict]
     error: Optional[str]
+    execution_log: Optional[list]
     started_at: datetime
     completed_at: Optional[datetime]
 
@@ -233,13 +234,14 @@ async def start_run(
     graph = GraphDefinition(**agent.graph_definition)
 
     # Define completion callback
-    async def on_complete(run_id: str, outputs: dict):
+    async def on_complete(run_id: str, outputs: dict, execution_log: list = None):
         db_session = next(get_db())
         try:
             run_record = db_session.query(AgentRun).filter(AgentRun.id == run_id).first()
             if run_record:
                 run_record.status = "completed"
                 run_record.outputs = outputs
+                run_record.execution_log = execution_log or []
                 run_record.completed_at = datetime.utcnow()
                 db_session.commit()
         finally:

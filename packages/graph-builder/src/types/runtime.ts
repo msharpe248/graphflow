@@ -17,8 +17,19 @@ export interface AgentRun {
   inputs: Record<string, any>;
   outputs?: Record<string, any>;
   error?: string;
+  execution_log?: ExecutionLogEntry[];
   started_at: string;        // Always present, set when run is created
   completed_at?: string;      // Optional, set when run finishes
+}
+
+export interface ExecutionLogEntry {
+  timestamp: string;
+  operation: 'read' | 'write';
+  key: string;
+  namespace: string;
+  value?: any;
+  step_id?: string;
+  step_label?: string;
 }
 
 export interface MemoryState {

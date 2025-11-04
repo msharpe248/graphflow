@@ -39,6 +39,7 @@ class AgentRun(Base):
     inputs = Column(JSON, nullable=False)
     outputs = Column(JSON, nullable=True)
     error = Column(Text, nullable=True)
+    execution_log = Column(JSON, nullable=True)  # List of execution log entries
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, AlertCircle, CheckCircle, Clock, Square, Database } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Clock, Square, Database, List } from 'lucide-react';
 import { useRun, useMemory } from '@/hooks/useRuntime';
 
 interface RunDetailProps {
@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
 export default function RunDetail({ agentId, runId }: RunDetailProps) {
   const { data: run, isLoading: runLoading } = useRun(agentId, runId);
   const { data: memory, isLoading: memoryLoading } = useMemory(agentId, runId);
-  const [activeTab, setActiveTab] = useState<'details' | 'memory'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'memory' | 'execution'>('details');
 
   if (runLoading) {
     return (
@@ -100,6 +100,20 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
             <Database className="w-4 h-4" />
             Memory
           </button>
+          <button
+            onClick={() => setActiveTab('execution')}
+            className={`
+              flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors border-b-2
+              ${
+                activeTab === 'execution'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }
+            `}
+          >
+            <List className="w-4 h-4" />
+            Execution
+          </button>
         </div>
       </div>
 
@@ -162,7 +176,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'memory' ? (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Memory State</h3>
             {memoryLoading ? (
@@ -201,6 +215,120 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
               </div>
             ) : (
               <p className="text-sm text-gray-500">Memory not available</p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Execution Log</h3>
+            {run.execution_log && run.execution_log.length > 0 ? (
+              <div className="space-y-3">
+                {(() => {
+                  // Group entries by step
+                  const stepGroups = new Map<string, typeof run.execution_log>();
+                  run.execution_log.forEach((entry) => {
+                    const stepId = entry.step_id || 'unknown';
+                    if (!stepGroups.has(stepId)) {
+                      stepGroups.set(stepId, []);
+                    }
+                    stepGroups.get(stepId)!.push(entry);
+                  });
+
+                  return Array.from(stepGroups.entries()).map(([stepId, entries], idx) => {
+                    const stepLabel = entries[0]?.step_label || stepId;
+                    const reads = entries.filter(e => e.operation === 'read');
+                    const writes = entries.filter(e => e.operation === 'write');
+
+                    return (
+                      <div
+                        key={idx}
+                        className="border border-gray-200 rounded-lg overflow-hidden"
+                      >
+                        {/* Step Header */}
+                        <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
+                          <h4 className="font-semibold text-gray-900">{stepLabel}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {reads.length} input(s) read, {writes.length} output(s) written
+                          </p>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                          {/* Inputs (Reads) */}
+                          {reads.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                                Inputs
+                              </h5>
+                              <div className="space-y-2">
+                                {reads.map((entry, readIdx) => (
+                                  <div
+                                    key={readIdx}
+                                    className="bg-blue-50 border border-blue-200 rounded p-2"
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono text-xs font-semibold text-blue-900">
+                                          {entry.key}
+                                        </span>
+                                        <span className="text-xs text-blue-600">
+                                          ({entry.namespace})
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {entry.value !== undefined && (
+                                      <pre className="mt-1 p-2 bg-white border border-blue-100 rounded text-xs font-mono overflow-x-auto max-h-32">
+                                        {JSON.stringify(entry.value, null, 2)}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Outputs (Writes) */}
+                          {writes.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                                Outputs
+                              </h5>
+                              <div className="space-y-2">
+                                {writes.map((entry, writeIdx) => (
+                                  <div
+                                    key={writeIdx}
+                                    className="bg-green-50 border border-green-200 rounded p-2"
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono text-xs font-semibold text-green-900">
+                                          {entry.key}
+                                        </span>
+                                        <span className="text-xs text-green-600">
+                                          ({entry.namespace})
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {entry.value !== undefined && (
+                                      <pre className="mt-1 p-2 bg-white border border-green-100 rounded text-xs font-mono overflow-x-auto max-h-32">
+                                        {JSON.stringify(entry.value, null, 2)}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                {run.status === 'completed'
+                  ? 'No execution log available for this run'
+                  : 'Execution log will appear when the run completes'}
+              </p>
             )}
           </div>
         )}
