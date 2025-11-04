@@ -106,7 +106,7 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
+        <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
           <select
             value={field.type}
             onChange={(e) => handleUpdateField(namespace, key, { type: e.target.value })}
@@ -132,13 +132,16 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
           )}
         </div>
 
-        <input
-          type="text"
-          value={field.default !== undefined ? field.default : ''}
-          onChange={(e) => handleUpdateField(namespace, key, { default: e.target.value })}
-          placeholder="Default value (optional)..."
-          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
-        />
+        <div>
+          <label className="text-xs text-gray-600 block mb-1">Value</label>
+          <input
+            type="text"
+            value={field.default !== undefined ? field.default : ''}
+            onChange={(e) => handleUpdateField(namespace, key, { default: e.target.value })}
+            placeholder="Enter value..."
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+          />
+        </div>
       </div>
     );
   };

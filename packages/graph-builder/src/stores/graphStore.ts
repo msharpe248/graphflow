@@ -19,6 +19,7 @@ interface GraphStore {
   // Actions
   setMetadata: (metadata: Partial<Metadata>) => void;
   setMemory: (memory: Partial<MemorySchema>) => void;
+  setMemoryValue: (namespace: 'inputs' | 'outputs' | 'intermediate', key: string, value: any) => void;
 
   // Node operations
   addNode: (stepType: string, position: { x: number; y: number }) => void;
@@ -110,6 +111,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setMemory: (memory) =>
     set((state) => ({
       memory: { ...state.memory, ...memory },
+    })),
+
+  setMemoryValue: (namespace, key, value) =>
+    set((state) => ({
+      memory: {
+        ...state.memory,
+        [namespace]: {
+          ...state.memory[namespace],
+          [key]: {
+            ...state.memory[namespace][key],
+            default: value,
+          },
+        },
+      },
     })),
 
   // Node operations
