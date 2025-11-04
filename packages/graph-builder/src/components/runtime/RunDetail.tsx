@@ -49,7 +49,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col min-w-0">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-start gap-3 mb-3">
@@ -118,7 +118,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 min-w-0">
         {activeTab === 'details' ? (
           <div className="space-y-4">
             {/* Timestamps */}
@@ -221,7 +221,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Execution Log</h3>
             {run.execution_log && run.execution_log.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 min-w-0">
                 {(() => {
                   // Group entries by step
                   const stepGroups = new Map<string, typeof run.execution_log>();
@@ -241,7 +241,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                     return (
                       <div
                         key={idx}
-                        className="border border-gray-200 rounded-lg overflow-hidden"
+                        className="border border-gray-200 rounded-lg overflow-hidden min-w-0"
                       >
                         {/* Step Header */}
                         <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
@@ -251,18 +251,18 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                           </p>
                         </div>
 
-                        <div className="p-4 space-y-3">
+                        <div className="p-4 space-y-3 min-w-0">
                           {/* Inputs (Reads) */}
                           {reads.length > 0 && (
-                            <div>
+                            <div className="min-w-0">
                               <h5 className="text-xs font-semibold text-gray-600 uppercase mb-2">
                                 Inputs
                               </h5>
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 {reads.map((entry, readIdx) => (
                                   <div
                                     key={readIdx}
-                                    className="bg-blue-50 border border-blue-200 rounded p-2"
+                                    className="bg-blue-50 border border-blue-200 rounded p-2 min-w-0"
                                   >
                                     <div className="flex items-center justify-between mb-1">
                                       <div className="flex items-center gap-2">
@@ -275,9 +275,19 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                                       </div>
                                     </div>
                                     {entry.value !== undefined && (
-                                      <pre className="mt-1 p-2 bg-white border border-blue-100 rounded text-xs font-mono overflow-x-auto max-h-32">
-                                        {JSON.stringify(entry.value, null, 2)}
-                                      </pre>
+                                      <div className="mt-1 bg-white border border-blue-100 rounded p-2 text-xs font-mono"
+                                           style={{
+                                             maxHeight: '128px',
+                                             overflow: 'auto',
+                                             whiteSpace: 'nowrap'
+                                           }}>
+                                        {typeof entry.value === 'string'
+                                          ? entry.value
+                                          : JSON.stringify(entry.value, null, 2).split('\n').map((line, idx) => (
+                                            <div key={idx} style={{ whiteSpace: 'nowrap' }}>{line}</div>
+                                          ))
+                                        }
+                                      </div>
                                     )}
                                   </div>
                                 ))}
@@ -287,15 +297,15 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
 
                           {/* Outputs (Writes) */}
                           {writes.length > 0 && (
-                            <div>
+                            <div className="min-w-0">
                               <h5 className="text-xs font-semibold text-gray-600 uppercase mb-2">
                                 Outputs
                               </h5>
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 {writes.map((entry, writeIdx) => (
                                   <div
                                     key={writeIdx}
-                                    className="bg-green-50 border border-green-200 rounded p-2"
+                                    className="bg-green-50 border border-green-200 rounded p-2 min-w-0"
                                   >
                                     <div className="flex items-center justify-between mb-1">
                                       <div className="flex items-center gap-2">
@@ -308,9 +318,19 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                                       </div>
                                     </div>
                                     {entry.value !== undefined && (
-                                      <pre className="mt-1 p-2 bg-white border border-green-100 rounded text-xs font-mono overflow-x-auto max-h-32">
-                                        {JSON.stringify(entry.value, null, 2)}
-                                      </pre>
+                                      <div className="mt-1 bg-white border border-green-100 rounded p-2 text-xs font-mono"
+                                           style={{
+                                             maxHeight: '128px',
+                                             overflow: 'auto',
+                                             whiteSpace: 'nowrap'
+                                           }}>
+                                        {typeof entry.value === 'string'
+                                          ? entry.value
+                                          : JSON.stringify(entry.value, null, 2).split('\n').map((line, idx) => (
+                                            <div key={idx} style={{ whiteSpace: 'nowrap' }}>{line}</div>
+                                          ))
+                                        }
+                                      </div>
                                     )}
                                   </div>
                                 ))}

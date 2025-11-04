@@ -137,11 +137,11 @@ export default function RuntimeView() {
 
         {/* Right: Run detail (only show if run selected) */}
         {selectedRun && selectedAgent ? (
-          <div className="flex-1 bg-white">
+          <div className="flex-1 bg-white min-w-0">
             <RunDetail agentId={selectedAgent.id} runId={selectedRun.id} />
           </div>
         ) : selectedAgent ? (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="flex-1 flex items-center justify-center bg-gray-50 min-w-0">
             <div className="text-center">
               <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Select a run to view details</p>
