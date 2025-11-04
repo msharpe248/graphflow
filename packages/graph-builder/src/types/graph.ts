@@ -37,6 +37,7 @@ export interface Step {
   config: Record<string, any>;
   outputs?: Record<string, string>;
   description?: string;
+  position?: { x: number; y: number };
 }
 
 export interface Edge {

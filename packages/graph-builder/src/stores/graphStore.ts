@@ -315,7 +315,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return {
         id: step.id,
         type: 'custom',
-        position: { x: 100 + (index % 3) * 250, y: 100 + Math.floor(index / 3) * 150 },
+        position: step.position || { x: 100 + (index % 3) * 250, y: 100 + Math.floor(index / 3) * 150 },
         data: { step, stepTypeInfo },
         deletable: true,
       };
@@ -351,7 +351,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   exportGraph: () => {
     const state = get();
 
-    const steps: Step[] = state.nodes.map((node) => node.data.step);
+    const steps: Step[] = state.nodes.map((node) => ({
+      ...node.data.step,
+      position: node.position,
+    }));
     const graphEdges = state.edges.map((edge) => ({
       id: edge.id,
       from: edge.source,
