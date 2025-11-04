@@ -198,6 +198,7 @@ async def delete_agent(
     for run in runs:
         exec.stop_run(run.id)
         exec.release_memory(run.id)
+        db.delete(run)  # Delete run from database
 
     db.delete(agent)
     db.commit()

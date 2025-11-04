@@ -111,7 +111,12 @@ export const useDeleteRun = () => {
     mutationFn: ({ agentId, runId }: { agentId: string; runId: string }) =>
       runtime.deleteRun(agentId, runId),
     onSuccess: (_, variables) => {
+      // Invalidate the runs list
       queryClient.invalidateQueries({ queryKey: keys.runs(variables.agentId) });
+      // Remove the specific run from cache
+      queryClient.removeQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      // Remove the run's memory from cache
+      queryClient.removeQueries({ queryKey: keys.memory(variables.agentId, variables.runId) });
     },
   });
 };

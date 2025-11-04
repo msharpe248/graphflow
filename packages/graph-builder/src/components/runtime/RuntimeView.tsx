@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Activity, AlertCircle } from 'lucide-react';
-import { useHealth, useAgent, useRun, useAgents } from '@/hooks/useRuntime';
+import { useHealth, useAgent, useRun, useAgents, useRuns } from '@/hooks/useRuntime';
 import { useAppStore } from '@/stores/appStore';
 import { Agent, AgentRun } from '@/types/runtime';
 import AgentsList from './AgentsList';
@@ -13,6 +13,9 @@ export default function RuntimeView() {
   const { runtimeContext } = useAppStore();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null);
+
+  // Fetch runs for the selected agent
+  const { data: runs } = useRuns(selectedAgent?.id || null);
 
   // Fetch agent and run from context if provided
   const { data: contextAgent } = useAgent(runtimeContext?.agentId || null);
@@ -44,6 +47,16 @@ export default function RuntimeView() {
       }
     }
   }, [agents, selectedAgent]);
+
+  // Clear selection if selected run no longer exists in the list
+  useEffect(() => {
+    if (selectedRun && runs) {
+      const runStillExists = runs.some(run => run.id === selectedRun.id);
+      if (!runStillExists) {
+        setSelectedRun(null);
+      }
+    }
+  }, [runs, selectedRun]);
 
   // Show error if runtime is not available
   if (healthError) {
