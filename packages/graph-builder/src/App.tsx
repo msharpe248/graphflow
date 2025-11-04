@@ -5,6 +5,7 @@ import BuilderView from './components/BuilderView';
 import RuntimeView from './components/runtime/RuntimeView';
 import RuntimeConnectionModal from './components/RuntimeConnectionModal';
 import { useSettingsStore } from './stores/settingsStore';
+import { useAppStore } from './stores/appStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,12 +16,10 @@ const queryClient = new QueryClient({
   },
 });
 
-type View = 'builder' | 'runtime';
-
 export default function App() {
-  const [activeView, setActiveView] = useState<View>('builder');
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const { runtime, checkConnection, getApiBaseUrl } = useSettingsStore();
+  const { activeView, setActiveView } = useAppStore();
 
   // Check connection on mount and periodically
   useEffect(() => {
@@ -61,7 +60,7 @@ export default function App() {
           {/* View switcher */}
           <div className="flex gap-1 bg-primary-foreground/10 rounded-lg p-1">
             <button
-              onClick={() => setActiveView('builder')}
+              onClick={() => setActiveView('builder', undefined)}
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                 ${
@@ -75,7 +74,7 @@ export default function App() {
               Builder
             </button>
             <button
-              onClick={() => setActiveView('runtime')}
+              onClick={() => setActiveView('runtime', undefined)}
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                 ${

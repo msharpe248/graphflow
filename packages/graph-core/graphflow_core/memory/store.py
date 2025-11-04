@@ -31,6 +31,25 @@ class MemoryStore:
         self._secrets: Dict[str, str] = {}
         self._initialized = False
 
+        # Initialize all intermediate and output fields with zero values
+        for key, field_def in schema.intermediate.items():
+            self._intermediate[key] = self._get_zero_value(field_def.type)
+
+        for key, field_def in schema.outputs.items():
+            self._outputs[key] = self._get_zero_value(field_def.type)
+
+    def _get_zero_value(self, field_type: str) -> Any:
+        """Get the zero value for a field type."""
+        zero_values = {
+            'string': '',
+            'number': 0,
+            'boolean': False,
+            'object': {},
+            'array': [],
+            'any': None,
+        }
+        return zero_values.get(field_type, None)
+
     def initialize_inputs(self, inputs: Dict[str, Any]) -> None:
         """
         Initialize input values.
@@ -47,12 +66,14 @@ class MemoryStore:
             if key not in self.schema.inputs:
                 raise KeyError(f"Input key not in schema: {key}")
 
-        # Check required inputs are provided
+        # Apply defaults and check required inputs
         for key, field_def in self.schema.inputs.items():
-            if field_def.required and key not in inputs:
+            if key not in inputs:
+                # Apply default if available
                 if field_def.default is not None:
                     inputs[key] = field_def.default
-                else:
+                # Check if required
+                elif field_def.required:
                     raise ValueError(f"Required input missing: {key}")
 
         self._inputs = inputs.copy()
@@ -63,10 +84,9 @@ class MemoryStore:
         Read value from memory.
 
         Searches in order: inputs, intermediate, outputs
-        Supports dotted notation for nested access (e.g., "user.name")
 
         Args:
-            key: Memory key, optionally with dotted path
+            key: Memory key (exact match, no nested navigation)
 
         Returns:
             Value from memory
@@ -74,79 +94,36 @@ class MemoryStore:
         Raises:
             KeyError: If key not found in any namespace
         """
-        # Parse dotted path
-        parts = key.split('.')
-        base_key = parts[0]
-
-        # Find base value
-        value = None
-        if base_key in self._inputs:
-            value = self._inputs[base_key]
-        elif base_key in self._intermediate:
-            value = self._intermediate[base_key]
-        elif base_key in self._outputs:
-            value = self._outputs[base_key]
+        # Find value in namespaces (exact key match)
+        if key in self._inputs:
+            return self._inputs[key]
+        elif key in self._intermediate:
+            return self._intermediate[key]
+        elif key in self._outputs:
+            return self._outputs[key]
         else:
-            raise KeyError(f"Memory key not found: {base_key}")
-
-        # Navigate nested path
-        for part in parts[1:]:
-            if isinstance(value, dict):
-                if part not in value:
-                    raise KeyError(f"Key not found in nested object: {key}")
-                value = value[part]
-            else:
-                raise TypeError(f"Cannot access '{part}' on non-dict value at {key}")
-
-        return value
+            raise KeyError(f"Memory key not found: {key}")
 
     def write(self, key: str, value: Any) -> None:
         """
         Write value to memory.
 
         Determines target namespace based on schema.
-        Supports dotted notation for nested writes (creates nested dicts).
 
         Args:
-            key: Memory key, optionally with dotted path
+            key: Memory key (exact match, no nested navigation)
             value: Value to write
 
         Raises:
-            KeyError: If base key not in schema
+            KeyError: If key not in schema
         """
-        parts = key.split('.')
-        base_key = parts[0]
-
-        # Determine target namespace
-        if base_key in self.schema.outputs:
-            target = self._outputs
-        elif base_key in self.schema.intermediate:
-            target = self._intermediate
+        # Determine target namespace (exact key match)
+        if key in self.schema.outputs:
+            self._outputs[key] = value
+        elif key in self.schema.intermediate:
+            self._intermediate[key] = value
         else:
-            raise KeyError(f"Memory key not in schema (outputs or intermediate): {base_key}")
-
-        # Handle nested writes
-        if len(parts) == 1:
-            # Simple write
-            target[base_key] = value
-        else:
-            # Nested write - ensure base exists as dict
-            if base_key not in target:
-                target[base_key] = {}
-            elif not isinstance(target[base_key], dict):
-                raise TypeError(f"Cannot write nested value: {base_key} is not a dict")
-
-            # Navigate to nested location
-            current = target[base_key]
-            for part in parts[1:-1]:
-                if part not in current:
-                    current[part] = {}
-                elif not isinstance(current[part], dict):
-                    raise TypeError(f"Cannot write nested value: path {key} crosses non-dict")
-                current = current[part]
-
-            # Write final value
-            current[parts[-1]] = value
+            raise KeyError(f"Memory key not in schema (outputs or intermediate): {key}")
 
     def set_input(self, key: str, value: Any) -> None:
         """
@@ -204,11 +181,10 @@ class MemoryStore:
 
     def has_key(self, key: str) -> bool:
         """Check if key exists in any namespace."""
-        base_key = key.split('.')[0]
         return (
-            base_key in self._inputs or
-            base_key in self._intermediate or
-            base_key in self._outputs
+            key in self._inputs or
+            key in self._intermediate or
+            key in self._outputs
         )
 
     def get_all_inputs(self) -> Dict[str, Any]:

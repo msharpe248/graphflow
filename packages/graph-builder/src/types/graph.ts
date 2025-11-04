@@ -28,6 +28,7 @@ export interface Metadata {
   version?: string;
   tags?: string[];
   author?: string;
+  linkedAgentId?: string;
 }
 
 export interface Step {

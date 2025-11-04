@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, MarkerType } from 'reactflow';
 import { GraphDefinition, Step, Metadata, MemorySchema, NodeData } from '@/types/graph';
 import { usePluginStore } from './pluginStore';
+import { validateGraph, ValidationResult } from '@/utils/graphValidator';
 
 interface GraphStore {
   // Graph metadata
@@ -34,9 +35,25 @@ interface GraphStore {
   loadGraph: (graph: GraphDefinition) => void;
   exportGraph: () => GraphDefinition;
   clearGraph: () => void;
+
+  // Validation
+  validateGraph: () => ValidationResult;
+
+  // Agent linking
+  linkToAgent: (agentId: string) => void;
+  unlinkAgent: () => void;
 }
 
 let nodeIdCounter = 1;
+
+// Helper function to normalize JSON Schema types to backend memory types
+function normalizeMemoryType(schemaType: string | undefined): string {
+  if (!schemaType) return 'string';
+  // Backend expects: 'number', 'string', 'array', 'boolean', 'any', 'object'
+  // JSON Schema can have 'integer' which needs to map to 'number'
+  if (schemaType === 'integer') return 'number';
+  return schemaType;
+}
 
 // Helper function to find all memory bindings in use
 function findUsedMemoryBindings(nodes: Node<NodeData>[]): Set<string> {
@@ -111,7 +128,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         // Create memory field for this config property
         const memoryKey = `${id}.${key}`;
         newMemoryFields[memoryKey] = {
-          type: schema.type || 'string',
+          type: normalizeMemoryType(schema.type),
           description: schema.description || `${key} for ${id}`,
           required: false,
         };
@@ -129,7 +146,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         // Create memory field for this output
         const memoryKey = `${id}.${outputKey}`;
         newMemoryFields[memoryKey] = {
-          type: (outputSchema as any).type || 'string',
+          type: normalizeMemoryType((outputSchema as any).type),
           description: (outputSchema as any).description || `${outputKey} output from ${id}`,
           required: false,
         };
@@ -353,4 +370,28 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       edges: [],
       selectedNodeId: null,
     }),
+
+  // Validation
+  validateGraph: () => {
+    const state = get();
+    const graph = state.exportGraph();
+    return validateGraph(graph, state.nodes);
+  },
+
+  // Agent linking
+  linkToAgent: (agentId: string) =>
+    set((state) => ({
+      metadata: {
+        ...state.metadata,
+        linkedAgentId: agentId,
+      },
+    })),
+
+  unlinkAgent: () =>
+    set((state) => ({
+      metadata: {
+        ...state.metadata,
+        linkedAgentId: undefined,
+      },
+    })),
 }));

@@ -24,14 +24,14 @@ class GeneratedAgent:
 
         # Execute steps in order
 {% for step_id in execution_order %}
-        await self._execute_{{ step_id }}()
+        await self._execute_{{ step_id | pythonize }}()
 {% endfor %}
 
         # Return outputs
         return self.memory.get_all_outputs()
 
 {% for step_id, step_code in step_execution_map.items() %}
-    async def _execute_{{ step_id }}(self):
+    async def _execute_{{ step_id | pythonize }}(self):
         """Execute step: {{ step_id }}"""
 {{ step_code | indent(8, first=False) }}
 {% endfor %}

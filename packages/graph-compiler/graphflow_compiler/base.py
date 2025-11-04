@@ -27,11 +27,17 @@ class CodeGenerator(ABC):
         # Add custom filters
         self.jinja_env.filters['repr'] = repr
         self.jinja_env.filters['json'] = self._json_filter
+        self.jinja_env.filters['pythonize'] = self._pythonize_filter
 
     def _json_filter(self, value: Any) -> str:
         """JSON filter for templates."""
         import json
         return json.dumps(value, indent=2)
+
+    def _pythonize_filter(self, value: str) -> str:
+        """Sanitize a string to be a valid Python identifier."""
+        # Replace dots and other invalid characters with underscores
+        return value.replace('.', '_').replace('-', '_').replace(' ', '_')
 
     @abstractmethod
     def get_framework_name(self) -> str:
@@ -196,7 +202,7 @@ Generated: {graph.metadata.created}
         elif step.type == "llm":
             return self._generate_llm_step_code(step, graph)
 
-        elif step.type == "http":
+        elif step.type == "http" or step.type.startswith("http."):
             return self._generate_http_step_code(step)
 
         elif step.type == "join":
@@ -279,21 +285,42 @@ await step.execute(self.memory)
 
     def _generate_http_step_code(self, step: Step) -> str:
         """Generate code for HTTP step."""
-        return """
-# HTTP step
-import httpx
-async with httpx.AsyncClient() as client:
-    response = await client.request(
-        method="{method}",
-        url="{url}",
-        headers={headers},
-        json={body}
-    )
-    self.memory.write("{response_key}", response.json())
-""".format(
-            method=step.config.get("method", "GET"),
-            url=step.config.get("url", ""),
-            headers=repr(step.config.get("headers", {})),
-            body=repr(step.config.get("body", {})),
-            response_key=step.config.get("response_key")
-        )
+        import re
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        lines = ["# HTTP GET step", "import httpx", ""]
+
+        # Read config values from memory
+        for key, value in step.config.items():
+            if isinstance(value, str) and '{memory.' in value:
+                match = pattern.search(value)
+                if match:
+                    mem_key = match.group(1)
+                    var_name = key
+                    lines.append(f'{var_name} = self.memory.read("{mem_key}")')
+
+        lines.append("")
+        lines.append("# Make HTTP request")
+        lines.append("async with httpx.AsyncClient() as client:")
+        lines.append("    response = await client.get(")
+        lines.append("        url=url,")
+        lines.append("        params=params if params else None,")
+        lines.append("        headers=headers if headers else None,")
+        lines.append("        timeout=timeout if timeout else 30.0,")
+        lines.append("    )")
+        lines.append("")
+
+        # Write outputs to memory
+        lines.append("# Write outputs to memory")
+        for output_name, output_template in step.outputs.items():
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                if output_name == "response":
+                    lines.append(f'self.memory.write("{output_key}", response.text)')
+                elif output_name == "status_code":
+                    lines.append(f'self.memory.write("{output_key}", response.status_code)')
+                elif output_name == "headers":
+                    lines.append(f'self.memory.write("{output_key}", dict(response.headers))')
+
+        return "\n".join(lines)

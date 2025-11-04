@@ -215,23 +215,21 @@ class GraphDefinition(BaseModel):
             # Parse memory references from config and outputs
             reads, writes = parse_memory_references(step.config, step.outputs)
 
-            # Validate reads
+            # Validate reads - check for exact key match only
+            # (nested navigation is handled at runtime, not validated at build time)
             for key in reads:
-                # Allow dotted paths for nested access (e.g., "object.field")
-                base_key = key.split('.')[0]
-                if base_key not in all_memory_keys:
+                if key not in all_memory_keys:
                     errors.append(
                         f"Step {step.id}: memory reference '{{memory.{key}}}' in config "
-                        f"references undeclared memory key '{base_key}'"
+                        f"references undeclared memory key '{key}'"
                     )
 
-            # Validate writes
+            # Validate writes - check for exact key match only
             for key in writes:
-                base_key = key.split('.')[0]
-                if base_key not in all_memory_keys:
+                if key not in all_memory_keys:
                     errors.append(
                         f"Step {step.id}: memory reference '{{memory.{key}}}' in outputs "
-                        f"references undeclared memory key '{base_key}'"
+                        f"references undeclared memory key '{key}'"
                     )
 
         return errors
