@@ -429,13 +429,16 @@ graphflow-runtime --reload
 - ✅ Drag-and-drop graph builder
 - ✅ Plugin system with step palette
 - ✅ Memory schema management
-- ✅ Visual memory binding
+- ✅ Visual memory binding with "Bound to" buttons
 - ✅ Editable outputs section with clean memory locations
 - ✅ HTTP plugin with 17 production-ready steps
 - ✅ Memory manipulation steps (read-memory, write-memory)
-- 🚧 Real-time runtime monitoring
+- ✅ Position persistence (node layouts saved/restored)
+- ✅ Runtime monitoring view with agents/runs/details
+- ✅ Execution log with horizontal scrollbars
+- ✅ Upload to runtime and execute graphs
 - 🚧 Graph templates
-- 🚧 Save/load graphs
+- 🚧 Auto-refresh for runtime view
 - 🚧 Compile from UI
 
 **Future**:
