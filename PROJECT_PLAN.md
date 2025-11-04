@@ -1233,7 +1233,7 @@ export class RuntimeClient {
 | Aspect | Decision | Rationale |
 |--------|----------|-----------|
 | **Monorepo** | Yes, simple directory structure | Easier development, shared dependencies |
-| **Package Manager** | Poetry | Modern Python packaging |
+| **Package Manager** | pip + pyproject.toml | Standard Python packaging with editable installs |
 | **Frontend Framework** | React + Vite | Modern, fast, good ecosystem |
 | **Graph Library** | ReactFlow | Purpose-built for node editors |
 | **Backend Framework** | FastAPI | Modern async Python, auto docs |
