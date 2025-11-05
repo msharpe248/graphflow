@@ -13,6 +13,15 @@ Visual graph builder UI for creating and monitoring GraphFlow agents with a drag
   - Plugin-based filtering (view steps by plugin)
   - Search functionality to quickly find steps
   - Collapsible sections for better organization
+- **Shape Annotations**: Add visual documentation and notes to your graphs
+  - **Rectangle**: Basic shape for highlighting areas or grouping steps
+  - **Ellipse**: Circular/oval shape for emphasis
+  - **Text Box**: Clean white container for detailed documentation with markdown support
+  - **Sticky Note**: Quick colorful notes with drop shadow and markdown formatting
+  - Inline editing: Double-click any textbox or sticky note to edit directly
+  - Full markdown support including headers, lists, bold, italic, code blocks, and more
+  - Customizable colors, borders, padding, and shadow effects
+  - Resizable and repositionable with position persistence
 - **Node Configuration**: Edit step properties with smart memory binding
 - **Properties Panel**:
   - Configure step settings with labeled fields
@@ -21,6 +30,7 @@ Visual graph builder UI for creating and monitoring GraphFlow agents with a drag
   - Memory location editing without `_key` suffixes
   - Step behavior information from schemas
   - Delete step functionality
+  - Shape properties editor with markdown hints
 - **Memory Schema Panel**:
   - Manage three memory namespaces: inputs, outputs, intermediate
   - Collapsible sections with usage counts
@@ -92,7 +102,14 @@ npm run preview
 4. **Edit outputs** to bind step outputs to memory locations
 5. **Configure memory bindings** using "Bound to" buttons or manual editing
 6. **Manage memory schema** via the Memory Schema panel (collapsible right panel)
-7. **Export graph** to JSON when complete
+7. **Add shapes** for documentation and visual organization
+   - Switch to the "Shapes" tab in the palette
+   - Drag shapes (rectangle, ellipse, textbox, sticky note) onto the canvas
+   - Double-click textbox or sticky note to edit content inline
+   - Use markdown formatting for rich text (bold, italic, headers, lists, code, etc.)
+   - Resize shapes by selecting them and dragging resize handles
+   - Customize colors, borders, padding, and shadows in Properties Panel
+8. **Export graph** to JSON when complete
 
 ### Monitoring Agent Runs
 
@@ -134,7 +151,10 @@ See [HTTP Plugin Documentation](../graph-plugins-http/README.md) for details.
 
 ### Keyboard Shortcuts
 
-- `Delete` - Delete selected node/edge
+- `Delete` or `Backspace` - Delete selected node/edge/shape
+- `Double-click` - Edit textbox or sticky note content inline
+- `Escape` - Exit inline editing mode (cancels changes)
+- Click outside shape - Save inline edits and exit editing mode
 - `Ctrl/Cmd + Z` - Undo (ReactFlow built-in)
 - `Ctrl/Cmd + C/V` - Copy/paste nodes
 
@@ -148,6 +168,8 @@ See [HTTP Plugin Documentation](../graph-plugins-http/README.md) for details.
 - **Zustand** - State management
 - **TanStack Query** - Server state management for runtime API
 - **Tailwind CSS** - Styling with Lucide icons
+- **react-markdown** - Markdown rendering for shape annotations
+- **remark-gfm** - GitHub-flavored markdown support
 - **Vite** - Build tooling
 
 ### Project Structure
@@ -157,11 +179,13 @@ src/
 ├── components/              # React components
 │   ├── BuilderView.tsx      # Main builder interface
 │   ├── RuntimeView.tsx      # Runtime monitoring interface
-│   ├── CustomNode.tsx       # ReactFlow node component
+│   ├── CustomNode.tsx       # ReactFlow node component for steps
+│   ├── ShapeNode.tsx        # ReactFlow node component for shapes
 │   ├── GraphCanvas.tsx      # ReactFlow canvas wrapper
-│   ├── StepPalette.tsx      # Plugin-based step palette
-│   ├── PropertiesPanel.tsx  # Node properties editor with outputs
+│   ├── StepPalette.tsx      # Plugin-based step palette with shapes tab
+│   ├── PropertiesPanel.tsx  # Node/shape properties editor
 │   ├── MemoryPanel.tsx      # Memory schema management
+│   ├── MarkdownText.tsx     # Markdown rendering component
 │   ├── SettingsModal.tsx    # Graph metadata modal
 │   ├── Toolbar.tsx          # Top toolbar with actions
 │   ├── runtime/
@@ -234,6 +258,23 @@ The builder exports graphs in the standard GraphFlow JSON format:
       "from": "start_1",
       "to": "llm_1"
     }
+  ],
+  "shapes": [
+    {
+      "id": "shape_1",
+      "type": "stickynote",
+      "position": {"x": 400, "y": 50},
+      "size": {"width": 250, "height": 250},
+      "text": "## Quick Note\n\nThis is a **markdown-enabled** sticky note!\n\n- Supports lists\n- **Bold** and *italic*\n- Code blocks",
+      "color": "#fef08a",
+      "borderColor": "#fde047",
+      "opacity": 0.95,
+      "padding": 12,
+      "shadow": true,
+      "textAlign": "left",
+      "textFontSize": 12,
+      "textColor": "#1f2937"
+    }
   ]
 }
 ```
@@ -243,6 +284,8 @@ The builder exports graphs in the standard GraphFlow JSON format:
 - Old `memory_reads` and `memory_writes` fields are deprecated
 - Steps can have optional `position` field for layout persistence
 - Memory bindings use `{memory.field}` template syntax
+- Graphs can now include optional `shapes` array for visual annotations (textbox, stickynote, rectangle, ellipse)
+- Shapes support markdown formatting in their `text` field
 
 See [GRAPH_FORMAT.md](../../GRAPH_FORMAT.md) for complete specification.
 
@@ -281,12 +324,14 @@ This is a **Proof of Concept** with the following limitations:
 ### Working Features ✅
 - Visual graph building with drag-and-drop
 - Plugin-based step palette with search
+- Shape annotations (rectangle, ellipse, textbox, sticky note)
+- Inline markdown editing for shapes (double-click to edit)
 - Memory schema management with auto-cleanup
 - Memory binding system with visual indicators
-- Position persistence
+- Position persistence for steps and shapes
 - Runtime monitoring with agent/run/detail views
 - Execution log with step-by-step breakdown
-- Import/export graphs as JSON
+- Import/export graphs as JSON (with shapes)
 - Direct upload to runtime
 - Run execution with custom inputs
 
