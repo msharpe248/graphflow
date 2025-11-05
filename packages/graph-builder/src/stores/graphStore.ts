@@ -20,6 +20,9 @@ interface GraphStore {
   selectedNodeId: string | null;
   selectedShapeId: string | null;
 
+  // Revision tracking - stores JSON of last saved state
+  lastSavedState: string | null;
+
   // Actions
   setMetadata: (metadata: Partial<Metadata>) => void;
   setMemory: (memory: Partial<MemorySchema>) => void;
@@ -121,6 +124,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   shapes: [],
   selectedNodeId: null,
   selectedShapeId: null,
+  lastSavedState: null,
 
   // Metadata actions
   setMetadata: (metadata) =>
@@ -235,7 +239,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       },
       metadata: {
         ...state.metadata,
-        revision: (state.metadata.revision || 1) + 1,
       },
     }));
   },
@@ -277,7 +280,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         },
         metadata: {
           ...state.metadata,
-          revision: (state.metadata.revision || 1) + 1,
         },
       };
     }),
@@ -310,7 +312,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         },
         metadata: {
           ...state.metadata,
-          revision: (state.metadata.revision || 1) + 1,
         },
       };
     }),
@@ -358,7 +359,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedNodeId: null,
       metadata: {
         ...state.metadata,
-        revision: (state.metadata.revision || 1) + 1,
       },
     }));
   },
@@ -383,7 +383,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ),
       metadata: {
         ...state.metadata,
-        revision: (state.metadata.revision || 1) + 1,
       },
     })),
 
@@ -394,7 +393,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedShapeId: state.selectedShapeId === shapeId ? null : state.selectedShapeId,
       metadata: {
         ...state.metadata,
-        revision: (state.metadata.revision || 1) + 1,
       },
     })),
 
@@ -430,7 +428,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...(hasRemoval && {
           metadata: {
             ...state.metadata,
-            revision: (state.metadata.revision || 1) + 1,
           },
         }),
       };
@@ -458,7 +455,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         edges: addEdge(newEdge, state.edges),
         metadata: {
           ...state.metadata,
-          revision: (state.metadata.revision || 1) + 1,
         },
       };
     }),
@@ -519,6 +515,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       },
     }));
 
+    // Store the loaded graph as the last saved state
+    const loadedGraph = {
+      version: graph.version,
+      metadata: graph.metadata,
+      memory: graph.memory,
+      steps: graph.steps,
+      edges: graph.edges,
+      shapes: shapesWithDefaults.length > 0 ? shapesWithDefaults : undefined,
+    };
+
     set({
       metadata: graph.metadata,
       memory: graph.memory,
@@ -527,6 +533,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       shapes: shapesWithDefaults,
       selectedNodeId: null,
       selectedShapeId: null,
+      lastSavedState: JSON.stringify(loadedGraph),
     });
   },
 
@@ -546,7 +553,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       to: edge.target,
     }));
 
-    return {
+    const currentGraph = {
       version: '1.0',
       metadata: state.metadata,
       memory: state.memory,
@@ -554,6 +561,26 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       edges: graphEdges,
       shapes: state.shapes.length > 0 ? state.shapes : undefined,
     };
+
+    // Check if state has changed since last save
+    const currentStateJSON = JSON.stringify(currentGraph);
+    const hasChangedSinceLastSave = state.lastSavedState !== null && currentStateJSON !== state.lastSavedState;
+
+    // Only increment revision if there were changes since last save
+    if (hasChangedSinceLastSave) {
+      currentGraph.metadata = {
+        ...currentGraph.metadata,
+        revision: (currentGraph.metadata.revision || 1) + 1,
+      };
+    }
+
+    // Update last saved state and metadata
+    set({
+      lastSavedState: JSON.stringify(currentGraph),
+      metadata: currentGraph.metadata,
+    });
+
+    return currentGraph;
   },
 
   clearGraph: () =>
@@ -576,6 +603,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       shapes: [],
       selectedNodeId: null,
       selectedShapeId: null,
+      lastSavedState: null,
     }),
 
   // Validation
@@ -607,7 +635,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((state) => ({
       metadata: {
         ...state.metadata,
-        revision: (state.metadata.revision || 1) + 1,
       },
     })),
 }));
