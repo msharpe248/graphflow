@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { NodeProps, NodeResizer } from 'reactflow';
 import { Shape } from '@/types/graph';
 import { useGraphStore } from '@/stores/graphStore';
+import MarkdownText from './MarkdownText';
 
 interface ShapeNodeData {
   shape: Shape;
@@ -51,7 +52,7 @@ function ShapeNode({ id, data, selected }: NodeProps<ShapeNodeData>) {
       <svg
         width={shape.size.width}
         height={shape.size.height}
-        style={{ overflow: 'visible' }}
+        style={{ overflow: 'visible', filter: shape.shadow ? 'drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.2))' : 'none' }}
       >
         {shape.type === 'rectangle' ? (
           <rect
@@ -65,7 +66,7 @@ function ShapeNode({ id, data, selected }: NodeProps<ShapeNodeData>) {
             strokeWidth={3}
             strokeDasharray={selected ? '5,5' : 'none'}
           />
-        ) : (
+        ) : shape.type === 'ellipse' ? (
           <ellipse
             cx={shape.size.width / 2}
             cy={shape.size.height / 2}
@@ -76,12 +77,36 @@ function ShapeNode({ id, data, selected }: NodeProps<ShapeNodeData>) {
             strokeWidth={3}
             strokeDasharray={selected ? '5,5' : 'none'}
           />
-        )}
+        ) : shape.type === 'textbox' ? (
+          <rect
+            x={0}
+            y={0}
+            width={shape.size.width}
+            height={shape.size.height}
+            rx={6}
+            fill={rgbaColor}
+            stroke={shape.borderColor || '#d1d5db'}
+            strokeWidth={2}
+            strokeDasharray={selected ? '5,5' : 'none'}
+          />
+        ) : shape.type === 'stickynote' ? (
+          <rect
+            x={0}
+            y={0}
+            width={shape.size.width}
+            height={shape.size.height}
+            rx={8}
+            fill={rgbaColor}
+            stroke={shape.borderColor || '#fde047'}
+            strokeWidth={2}
+            strokeDasharray={selected ? '5,5' : 'none'}
+          />
+        ) : null}
       </svg>
 
       {/* Title and text */}
       <div
-        className={`absolute inset-0 flex flex-col p-4 pointer-events-none ${
+        className={`absolute inset-0 flex flex-col pointer-events-none ${
           shape.textAlign === 'left' ? 'items-start' :
           shape.textAlign === 'right' ? 'items-end' :
           'items-center'
@@ -92,41 +117,79 @@ function ShapeNode({ id, data, selected }: NodeProps<ShapeNodeData>) {
         }`}
         style={{
           color: shape.textColor || '#1f2937',
+          padding: `${shape.padding || 16}px`,
         }}
       >
-        {shape.title && (
-          <div
-            className={`mb-1 ${
-              shape.textAlign === 'left' ? 'text-left' :
-              shape.textAlign === 'right' ? 'text-right' :
-              'text-center'
-            } ${
-              shape.fontWeight === 'bold' ? 'font-bold' :
-              shape.fontWeight === 'semibold' ? 'font-semibold' :
-              shape.fontWeight === 'medium' ? 'font-medium' :
-              'font-normal'
-            }`}
-            style={{ fontSize: shape.titleFontSize ? `${shape.titleFontSize}px` : '14px' }}
-          >
-            {shape.title}
-          </div>
-        )}
-        {shape.text && (
-          <div
-            className={`${
-              shape.textAlign === 'left' ? 'text-left' :
-              shape.textAlign === 'right' ? 'text-right' :
-              'text-center'
-            } ${
-              shape.fontWeight === 'bold' ? 'font-bold' :
-              shape.fontWeight === 'semibold' ? 'font-semibold' :
-              shape.fontWeight === 'medium' ? 'font-medium' :
-              'font-normal'
-            }`}
-            style={{ fontSize: shape.textFontSize ? `${shape.textFontSize}px` : '12px' }}
-          >
-            {shape.text}
-          </div>
+        {(shape.type === 'textbox' || shape.type === 'stickynote') ? (
+          // Markdown rendering for textbox and stickynote
+          <>
+            {shape.title && (
+              <div
+                className={`mb-2 ${
+                  shape.textAlign === 'left' ? 'text-left' :
+                  shape.textAlign === 'right' ? 'text-right' :
+                  'text-center'
+                } ${
+                  shape.fontWeight === 'bold' ? 'font-bold' :
+                  shape.fontWeight === 'semibold' ? 'font-semibold' :
+                  shape.fontWeight === 'medium' ? 'font-medium' :
+                  'font-normal'
+                }`}
+                style={{ fontSize: shape.titleFontSize ? `${shape.titleFontSize}px` : '16px' }}
+              >
+                {shape.title}
+              </div>
+            )}
+            {shape.text && (
+              <div className="w-full overflow-auto">
+                <MarkdownText
+                  content={shape.text}
+                  fontSize={shape.textFontSize || 12}
+                  fontWeight={shape.fontWeight}
+                  textAlign={shape.textAlign}
+                  textColor={shape.textColor}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          // Original plain text rendering for rectangle and ellipse
+          <>
+            {shape.title && (
+              <div
+                className={`mb-1 ${
+                  shape.textAlign === 'left' ? 'text-left' :
+                  shape.textAlign === 'right' ? 'text-right' :
+                  'text-center'
+                } ${
+                  shape.fontWeight === 'bold' ? 'font-bold' :
+                  shape.fontWeight === 'semibold' ? 'font-semibold' :
+                  shape.fontWeight === 'medium' ? 'font-medium' :
+                  'font-normal'
+                }`}
+                style={{ fontSize: shape.titleFontSize ? `${shape.titleFontSize}px` : '14px' }}
+              >
+                {shape.title}
+              </div>
+            )}
+            {shape.text && (
+              <div
+                className={`${
+                  shape.textAlign === 'left' ? 'text-left' :
+                  shape.textAlign === 'right' ? 'text-right' :
+                  'text-center'
+                } ${
+                  shape.fontWeight === 'bold' ? 'font-bold' :
+                  shape.fontWeight === 'semibold' ? 'font-semibold' :
+                  shape.fontWeight === 'medium' ? 'font-medium' :
+                  'font-normal'
+                }`}
+                style={{ fontSize: shape.textFontSize ? `${shape.textFontSize}px` : '12px' }}
+              >
+                {shape.text}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

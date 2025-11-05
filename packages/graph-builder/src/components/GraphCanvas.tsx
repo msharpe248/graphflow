@@ -56,14 +56,14 @@ function GraphCanvasInner() {
 
       // Check if it's a shape
       const shapeType = event.dataTransfer.getData('application/shape');
-      if (shapeType && (shapeType === 'rectangle' || shapeType === 'ellipse')) {
+      if (shapeType && (shapeType === 'rectangle' || shapeType === 'ellipse' || shapeType === 'textbox' || shapeType === 'stickynote')) {
         // Use pixel coordinates directly for shapes (no projection)
         const position = {
           x: event.clientX - reactFlowBounds.left,
           y: event.clientY - reactFlowBounds.top,
         };
         console.log('[GraphCanvas] Dropping shape:', shapeType, 'at position:', position);
-        useGraphStore.getState().addShape(shapeType, position);
+        useGraphStore.getState().addShape(shapeType as 'rectangle' | 'ellipse' | 'textbox' | 'stickynote', position);
         return;
       }
     },

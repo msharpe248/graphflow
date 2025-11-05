@@ -322,18 +322,40 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // Shape operations
   addShape: (shapeType, position) => {
     const id = `shape_${shapeIdCounter++}`;
+
+    // Type-specific defaults
+    const defaults = shapeType === 'textbox' ? {
+      size: { width: 400, height: 300 },
+      color: '#ffffff',
+      borderColor: '#d1d5db',
+      opacity: 1.0,
+      padding: 16,
+      shadow: false,
+    } : shapeType === 'stickynote' ? {
+      size: { width: 250, height: 250 },
+      color: '#fef08a',  // yellow-200
+      borderColor: '#fde047',  // yellow-300
+      opacity: 0.95,
+      padding: 12,
+      shadow: true,
+    } : {
+      size: { width: 300, height: 200 },
+      color: '#93c5fd',  // Muted blue-300
+      borderColor: '#64748b',  // Slate-500
+      opacity: 0.3,
+      padding: 16,
+      shadow: false,
+    };
+
     const newShape: Shape = {
       id,
       type: shapeType,
       position,
-      size: { width: 300, height: 200 },
-      color: '#93c5fd',  // Muted blue-300
-      borderColor: '#64748b',  // Slate-500
-      opacity: 0.3,      // Semi-transparent by default
+      ...defaults,
       zIndex: 1,         // Behind steps (steps are at 100) but above background
       textAlign: 'center',
       textVerticalAlign: 'center',
-      titleFontSize: 14,
+      titleFontSize: shapeType === 'textbox' || shapeType === 'stickynote' ? 16 : 14,
       textFontSize: 12,
       textColor: '#1f2937',  // Dark gray for visibility
       fontWeight: 'semibold',
@@ -476,6 +498,17 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       };
     });
 
+    // Update nodeIdCounter to avoid conflicts with loaded step IDs
+    graph.steps.forEach((step) => {
+      const match = step.id.match(/^step_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= nodeIdCounter) {
+          nodeIdCounter = num + 1;
+        }
+      }
+    });
+
     // Convert shapes to ReactFlow nodes with default values for new properties
     const shapesWithDefaults: Shape[] = (graph.shapes || []).map((shape) => ({
       ...shape,
@@ -485,7 +518,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       textFontSize: shape.textFontSize || 12,
       textColor: shape.textColor || '#1f2937',
       fontWeight: shape.fontWeight || 'semibold',
+      shadow: shape.shadow ?? false,
+      padding: shape.padding ?? 16,
     }));
+
+    // Update shapeIdCounter to avoid conflicts with loaded shape IDs
+    shapesWithDefaults.forEach((shape) => {
+      const match = shape.id.match(/^shape_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= shapeIdCounter) {
+          shapeIdCounter = num + 1;
+        }
+      }
+    });
 
     const shapeNodes: Node[] = shapesWithDefaults.map((shape) => ({
       id: shape.id,

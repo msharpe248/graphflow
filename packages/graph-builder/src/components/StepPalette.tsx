@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
-import { Search, ChevronDown, ChevronRight, Layers, Package, Square, Circle, Shapes } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Layers, Package, Square, Circle, Shapes, FileText, StickyNote } from 'lucide-react';
 import { StepTypeInfo } from '@/types/graph';
 import { usePluginStore } from '@/stores/pluginStore';
 
 interface StepPaletteProps {
   onDragStart: (event: React.DragEvent, stepType: string) => void;
-  onShapeDragStart: (event: React.DragEvent, shapeType: 'rectangle' | 'ellipse') => void;
+  onShapeDragStart: (event: React.DragEvent, shapeType: 'rectangle' | 'ellipse' | 'textbox' | 'stickynote') => void;
 }
 
 type ViewMode = 'category' | 'plugin';
@@ -314,6 +314,54 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
               </div>
               <div className="text-xs text-gray-500">
                 Ellipse/circle shape for annotations
+              </div>
+            </div>
+
+            {/* Text Box */}
+            <div
+              draggable
+              onDragStart={(e) => onShapeDragStart(e, 'textbox')}
+              className="
+                p-3 rounded-lg border border-gray-300 bg-white
+                cursor-grab active:cursor-grabbing
+                hover:border-gray-400 hover:shadow-md
+                transition-all
+              "
+              style={{
+                borderLeftColor: '#22c55e',
+                borderLeftWidth: '4px',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="w-4 h-4 flex-shrink-0 text-green-600" />
+                <div className="font-medium text-sm text-gray-900">Text Box</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                Text container with markdown support
+              </div>
+            </div>
+
+            {/* Sticky Note */}
+            <div
+              draggable
+              onDragStart={(e) => onShapeDragStart(e, 'stickynote')}
+              className="
+                p-3 rounded-lg border border-gray-300 bg-white
+                cursor-grab active:cursor-grabbing
+                hover:border-gray-400 hover:shadow-md
+                transition-all
+              "
+              style={{
+                borderLeftColor: '#f59e0b',
+                borderLeftWidth: '4px',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <StickyNote className="w-4 h-4 flex-shrink-0 text-amber-600" />
+                <div className="font-medium text-sm text-gray-900">Sticky Note</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                Quick note with markdown support
               </div>
             </div>
           </div>

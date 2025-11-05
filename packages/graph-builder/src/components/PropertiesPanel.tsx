@@ -58,7 +58,12 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
               </label>
               <input
                 type="text"
-                value={selectedShape.type === 'rectangle' ? 'Rectangle' : 'Ellipse'}
+                value={
+                  selectedShape.type === 'rectangle' ? 'Rectangle' :
+                  selectedShape.type === 'ellipse' ? 'Ellipse' :
+                  selectedShape.type === 'textbox' ? 'Text Box' :
+                  'Sticky Note'
+                }
                 disabled
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
               />
@@ -86,7 +91,11 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
               <textarea
                 value={selectedShape.text || ''}
                 onChange={(e) => updateShape(selectedShape.id, { text: e.target.value })}
-                placeholder="Enter text..."
+                placeholder={
+                  selectedShape.type === 'textbox' || selectedShape.type === 'stickynote'
+                    ? 'Enter text... Supports markdown: **bold**, *italic*, etc.'
+                    : 'Enter text...'
+                }
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
@@ -209,6 +218,44 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                 className="w-full"
               />
             </div>
+
+            {/* Padding - only for textbox and stickynote */}
+            {(selectedShape.type === 'textbox' || selectedShape.type === 'stickynote') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Padding (px)
+                </label>
+                <input
+                  type="number"
+                  value={selectedShape.padding ?? 16}
+                  onChange={(e) => updateShape(selectedShape.id, { padding: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  max="50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Inner spacing around text content
+                </p>
+              </div>
+            )}
+
+            {/* Shadow - only for shapes that support it */}
+            {(selectedShape.type === 'textbox' || selectedShape.type === 'stickynote' || selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') && (
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedShape.shadow ?? false}
+                    onChange={(e) => updateShape(selectedShape.id, { shadow: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Drop Shadow</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  Add a subtle shadow effect
+                </p>
+              </div>
+            )}
 
             {/* Z-Index */}
             <div>

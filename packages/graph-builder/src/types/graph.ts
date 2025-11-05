@@ -11,7 +11,7 @@ export interface FieldDefinition {
 
 export interface Shape {
   id: string;
-  type: 'rectangle' | 'ellipse';
+  type: 'rectangle' | 'ellipse' | 'textbox' | 'stickynote';
   position: { x: number; y: number };
   size: { width: number; height: number };
   title?: string;
@@ -26,6 +26,8 @@ export interface Shape {
   textFontSize?: number;
   textColor?: string;
   fontWeight?: 'normal' | 'medium' | 'semibold' | 'bold';
+  shadow?: boolean;
+  padding?: number;
 }
 
 export interface SecretDefinition {
