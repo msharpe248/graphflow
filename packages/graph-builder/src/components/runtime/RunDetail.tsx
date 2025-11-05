@@ -187,31 +187,123 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
               <div className="space-y-4">
                 {/* Inputs namespace */}
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Inputs</h4>
-                  <pre className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs font-mono overflow-x-auto">
-                    {JSON.stringify(memory.inputs, null, 2)}
-                  </pre>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Inputs ({Object.keys(memory.inputs).length})
+                  </h4>
+                  {Object.keys(memory.inputs).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.inputs).map(([key, value]) => (
+                        <div key={key} className="bg-blue-50 border border-blue-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-blue-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-blue-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No inputs
+                    </p>
+                  )}
                 </div>
 
                 {/* Intermediate namespace */}
-                {Object.keys(memory.intermediate).length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Intermediate</h4>
-                    <pre className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs font-mono overflow-x-auto">
-                      {JSON.stringify(memory.intermediate, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Intermediate ({Object.keys(memory.intermediate).length})
+                  </h4>
+                  {Object.keys(memory.intermediate).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.intermediate).map(([key, value]) => (
+                        <div key={key} className="bg-purple-50 border border-purple-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-purple-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-purple-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No intermediate values
+                    </p>
+                  )}
+                </div>
 
                 {/* Outputs namespace */}
-                {Object.keys(memory.outputs).length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Outputs</h4>
-                    <pre className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs font-mono overflow-x-auto">
-                      {JSON.stringify(memory.outputs, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Outputs ({Object.keys(memory.outputs).length})
+                  </h4>
+                  {Object.keys(memory.outputs).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.outputs).map(([key, value]) => (
+                        <div key={key} className="bg-green-50 border border-green-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-green-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-green-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No outputs
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-500">Memory not available</p>

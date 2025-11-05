@@ -29,6 +29,26 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
 
   const handleUploadCurrent = () => {
     const graph = exportGraph();
+
+    // Check if an agent with same name, version, and revision already exists
+    const existingAgent = agents?.find(
+      (agent) => {
+        const graphDef = agent.graph_definition as GraphDefinition;
+        return (
+          graphDef.metadata.name === graph.metadata.name &&
+          graphDef.metadata.version === graph.metadata.version &&
+          graphDef.metadata.revision === graph.metadata.revision
+        );
+      }
+    );
+
+    if (existingAgent) {
+      // Agent with same version.revision already exists, just select it
+      onSelectAgent(existingAgent);
+      return;
+    }
+
+    // Create new agent
     createAgent.mutate({
       name: graph.metadata.name,
       description: graph.metadata.description,
@@ -136,6 +156,12 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm text-gray-900 truncate">
                     {agent.name}
+                    {(() => {
+                      const graphDef = agent.graph_definition as GraphDefinition;
+                      const version = graphDef.metadata.version || '1.0';
+                      const revision = graphDef.metadata.revision || 1;
+                      return ` (${version}.${revision})`;
+                    })()}
                   </div>
                   {agent.description && (
                     <div className="text-xs text-gray-600 mt-1 line-clamp-2">

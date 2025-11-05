@@ -52,16 +52,31 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Version
-              </label>
-              <input
-                type="text"
-                value={metadata.version || '1.0'}
-                onChange={(e) => setMetadata({ version: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Version
+                </label>
+                <input
+                  type="text"
+                  value={metadata.version || '1.0'}
+                  onChange={(e) => setMetadata({ version: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Revision
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={metadata.revision || 1}
+                  onChange={(e) => setMetadata({ revision: parseInt(e.target.value) || 1 })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
             </div>
 
             <div>

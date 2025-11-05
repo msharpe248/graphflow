@@ -1,18 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
-import { Search, ChevronDown, ChevronRight, Layers, Package } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Layers, Package, Square, Circle, Shapes } from 'lucide-react';
 import { StepTypeInfo } from '@/types/graph';
 import { usePluginStore } from '@/stores/pluginStore';
 
 interface StepPaletteProps {
   onDragStart: (event: React.DragEvent, stepType: string) => void;
+  onShapeDragStart: (event: React.DragEvent, shapeType: 'rectangle' | 'ellipse') => void;
 }
 
 type ViewMode = 'category' | 'plugin';
+type MainTab = 'steps' | 'shapes';
 
-export default function StepPalette({ onDragStart }: StepPaletteProps) {
+export default function StepPalette({ onDragStart, onShapeDragStart }: StepPaletteProps) {
   const { isLoading, error, fetchStepTypes, getStepTypesByCategory, getStepTypesByPlugin } = usePluginStore();
 
+  const [mainTab, setMainTab] = useState<MainTab>('steps');
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -165,65 +168,155 @@ export default function StepPalette({ onDragStart }: StepPaletteProps) {
     <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 space-y-3 shrink-0">
-        <h2 className="text-lg font-bold text-gray-900">Step Palette</h2>
+        <h2 className="text-lg font-bold text-gray-900">Palette</h2>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search steps..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-
-        {/* View Mode Tabs */}
+        {/* Main Tabs: Steps vs Shapes */}
         <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
           <button
-            onClick={() => setViewMode('category')}
+            onClick={() => setMainTab('steps')}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+              flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
               ${
-                viewMode === 'category'
+                mainTab === 'steps'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }
             `}
           >
-            <Layers className="w-3.5 h-3.5" />
-            Category
+            <Package className="w-4 h-4" />
+            Steps
           </button>
           <button
-            onClick={() => setViewMode('plugin')}
+            onClick={() => setMainTab('shapes')}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+              flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
               ${
-                viewMode === 'plugin'
+                mainTab === 'shapes'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }
             `}
           >
-            <Package className="w-3.5 h-3.5" />
-            Plugin
+            <Shapes className="w-4 h-4" />
+            Shapes
           </button>
         </div>
+
+        {/* Search - only for steps */}
+        {mainTab === 'steps' && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search steps..."
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        )}
+
+        {/* View Mode Tabs - only for steps */}
+        {mainTab === 'steps' && (
+          <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('category')}
+              className={`
+                flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                ${
+                  viewMode === 'category'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }
+              `}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Category
+            </button>
+            <button
+              onClick={() => setViewMode('plugin')}
+              className={`
+                flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                ${
+                  viewMode === 'plugin'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }
+              `}
+            >
+              <Package className="w-3.5 h-3.5" />
+              Plugin
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Steps List */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {Object.keys(filteredSteps).length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-gray-500">
-              {searchQuery ? 'No steps found matching your search.' : 'No steps available.'}
-            </p>
-          </div>
-        ) : (
-          Object.entries(filteredSteps).map(([groupName, steps]) =>
-            steps.length > 0 ? renderGroup(groupName, steps) : null
+        {mainTab === 'steps' ? (
+          // Steps List
+          Object.keys(filteredSteps).length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-500">
+                {searchQuery ? 'No steps found matching your search.' : 'No steps available.'}
+              </p>
+            </div>
+          ) : (
+            Object.entries(filteredSteps).map(([groupName, steps]) =>
+              steps.length > 0 ? renderGroup(groupName, steps) : null
+            )
           )
+        ) : (
+          // Shapes List
+          <div className="space-y-2">
+            {/* Rectangle */}
+            <div
+              draggable
+              onDragStart={(e) => onShapeDragStart(e, 'rectangle')}
+              className="
+                p-3 rounded-lg border border-gray-300 bg-white
+                cursor-grab active:cursor-grabbing
+                hover:border-gray-400 hover:shadow-md
+                transition-all
+              "
+              style={{
+                borderLeftColor: '#3b82f6',
+                borderLeftWidth: '4px',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Square className="w-4 h-4 flex-shrink-0 text-blue-600" />
+                <div className="font-medium text-sm text-gray-900">Rectangle</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                Rounded rectangle shape for annotations
+              </div>
+            </div>
+
+            {/* Ellipse */}
+            <div
+              draggable
+              onDragStart={(e) => onShapeDragStart(e, 'ellipse')}
+              className="
+                p-3 rounded-lg border border-gray-300 bg-white
+                cursor-grab active:cursor-grabbing
+                hover:border-gray-400 hover:shadow-md
+                transition-all
+              "
+              style={{
+                borderLeftColor: '#8b5cf6',
+                borderLeftWidth: '4px',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Circle className="w-4 h-4 flex-shrink-0 text-purple-600" />
+                <div className="font-medium text-sm text-gray-900">Ellipse</div>
+              </div>
+              <div className="text-xs text-gray-500">
+                Ellipse/circle shape for annotations
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -231,7 +324,9 @@ export default function StepPalette({ onDragStart }: StepPaletteProps) {
       <div className="p-4 border-t border-gray-200 shrink-0">
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs text-blue-900">
-            <strong>Tip:</strong> Drag and drop steps onto the canvas to build your graph.
+            <strong>Tip:</strong> {mainTab === 'steps'
+              ? 'Drag and drop steps onto the canvas to build your graph.'
+              : 'Drag and drop shapes onto the canvas for visual annotations.'}
           </p>
         </div>
       </div>

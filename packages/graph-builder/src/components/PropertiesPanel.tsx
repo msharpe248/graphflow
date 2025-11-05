@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGraphStore } from '@/stores/graphStore';
 import { X, Link, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
+import ColorPicker from './ColorPicker';
 
 interface PropertiesPanelProps {
   isCollapsed: boolean;
@@ -8,7 +9,7 @@ interface PropertiesPanelProps {
 }
 
 export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: PropertiesPanelProps) {
-  const { nodes, selectedNodeId, setSelectedNode, updateNode, deleteNode, memory, setMemoryValue } = useGraphStore();
+  const { nodes, selectedNodeId, setSelectedNode, updateNode, deleteNode, memory, setMemoryValue, shapes, selectedShapeId, updateShape, deleteShape, setSelectedShape } = useGraphStore();
   const [inputsCollapsed, setInputsCollapsed] = useState(false);
   const [outputsCollapsed, setOutputsCollapsed] = useState(false);
   const [bindingDialog, setBindingDialog] = useState<{ configKey: string; currentValue: string } | null>(null);
@@ -21,12 +22,262 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
   const [outputDialogSections, setOutputDialogSections] = useState({ intermediate: true, outputs: true });
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+  const selectedShape = shapes.find((s) => s.id === selectedShapeId);
+
+  // If a shape is selected, show shape properties
+  if (selectedShape) {
+    return (
+      <div className="h-full flex flex-col bg-gray-50 border-l border-gray-200">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-3 flex items-center justify-between">
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-2 hover:bg-gray-50 transition-colors flex-1 text-left -m-3 p-3"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            )}
+            <h2 className="text-sm font-bold text-gray-900">Shape Properties</h2>
+          </button>
+          <button
+            onClick={() => setSelectedShape(null)}
+            className="p-1 hover:bg-gray-100 rounded"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Shape Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shape Type
+              </label>
+              <input
+                type="text"
+                value={selectedShape.type === 'rectangle' ? 'Rectangle' : 'Ellipse'}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+              />
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Title (optional)
+              </label>
+              <input
+                type="text"
+                value={selectedShape.title || ''}
+                onChange={(e) => updateShape(selectedShape.id, { title: e.target.value })}
+                placeholder="Enter title..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+
+            {/* Text */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Text (optional)
+              </label>
+              <textarea
+                value={selectedShape.text || ''}
+                onChange={(e) => updateShape(selectedShape.id, { text: e.target.value })}
+                placeholder="Enter text..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+
+            {/* Text Formatting */}
+            <div className="space-y-3">
+              {/* Text Color */}
+              <ColorPicker
+                value={selectedShape.textColor || '#1f2937'}
+                onChange={(color) => updateShape(selectedShape.id, { textColor: color })}
+                label="Text Color"
+              />
+
+              {/* Font Weight */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Font Weight
+                </label>
+                <select
+                  value={selectedShape.fontWeight || 'semibold'}
+                  onChange={(e) => updateShape(selectedShape.id, { fontWeight: e.target.value as 'normal' | 'medium' | 'semibold' | 'bold' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="normal">Normal</option>
+                  <option value="medium">Medium</option>
+                  <option value="semibold">Semibold</option>
+                  <option value="bold">Bold</option>
+                </select>
+              </div>
+
+              {/* Font Sizes */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title Size
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedShape.titleFontSize || 14}
+                    onChange={(e) => updateShape(selectedShape.id, { titleFontSize: parseInt(e.target.value) || 14 })}
+                    min="8"
+                    max="72"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Text Size
+                  </label>
+                  <input
+                    type="number"
+                    value={selectedShape.textFontSize || 12}
+                    onChange={(e) => updateShape(selectedShape.id, { textFontSize: parseInt(e.target.value) || 12 })}
+                    min="8"
+                    max="72"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              {/* Text Alignment */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Horizontal
+                  </label>
+                  <select
+                    value={selectedShape.textAlign || 'center'}
+                    onChange={(e) => updateShape(selectedShape.id, { textAlign: e.target.value as 'left' | 'center' | 'right' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vertical
+                  </label>
+                  <select
+                    value={selectedShape.textVerticalAlign || 'center'}
+                    onChange={(e) => updateShape(selectedShape.id, { textVerticalAlign: e.target.value as 'top' | 'center' | 'bottom' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="top">Top</option>
+                    <option value="center">Center</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Fill Color */}
+            <ColorPicker
+              value={selectedShape.color}
+              onChange={(color) => updateShape(selectedShape.id, { color })}
+              label="Fill Color"
+            />
+
+            {/* Border Color */}
+            <ColorPicker
+              value={selectedShape.borderColor || '#64748b'}
+              onChange={(color) => updateShape(selectedShape.id, { borderColor: color })}
+              label="Border Color"
+            />
+
+            {/* Opacity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Opacity: {Math.round(selectedShape.opacity * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={selectedShape.opacity * 100}
+                onChange={(e) => updateShape(selectedShape.id, { opacity: parseInt(e.target.value) / 100 })}
+                className="w-full"
+              />
+            </div>
+
+            {/* Z-Index */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Z-Index (layer order)
+              </label>
+              <input
+                type="number"
+                value={selectedShape.zIndex ?? 1}
+                onChange={(e) => updateShape(selectedShape.id, { zIndex: parseInt(e.target.value) || 1 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                1-99 = Behind nodes (default: 1), 100+ = In front of nodes
+              </p>
+            </div>
+
+            {/* Size */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  value={selectedShape.size.width}
+                  onChange={(e) => updateShape(selectedShape.id, {
+                    size: { ...selectedShape.size, width: parseInt(e.target.value) || 100 }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  value={selectedShape.size.height}
+                  onChange={(e) => updateShape(selectedShape.id, {
+                    size: { ...selectedShape.size, height: parseInt(e.target.value) || 60 }
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => {
+                if (confirm(`Delete this shape?`)) {
+                  deleteShape(selectedShape.id);
+                }
+              }}
+              className="w-full px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            >
+              Delete Shape
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!selectedNode) {
     return (
       <div className="h-full bg-gray-50 border-l border-gray-200 p-4">
         <p className="text-sm text-gray-500 text-center mt-8">
-          Select a node to view its properties
+          Select a node or shape to view its properties
         </p>
       </div>
     );
@@ -39,6 +290,8 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
     if (!searchTerm.trim()) return entries;
     const lowerSearch = searchTerm.toLowerCase();
     return entries.filter(([key, field]) => {
+      // Safety check: ensure field is an object with required properties
+      if (!field || typeof field !== 'object') return false;
       return (
         key.toLowerCase().includes(lowerSearch) ||
         field.type?.toLowerCase().includes(lowerSearch) ||
@@ -80,6 +333,15 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
     if (location) {
       setMemoryValue(location.namespace, location.key, value);
     }
+  };
+
+  // Get all memory fields as binding strings
+  const getAllMemoryFields = (): string[] => {
+    const fields: string[] = [];
+    Object.keys(memory.inputs).forEach((key) => fields.push(`{memory.${key}}`));
+    Object.keys(memory.intermediate).forEach((key) => fields.push(`{memory.${key}}`));
+    Object.keys(memory.outputs).forEach((key) => fields.push(`{memory.${key}}`));
+    return fields;
   };
 
   const handleConfigChange = (key: string, value: any) => {
@@ -471,7 +733,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.inputs), inputDialogSearch).map(([key, field]) => {
                       const binding = `{memory.${key}}`;
                       const isCurrentBinding = binding === bindingDialog.currentValue;
-                      const stepsUsing = nodes.filter(n => {
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
                         const configStr = JSON.stringify(n.data.step.config);
                         return configStr.includes(binding);
                       }).map(n => n.data.step.id);
@@ -492,7 +754,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{key}</span>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
                           </div>
                           {stepsUsing.length > 0 && (
                             <p className="text-xs text-gray-600 mt-1">
@@ -546,7 +808,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.intermediate), inputDialogSearch).map(([key, field]) => {
                       const binding = `{memory.${key}}`;
                       const isCurrentBinding = binding === bindingDialog.currentValue;
-                      const stepsUsing = nodes.filter(n => {
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
                         const configStr = JSON.stringify(n.data.step.config);
                         return configStr.includes(binding);
                       }).map(n => n.data.step.id);
@@ -567,7 +829,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{key}</span>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
                           </div>
                           {stepsUsing.length > 0 && (
                             <p className="text-xs text-gray-600 mt-1">
@@ -621,7 +883,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.outputs), inputDialogSearch).map(([key, field]) => {
                       const binding = `{memory.${key}}`;
                       const isCurrentBinding = binding === bindingDialog.currentValue;
-                      const stepsUsing = nodes.filter(n => {
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
                         const configStr = JSON.stringify(n.data.step.config);
                         return configStr.includes(binding);
                       }).map(n => n.data.step.id);
@@ -642,7 +904,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{key}</span>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
                           </div>
                           {stepsUsing.length > 0 && (
                             <p className="text-xs text-gray-600 mt-1">
@@ -737,7 +999,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.intermediate), outputDialogSearch).map(([key, field]) => {
                       const binding = `{memory.${key}}`;
                       const isCurrentBinding = binding === outputBindingDialog.currentValue;
-                      const stepsUsing = nodes.filter(n => {
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
                         const outputsStr = JSON.stringify(n.data.step.outputs);
                         return outputsStr.includes(binding);
                       }).map(n => n.data.step.id);
@@ -758,7 +1020,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{key}</span>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
                           </div>
                           {stepsUsing.length > 0 && (
                             <p className="text-xs text-gray-600 mt-1">
@@ -812,7 +1074,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.outputs), outputDialogSearch).map(([key, field]) => {
                       const binding = `{memory.${key}}`;
                       const isCurrentBinding = binding === outputBindingDialog.currentValue;
-                      const stepsUsing = nodes.filter(n => {
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
                         const outputsStr = JSON.stringify(n.data.step.outputs);
                         return outputsStr.includes(binding);
                       }).map(n => n.data.step.id);
@@ -833,7 +1095,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-mono font-medium">{key}</span>
-                            <span className="text-xs text-gray-500">{field.type}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
                           </div>
                           {stepsUsing.length > 0 && (
                             <p className="text-xs text-gray-600 mt-1">

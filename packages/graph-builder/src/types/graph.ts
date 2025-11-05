@@ -9,6 +9,25 @@ export interface FieldDefinition {
   properties?: Record<string, FieldDefinition>;
 }
 
+export interface Shape {
+  id: string;
+  type: 'rectangle' | 'ellipse';
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  title?: string;
+  text?: string;
+  color: string;
+  borderColor?: string;
+  opacity: number;
+  zIndex?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  textVerticalAlign?: 'top' | 'center' | 'bottom';
+  titleFontSize?: number;
+  textFontSize?: number;
+  textColor?: string;
+  fontWeight?: 'normal' | 'medium' | 'semibold' | 'bold';
+}
+
 export interface SecretDefinition {
   source: string;
   key: string;
@@ -26,6 +45,7 @@ export interface Metadata {
   name: string;
   description: string;
   version?: string;
+  revision?: number;
   tags?: string[];
   author?: string;
   linkedAgentId?: string;
@@ -53,6 +73,7 @@ export interface GraphDefinition {
   memory: MemorySchema;
   steps: Step[];
   edges: Edge[];
+  shapes?: Shape[];
 }
 
 // Step type categories

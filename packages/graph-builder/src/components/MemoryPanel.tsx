@@ -26,6 +26,9 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
     };
 
     nodes.forEach((node) => {
+      // Skip shape nodes - they don't have step data
+      if (node.type === 'shape' || !node.data.step) return;
+
       const { step } = node.data;
 
       // Check both config and outputs for this memory binding

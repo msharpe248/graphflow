@@ -16,6 +16,11 @@ export default function BuilderView() {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const onShapeDragStart = (event: React.DragEvent, shapeType: 'rectangle' | 'ellipse') => {
+    event.dataTransfer.setData('application/shape', shapeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
   // Determine height classes based on collapse states
   const getPropertiesHeight = () => {
     if (propertiesCollapsed) return 'h-auto';
@@ -38,7 +43,7 @@ export default function BuilderView() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar - Step palette */}
         <div className="w-64 shrink-0">
-          <StepPalette onDragStart={onDragStart} />
+          <StepPalette onDragStart={onDragStart} onShapeDragStart={onShapeDragStart} />
         </div>
 
         {/* Center - Canvas */}
