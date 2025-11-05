@@ -24,7 +24,7 @@ const PRESET_COLORS = [
   // Yellows/Ambers
   '#fcd34d', // yellow-300
   '#fbbf24', // yellow-400
-  '#fbbf24', // yellow-400
+  '#f59e0b', // amber-500
 
   // Reds/Pinks
   '#fca5a5', // red-300
