@@ -129,6 +129,15 @@ Generated: {graph.metadata.created}
         if "llm" in step_types:
             imports.append("# LLM step will use framework-specific implementation")
 
+        # Check if we need StepRegistry for generic step types
+        # These are step types that use the generic execution path (lines 211-222 in generate_step_code)
+        known_specialized_types = {"start", "output", "transform", "conditional", "llm", "join"}
+        http_types = {t for t in step_types if t == "http" or t.startswith("http.")}
+        needs_registry = step_types - known_specialized_types - http_types
+
+        if needs_registry:
+            imports.append("from graphflow_core.steps.registry import StepRegistry")
+
         return imports
 
     def generate_memory_schema(self, graph: GraphDefinition) -> str:
