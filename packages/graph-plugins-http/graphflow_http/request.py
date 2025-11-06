@@ -33,7 +33,17 @@ class HTTPGetStep(BaseHTTPStep):
                 "headers": {
                     "type": "object",
                     "additionalProperties": {"type": "string"},
-                    "description": "Request headers (key-value pairs)"
+                    "description": "Request headers (key-value pairs)",
+                    "x-editor": "table",
+                    "x-editor-config": {
+                        "columns": [
+                            {"key": "name", "label": "Header Name", "placeholder": "Content-Type"},
+                            {"key": "value", "label": "Value", "placeholder": "application/json"}
+                        ],
+                        "initialRows": 3,
+                        "addRowLabel": "Add Header",
+                        "emptyMessage": "No headers defined"
+                    }
                 },
                 "auth": {
                     "type": "object",
@@ -163,7 +173,17 @@ class HTTPPostStep(BaseHTTPStep):
                 "headers": {
                     "type": "object",
                     "additionalProperties": {"type": "string"},
-                    "description": "Request headers (key-value pairs)"
+                    "description": "Request headers (key-value pairs)",
+                    "x-editor": "table",
+                    "x-editor-config": {
+                        "columns": [
+                            {"key": "name", "label": "Header Name", "placeholder": "Content-Type"},
+                            {"key": "value", "label": "Value", "placeholder": "application/json"}
+                        ],
+                        "initialRows": 3,
+                        "addRowLabel": "Add Header",
+                        "emptyMessage": "No headers defined"
+                    }
                 },
                 "auth": {
                     "type": "object",

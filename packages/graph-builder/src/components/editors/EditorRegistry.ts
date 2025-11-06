@@ -5,6 +5,7 @@ import BooleanEditor from './BooleanEditor';
 import JsonEditor from './JsonEditor';
 import KeyValueEditor from './KeyValueEditor';
 import ColorPickerModal from './ColorPickerModal';
+import TableEditor from './TableEditor';
 
 // Registry of all available editors
 const EDITOR_REGISTRY: Record<string, EditorConfig> = {
@@ -30,6 +31,10 @@ const EDITOR_REGISTRY: Record<string, EditorConfig> = {
   },
   'color': {
     component: ColorPickerModal,
+    displayMode: 'modal',
+  },
+  'table': {
+    component: TableEditor,
     displayMode: 'modal',
   },
 };

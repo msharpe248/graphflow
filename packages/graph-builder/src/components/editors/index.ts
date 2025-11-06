@@ -5,6 +5,7 @@ export { default as BooleanEditor } from './BooleanEditor';
 export { default as JsonEditor } from './JsonEditor';
 export { default as KeyValueEditor } from './KeyValueEditor';
 export { default as ColorPickerModal } from './ColorPickerModal';
+export { default as TableEditor } from './TableEditor';
 export { default as BaseEditorModal } from './BaseEditorModal';
 
 // Export registry functions
