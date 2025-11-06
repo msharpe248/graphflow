@@ -250,3 +250,155 @@ class SlackNotificationStep(StepBase):
             if match:
                 output_key = match.group(1)
                 memory.write(output_key, result)
+
+
+class EditorShowcaseStep(StepBase):
+    """
+    Showcase step demonstrating all available custom editors.
+
+    This step does nothing but provides examples of all editor types
+    for documentation and testing purposes.
+    """
+
+    # Step metadata for UI
+    label = "Editor Showcase"
+    description = "Demonstrates all available custom editors (no-op step for documentation)"
+    category = "example"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "EditorShowcaseStep"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                # String editor (default)
+                "text_field": {
+                    "type": "string",
+                    "description": "Simple text input (string editor)"
+                },
+                # Number editor
+                "number_field": {
+                    "type": "number",
+                    "description": "Numeric input (number editor)"
+                },
+                # Boolean editor (checkbox)
+                "boolean_field": {
+                    "type": "boolean",
+                    "description": "Toggle switch (boolean editor)",
+                    "default": False
+                },
+                # JSON editor
+                "json_field": {
+                    "type": "object",
+                    "description": "JSON data (json editor - modal)",
+                    "x-editor": "json"
+                },
+                # Key-Value editor
+                "keyvalue_field": {
+                    "type": "object",
+                    "description": "Key-value pairs (keyvalue editor - modal)",
+                    "x-editor": "keyvalue"
+                },
+                # Color picker
+                "color_field": {
+                    "type": "string",
+                    "description": "Color selection (color picker - modal)",
+                    "x-editor": "color",
+                    "default": "#3b82f6"
+                },
+                # Table editor
+                "table_field": {
+                    "type": "object",
+                    "description": "Tabular data (table editor - modal)",
+                    "x-editor": "table",
+                    "x-editor-config": {
+                        "columns": [
+                            {"key": "name", "label": "Name", "placeholder": "Item name"},
+                            {"key": "value", "label": "Value", "placeholder": "Item value"}
+                        ],
+                        "initialRows": 2,
+                        "addRowLabel": "Add Item",
+                        "emptyMessage": "No items defined"
+                    }
+                },
+                # Markdown editor
+                "markdown_field": {
+                    "type": "string",
+                    "description": "Markdown content (markdown editor - modal)",
+                    "x-editor": "markdown"
+                },
+                # Date picker
+                "date_field": {
+                    "type": "string",
+                    "description": "Date selection (date picker - inline)",
+                    "x-editor": "date"
+                },
+                # Time picker
+                "time_field": {
+                    "type": "string",
+                    "description": "Time selection (time editor - inline)",
+                    "x-editor": "time"
+                },
+                # DateTime picker
+                "datetime_field": {
+                    "type": "string",
+                    "description": "Date and time selection (datetime picker - inline)",
+                    "x-editor": "datetime"
+                }
+            },
+            "required": []
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "description": "No inputs required - this is a showcase step",
+            "properties": {}
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "showcase_data": {
+                    "type": "object",
+                    "description": "All configured editor values (for testing)"
+                }
+            }
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """
+        No-op execution - just collects all editor values for output.
+
+        This step doesn't perform any real action, it's purely for
+        showcasing the different editor types available.
+        """
+        # Collect all config values
+        showcase_data = {
+            "text_field": self.config.get("text_field"),
+            "number_field": self.config.get("number_field"),
+            "boolean_field": self.config.get("boolean_field"),
+            "json_field": self.config.get("json_field"),
+            "keyvalue_field": self.config.get("keyvalue_field"),
+            "color_field": self.config.get("color_field"),
+            "table_field": self.config.get("table_field"),
+            "markdown_field": self.config.get("markdown_field"),
+            "date_field": self.config.get("date_field"),
+            "time_field": self.config.get("time_field"),
+            "datetime_field": self.config.get("datetime_field"),
+        }
+
+        # Write output to memory if configured
+        if "showcase_data" in self.outputs:
+            output_template = self.outputs["showcase_data"]
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(output_template)
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, showcase_data)

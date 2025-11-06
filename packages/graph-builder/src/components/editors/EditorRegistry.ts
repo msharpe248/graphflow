@@ -6,6 +6,10 @@ import JsonEditor from './JsonEditor';
 import KeyValueEditor from './KeyValueEditor';
 import ColorPickerModal from './ColorPickerModal';
 import TableEditor from './TableEditor';
+import MarkdownEditor from './MarkdownEditor';
+import DatePicker from './DatePicker';
+import TimeEditor from './TimeEditor';
+import DateTimePicker from './DateTimePicker';
 
 // Registry of all available editors
 const EDITOR_REGISTRY: Record<string, EditorConfig> = {
@@ -36,6 +40,22 @@ const EDITOR_REGISTRY: Record<string, EditorConfig> = {
   'table': {
     component: TableEditor,
     displayMode: 'modal',
+  },
+  'markdown': {
+    component: MarkdownEditor,
+    displayMode: 'modal',
+  },
+  'date': {
+    component: DatePicker,
+    displayMode: 'inline',
+  },
+  'time': {
+    component: TimeEditor,
+    displayMode: 'inline',
+  },
+  'datetime': {
+    component: DateTimePicker,
+    displayMode: 'inline',
   },
 };
 
