@@ -1,0 +1,86 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e packages/graph-core
+        pip install -e packages/graph-compiler
+        pip install -e packages/graph-runtime
+        pip install pytest pytest-asyncio httpx requests pytest-cov pytest-timeout
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v --cov=graphflow_core --cov=graphflow_compiler --cov=graphflow_runtime --cov-report=xml --cov-report=term
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff black isort mypy
+
+    - name: Run ruff
+      run: ruff check packages/
+      continue-on-error: true
+
+    - name: Run black
+      run: black --check packages/
+      continue-on-error: true
+
+    - name: Run isort
+      run: isort --check-only packages/
+      continue-on-error: true
+
+    - name: Run mypy
+      run: mypy packages/ --ignore-missing-imports
+      continue-on-error: true

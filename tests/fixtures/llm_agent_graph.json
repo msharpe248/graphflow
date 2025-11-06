@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "LLM Question Answering Agent",
+    "description": "An agent that answers questions using an LLM",
+    "created": "2025-01-01T00:00:00Z",
+    "framework_hints": ["pydantic_ai", "langgraph"],
+    "tags": ["test", "llm"]
+  },
+  "memory": {
+    "inputs": {
+      "user_question": {
+        "type": "string",
+        "description": "User's question"
+      }
+    },
+    "outputs": {
+      "answer": {
+        "type": "string",
+        "description": "LLM's answer"
+      }
+    },
+    "intermediate": {
+      "llm_response": {
+        "type": "string",
+        "description": "Raw LLM response"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "llm_1",
+      "type": "llm",
+      "config": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "system_prompt": "You are a helpful assistant. Provide concise, accurate answers.",
+        "user_prompt": "{memory.user_question}",
+        "temperature": 0.7
+      },
+      "outputs": {
+        "response": "{memory.llm_response}"
+      }
+    },
+    {
+      "id": "transform_1",
+      "type": "transform",
+      "config": {
+        "input": "{memory.llm_response}",
+        "transform_type": "add_prefix",
+        "prefix": "Answer: "
+      },
+      "outputs": {
+        "result": "{memory.answer}"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "from": "llm_1",
+      "to": "transform_1"
+    }
+  ]
+}
