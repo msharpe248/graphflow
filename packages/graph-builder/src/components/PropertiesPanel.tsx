@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGraphStore } from '@/stores/graphStore';
 import { X, Link, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
 import ColorPickerModal from './editors/ColorPickerModal';
+import MarkdownEditor from './editors/MarkdownEditor';
 import { getEditorForSchema } from './editors';
 
 interface PropertiesPanelProps {
@@ -70,36 +71,42 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
               />
             </div>
 
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Title (optional)
-              </label>
-              <input
-                type="text"
-                value={selectedShape.title || ''}
-                onChange={(e) => updateShape(selectedShape.id, { title: e.target.value })}
-                placeholder="Enter title..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
+            {/* Title - only show for rectangle and ellipse */}
+            {(selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title (optional)
+                </label>
+                <input
+                  type="text"
+                  value={selectedShape.title || ''}
+                  onChange={(e) => updateShape(selectedShape.id, { title: e.target.value })}
+                  placeholder="Enter title..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+            )}
 
             {/* Text */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Text (optional)
               </label>
-              <textarea
-                value={selectedShape.text || ''}
-                onChange={(e) => updateShape(selectedShape.id, { text: e.target.value })}
-                placeholder={
-                  selectedShape.type === 'textbox' || selectedShape.type === 'stickynote'
-                    ? 'Enter text... Supports markdown: **bold**, *italic*, etc.'
-                    : 'Enter text...'
-                }
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
+              {(selectedShape.type === 'textbox' || selectedShape.type === 'stickynote') ? (
+                <MarkdownEditor
+                  value={selectedShape.text || ''}
+                  onChange={(value) => updateShape(selectedShape.id, { text: value })}
+                  schema={{ description: 'Text content (supports markdown)' }}
+                />
+              ) : (
+                <textarea
+                  value={selectedShape.text || ''}
+                  onChange={(e) => updateShape(selectedShape.id, { text: e.target.value })}
+                  placeholder="Enter text..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              )}
             </div>
 
             {/* Text Formatting */}
@@ -134,20 +141,36 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
               </div>
 
               {/* Font Sizes */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title Size
-                  </label>
-                  <input
-                    type="number"
-                    value={selectedShape.titleFontSize || 14}
-                    onChange={(e) => updateShape(selectedShape.id, { titleFontSize: parseInt(e.target.value) || 14 })}
-                    min="8"
+              {(selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Title Size
+                    </label>
+                    <input
+                      type="number"
+                      value={selectedShape.titleFontSize || 14}
+                      onChange={(e) => updateShape(selectedShape.id, { titleFontSize: parseInt(e.target.value) || 14 })}
+                      min="8"
+                      max="72"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Text Size
+                    </label>
+                    <input
+                      type="number"
+                      value={selectedShape.textFontSize || 12}
+                      onChange={(e) => updateShape(selectedShape.id, { textFontSize: parseInt(e.target.value) || 12 })}
+                      min="8"
                     max="72"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
+              </div>
+              ) : (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Text Size
@@ -161,7 +184,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
-              </div>
+              )}
 
               {/* Text Alignment */}
               <div className="grid grid-cols-2 gap-2">
