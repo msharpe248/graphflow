@@ -73,8 +73,10 @@ def sample_graph_simple():
                 "id": "transform_1",
                 "type": "transform",
                 "config": {
-                    "input": "{memory.input}",
-                    "transform_type": "uppercase"
+                    "operation": "uppercase",
+                    "code": "return input.upper()",
+                    "input_keys": ["input"],
+                    "output_key": "output"
                 },
                 "outputs": {
                     "result": "{memory.output}"

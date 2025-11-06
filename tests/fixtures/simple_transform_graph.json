@@ -32,8 +32,10 @@
       "id": "transform_1",
       "type": "transform",
       "config": {
-        "input": "{memory.user_input}",
-        "transform_type": "uppercase"
+        "operation": "uppercase",
+        "code": "return user_input.upper()",
+        "input_keys": ["user_input"],
+        "output_key": "uppercase_text"
       },
       "outputs": {
         "result": "{memory.uppercase_text}"
@@ -43,9 +45,10 @@
       "id": "transform_2",
       "type": "transform",
       "config": {
-        "input": "{memory.uppercase_text}",
-        "transform_type": "add_prefix",
-        "prefix": "RESULT: "
+        "operation": "add_prefix",
+        "code": "return 'RESULT: ' + uppercase_text",
+        "input_keys": ["uppercase_text"],
+        "output_key": "result"
       },
       "outputs": {
         "result": "{memory.result}"

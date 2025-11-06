@@ -305,8 +305,10 @@ class TestDifferentGraphTypes:
                     "id": "step1",
                     "type": "transform",
                     "config": {
-                        "input": "{memory.input}",
-                        "transform_type": "uppercase",
+                        "operation": "uppercase",
+                        "code": "return input.upper()",
+                        "input_keys": ["input"],
+                        "output_key": "output1"
                     },
                     "outputs": {"result": "{memory.output1}"},
                 },
@@ -314,8 +316,10 @@ class TestDifferentGraphTypes:
                     "id": "step2",
                     "type": "transform",
                     "config": {
-                        "input": "{memory.input}",
-                        "transform_type": "lowercase",
+                        "operation": "lowercase",
+                        "code": "return input.lower()",
+                        "input_keys": ["input"],
+                        "output_key": "output2"
                     },
                     "outputs": {"result": "{memory.output2}"},
                 },
