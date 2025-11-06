@@ -620,14 +620,20 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                       )}
                       {isOutputBound && (
                         <div>
-                          <label className="block text-xs font-medium text-green-700 mb-1">Value</label>
-                          <input
-                            type="text"
-                            value={outputMemoryValue !== undefined ? outputMemoryValue : ''}
-                            onChange={(e) => updateMemoryValue(outputValue, e.target.value)}
-                            placeholder="Enter default value..."
-                            className="w-full px-2 py-1.5 border border-green-300 rounded text-xs bg-white"
-                          />
+                          <label className="block text-xs font-medium text-green-700 mb-1">Default Value</label>
+                          {(() => {
+                            // Get the appropriate editor for this output schema
+                            const editorConfig = getEditorForSchema(outputSchema);
+                            const EditorComponent = editorConfig.component;
+
+                            return (
+                              <EditorComponent
+                                value={outputMemoryValue !== undefined ? outputMemoryValue : (outputSchema.default ?? '')}
+                                onChange={(newValue) => updateMemoryValue(outputValue, newValue)}
+                                schema={outputSchema}
+                              />
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
