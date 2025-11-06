@@ -52,9 +52,9 @@ export default function BuilderView() {
         </div>
 
         {/* Right sidebar - Properties and Memory */}
-        <div className="w-96 shrink-0 flex flex-col">
+        <div className="w-96 shrink-0 flex flex-col overflow-hidden">
           {/* Top: Properties Panel */}
-          <div className={`${getPropertiesHeight()} border-b`}>
+          <div className={`${getPropertiesHeight()} ${!propertiesCollapsed ? 'min-h-0' : ''}`}>
             <PropertiesPanel
               isCollapsed={propertiesCollapsed}
               setIsCollapsed={setPropertiesCollapsed}
@@ -62,7 +62,7 @@ export default function BuilderView() {
           </div>
 
           {/* Bottom: Memory Panel */}
-          <div className={getMemoryHeight()}>
+          <div className={`${getMemoryHeight()} ${!memoryCollapsed ? 'min-h-0' : ''} border-t border-gray-200`}>
             <MemoryPanel
               isCollapsed={memoryCollapsed}
               setIsCollapsed={setMemoryCollapsed}

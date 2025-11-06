@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useGraphStore } from '@/stores/graphStore';
 import { X, Link, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
-import ColorPicker from './ColorPicker';
+import ColorPickerModal from './editors/ColorPickerModal';
+import { getEditorForSchema } from './editors';
 
 interface PropertiesPanelProps {
   isCollapsed: boolean;
@@ -104,11 +105,16 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
             {/* Text Formatting */}
             <div className="space-y-3">
               {/* Text Color */}
-              <ColorPicker
-                value={selectedShape.textColor || '#1f2937'}
-                onChange={(color) => updateShape(selectedShape.id, { textColor: color })}
-                label="Text Color"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Text Color
+                </label>
+                <ColorPickerModal
+                  value={selectedShape.textColor || '#1f2937'}
+                  onChange={(color) => updateShape(selectedShape.id, { textColor: color })}
+                  schema={{ description: 'Text Color' }}
+                />
+              </div>
 
               {/* Font Weight */}
               <div>
@@ -191,18 +197,28 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
             </div>
 
             {/* Fill Color */}
-            <ColorPicker
-              value={selectedShape.color}
-              onChange={(color) => updateShape(selectedShape.id, { color })}
-              label="Fill Color"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fill Color
+              </label>
+              <ColorPickerModal
+                value={selectedShape.color}
+                onChange={(color) => updateShape(selectedShape.id, { color })}
+                schema={{ description: 'Fill Color' }}
+              />
+            </div>
 
             {/* Border Color */}
-            <ColorPicker
-              value={selectedShape.borderColor || '#64748b'}
-              onChange={(color) => updateShape(selectedShape.id, { borderColor: color })}
-              label="Border Color"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Border Color
+              </label>
+              <ColorPickerModal
+                value={selectedShape.borderColor || '#64748b'}
+                onChange={(color) => updateShape(selectedShape.id, { borderColor: color })}
+                schema={{ description: 'Border Color' }}
+              />
+            </div>
 
             {/* Opacity */}
             <div>
@@ -509,119 +525,33 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                       {isBound ? (
                         <div className="mb-2">
                           <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
-                          {schema.type === 'object' || schema.type === 'array' ? (
-                            <textarea
-                              value={memoryValue !== undefined ? JSON.stringify(memoryValue, null, 2) : ''}
-                              onChange={(e) => {
-                                try {
-                                  const parsed = JSON.parse(e.target.value);
-                                  updateMemoryValue(currentValue, parsed);
-                                } catch {
-                                  // Invalid JSON, keep it as string for now
-                                }
-                              }}
-                              placeholder="Enter JSON value..."
-                              rows={3}
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono"
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              value={memoryValue !== undefined ? memoryValue : ''}
-                              onChange={(e) => updateMemoryValue(currentValue, e.target.value)}
-                              placeholder="Enter value..."
-                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
-                            />
-                          )}
+                          {(() => {
+                            // Get the appropriate editor for this schema
+                            const editorConfig = getEditorForSchema(schema);
+                            const EditorComponent = editorConfig.component;
+
+                            return (
+                              <EditorComponent
+                                value={memoryValue !== undefined ? memoryValue : (schema.default ?? '')}
+                                onChange={(newValue) => updateMemoryValue(currentValue, newValue)}
+                                schema={schema}
+                              />
+                            );
+                          })()}
                         </div>
-                      ) : schema.type === 'boolean' ? (
-                        <input
-                          type="checkbox"
-                          checked={step.config[key] ?? schema.default ?? false}
-                          onChange={(e) => handleConfigChange(key, e.target.checked)}
-                          className="rounded border-gray-300"
-                        />
-                      ) : schema.enum ? (
-                        <div>
-                          <input
-                            type="text"
-                            value={currentValue}
-                            onChange={(e) => handleConfigChange(key, e.target.value)}
-                            placeholder={`e.g., ${schema.enum[0]} or {memory.field_name}`}
-                            className={`w-full px-3 py-2 border rounded-md text-sm ${
-                              isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
-                            }`}
-                            list={`${key}-options`}
+                      ) : (() => {
+                        // Get the appropriate editor for this schema
+                        const editorConfig = getEditorForSchema(schema);
+                        const EditorComponent = editorConfig.component;
+
+                        return (
+                          <EditorComponent
+                            value={step.config[key] ?? schema.default}
+                            onChange={(newValue) => handleConfigChange(key, newValue)}
+                            schema={schema}
                           />
-                          <datalist id={`${key}-options`}>
-                            {schema.enum.map((opt: string) => (
-                              <option key={opt} value={opt} />
-                            ))}
-                            {getAllMemoryFields().map((field) => (
-                              <option key={field} value={field} />
-                            ))}
-                          </datalist>
-                        </div>
-                      ) : schema.type === 'number' || schema.type === 'integer' ? (
-                        <input
-                          type="text"
-                          value={currentValue}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // If it's a memory binding, keep as string; otherwise parse as number
-                            if (val.startsWith('{memory.')) {
-                              handleConfigChange(key, val);
-                            } else if (val === '') {
-                              handleConfigChange(key, '');
-                            } else {
-                              const parsed = schema.type === 'integer' ? parseInt(val, 10) : parseFloat(val);
-                              handleConfigChange(key, isNaN(parsed) ? val : parsed);
-                            }
-                          }}
-                          placeholder={`e.g., ${schema.type === 'integer' ? '30' : '0.7'} or {memory.field_name}`}
-                          className={`w-full px-3 py-2 border rounded-md text-sm ${
-                            isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
-                          }`}
-                        />
-                      ) : schema.type === 'object' || schema.type === 'array' ? (
-                        <textarea
-                          value={
-                            typeof step.config[key] === 'string' ? step.config[key] :
-                            step.config[key]
-                              ? JSON.stringify(step.config[key], null, 2)
-                              : ''
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val.startsWith('{memory.')) {
-                              handleConfigChange(key, val);
-                            } else {
-                              try {
-                                const parsed = JSON.parse(val);
-                                handleConfigChange(key, parsed);
-                              } catch {
-                                // Invalid JSON, keep as string (might be incomplete)
-                                handleConfigChange(key, val);
-                              }
-                            }
-                          }}
-                          placeholder={`${schema.type === 'object' ? '{}' : '[]'} or {memory.field_name}`}
-                          rows={3}
-                          className={`w-full px-3 py-2 border rounded-md text-sm font-mono ${
-                            isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
-                          }`}
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={currentValue}
-                          onChange={(e) => handleConfigChange(key, e.target.value)}
-                          placeholder="Enter value or {memory.field_name}"
-                          className={`w-full px-3 py-2 border rounded-md text-sm ${
-                            isBound ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
-                          }`}
-                        />
-                      )}
+                        );
+                      })()}
                       {schema.description && (
                         <p className="text-xs text-gray-500 mt-1">{schema.description}</p>
                       )}

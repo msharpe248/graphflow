@@ -1,6 +1,7 @@
 import { useGraphStore } from '@/stores/graphStore';
 import { Plus, X, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { getEditorForType } from './editors';
 
 interface MemoryPanelProps {
   isCollapsed: boolean;
@@ -137,13 +138,19 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
 
         <div>
           <label className="text-xs text-gray-600 block mb-1">Value</label>
-          <input
-            type="text"
-            value={field.default !== undefined ? field.default : ''}
-            onChange={(e) => handleUpdateField(namespace, key, { default: e.target.value })}
-            placeholder="Enter value..."
-            className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-          />
+          {(() => {
+            // Get the appropriate editor based on type only
+            const editorConfig = getEditorForType({ type: field.type });
+            const EditorComponent = editorConfig.component;
+
+            return (
+              <EditorComponent
+                value={field.default !== undefined ? field.default : ''}
+                onChange={(newValue) => handleUpdateField(namespace, key, { default: newValue })}
+                schema={{ type: field.type, description: 'Value' }}
+              />
+            );
+          })()}
         </div>
       </div>
     );
