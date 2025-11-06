@@ -2,8 +2,14 @@
 
 # GraphFlow Test Runner
 # Convenience script for running different test suites
+# Run from project root or tests directory
 
 set -e  # Exit on error
+
+# Change to project root if we're in tests directory
+if [[ $(basename "$PWD") == "tests" ]]; then
+    cd ..
+fi
 
 # Colors for output
 RED='\033[0;31m'

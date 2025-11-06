@@ -114,8 +114,9 @@ python my_agent.py --server
 # Terminal 1: Start runtime server
 graphflow-runtime
 
-# Terminal 2: Upload and run agent
-python test_end_to_end.py
+# Terminal 2: Run integration tests
+cd tests
+pytest test_runtime_execution.py -v
 ```
 
 ### Example 3: API Usage
@@ -283,17 +284,33 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 
 ## 🧪 Testing
 
-```bash
-# Run end-to-end test
-python test_end_to_end.py
+GraphFlow has a comprehensive test suite covering all major use cases:
 
-# Expected output:
-# ✓ Graph loaded
-# ✓ Agent created
-# ✓ Run completed
-# ✓ Outputs retrieved
-# ✓ Memory inspected
+```bash
+# Run all tests
+cd tests
+./run_tests.sh all
+
+# Run specific test categories
+./run_tests.sh compilation    # Test graph compilation
+./run_tests.sh standalone      # Test standalone execution
+./run_tests.sh runtime         # Test runtime server
+
+# Run with coverage
+./run_tests.sh coverage
+
+# Or use pytest directly
+pytest tests/ -v
 ```
+
+**Test Coverage:**
+- ✅ Graph compilation (Pydantic AI & LangGraph)
+- ✅ Standalone execution (CLI & server modes)
+- ✅ Multi-graph runtime (CRUD, execution, memory)
+- ✅ Core functionality (graph definition, memory, steps)
+- ✅ Error handling and validation
+
+See **[tests/README.md](tests/README.md)** for detailed testing documentation.
 
 ## 🎨 Graph Definition Format
 
