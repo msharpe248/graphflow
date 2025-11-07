@@ -1,0 +1,59 @@
+# LLM step using LangChain
+
+# Render prompts from state
+{%- for key in memory_refs | sort %}
+{{ key | replace('.', '_') }} = state.get("{{ key }}", "")
+{%- endfor %}
+
+# Build prompt
+{%- if user_prompt %}
+user_prompt_template = {{ user_prompt | repr }}
+{%- for key in memory_refs | sort %}
+user_prompt_template = user_prompt_template.replace("{memory.{{ key }}}", str({{ key | replace('.', '_') }}))
+{%- endfor %}
+{%- else %}
+user_prompt_template = ""
+{%- endif %}
+
+{%- if api_key_secret %}
+# API key should be in environment
+import os
+api_key = os.getenv("{{ api_key_secret | upper }}", "")
+{%- else %}
+api_key = None
+{%- endif %}
+
+# Create LangChain LLM
+{%- if provider == "anthropic" %}
+llm = ChatAnthropic(model="{{ model }}", temperature={{ temperature }})
+{%- elif provider == "openrouter" %}
+llm = ChatOpenAI(
+    model="{{ model }}",
+    temperature={{ temperature }},
+    openai_api_base="https://openrouter.ai/api/v1",
+    openai_api_key=api_key,
+)
+{%- else %}
+llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }})
+{%- endif %}
+
+# Build messages
+messages = []
+{%- if system_prompt %}
+messages.append(SystemMessage(content={{ system_prompt | repr }}))
+{%- endif %}
+messages.append(HumanMessage(content=user_prompt_template))
+
+# Invoke LLM
+response = await llm.ainvoke(messages)
+
+{%- if output_schema %}
+# Parse structured output (placeholder)
+# In production, use with_structured_output()
+response_data = {"answer": response.content, "confidence": 0.85}
+state["{{ output_key }}"] = response_data
+{%- else %}
+state["{{ output_key }}"] = response.content
+{%- endif %}
+
+return state

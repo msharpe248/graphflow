@@ -2,7 +2,7 @@
 
 import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Optional
 from graphflow_core.memory.store import MemoryStore
 
 
@@ -175,6 +175,65 @@ class StepBase(ABC):
             List of error messages (empty if valid)
         """
         return []
+
+    @classmethod
+    def get_code_template(cls, framework: str) -> Optional[str]:
+        """
+        Return Jinja2 template string for generating code for this step type.
+
+        By default, returns None which signals the compiler to use the generic
+        default template (step class instantiation + execute call).
+
+        Override this method to provide framework-specific code generation
+        templates. Only needed for steps that require special handling in
+        specific frameworks (e.g., LLM steps that use framework-specific APIs).
+
+        Args:
+            framework: Target framework identifier ('pydantic_ai', 'langgraph', etc.)
+
+        Returns:
+            Jinja2 template string for code generation, or None to use default
+
+        Example:
+            @classmethod
+            def get_code_template(cls, framework: str) -> Optional[str]:
+                if framework == "pydantic_ai":
+                    return '''
+                    # Custom Pydantic AI code
+                    agent = Agent("{{ config.model }}")
+                    result = await agent.run("{{ config.prompt }}")
+                    self.memory.write("{{ config.output_key }}", result.data)
+                    '''
+                elif framework == "langgraph":
+                    return '''
+                    # Custom LangGraph code
+                    llm = ChatOpenAI(model="{{ config.model }}")
+                    result = await llm.ainvoke("{{ config.prompt }}")
+                    state["{{ config.output_key }}"] = result.content
+                    return state
+                    '''
+                return None
+        """
+        return None
+
+    @classmethod
+    def get_supported_frameworks(cls) -> List[str]:
+        """
+        Return list of frameworks this step can compile to.
+
+        By default, all steps support all frameworks via the generic default
+        template. Override this if your step provides framework-specific
+        templates or has specific framework requirements.
+
+        Returns:
+            List of framework identifiers this step supports
+
+        Example:
+            @classmethod
+            def get_supported_frameworks(cls) -> List[str]:
+                return ["pydantic_ai", "langgraph"]
+        """
+        return ["pydantic_ai", "langgraph"]
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.id}, type={self.get_type()})"

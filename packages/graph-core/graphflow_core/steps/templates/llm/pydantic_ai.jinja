@@ -1,0 +1,79 @@
+# LLM step using Pydantic AI
+
+{% if output_schema -%}
+# Define output schema
+class LLMOutput_{{ step.id }}(BaseModel):
+{%- if output_schema.properties %}
+{%- for prop_name, prop_def in output_schema.properties.items() %}
+    {{ prop_name }}: {{ json_type_to_python(prop_def.type) }}  # {{ prop_def.description | default("") }}
+{%- endfor %}
+{%- else %}
+    pass
+{%- endif %}
+
+{% endif -%}
+
+# Render prompts
+{%- for key in memory_refs | sort %}
+{{ key | replace('.', '_') }} = self.memory.read("{{ key }}")
+{%- endfor %}
+
+# Build prompt
+{%- if user_prompt %}
+user_prompt_template = {{ user_prompt | repr }}
+{%- for key in memory_refs | sort %}
+user_prompt_template = user_prompt_template.replace("{memory.{{ key }}}", str({{ key | replace('.', '_') }}))
+{%- endfor %}
+{%- else %}
+user_prompt_template = ""
+{%- endif %}
+
+{%- if api_key_secret %}
+api_key = self.memory.get_secret("{{ api_key_secret }}")
+{%- else %}
+api_key = None  # Will use environment variable
+{%- endif %}
+
+# Create Pydantic AI agent
+{%- if provider == "openrouter" %}
+agent = Agent(
+    "openai:{{ model }}",
+{%- elif provider == "anthropic" %}
+agent = Agent(
+    "{{ model }}",
+{%- else %}
+agent = Agent(
+    "{{ model }}",
+{%- endif %}
+{%- if system_prompt %}
+    system_prompt={{ system_prompt | repr }},
+{%- endif %}
+{%- if output_schema %}
+    result_type=LLMOutput_{{ step.id }},
+{%- else %}
+    result_type=str,
+{%- endif %}
+)
+
+# Run agent
+result = await agent.run(user_prompt_template)
+
+# Extract result
+{%- if output_schema %}
+response_data = result.data.model_dump()
+{%- else %}
+response_data = result.data
+{%- endif %}
+
+# Write to memory using outputs dict
+{%- for output_name, output_template in outputs.items() %}
+{%- if '{memory.' in output_template %}
+{%- set output_key = output_template.split('{memory.')[1].split('}')[0] %}
+{%- if output_name == 'response' %}
+self.memory.write("{{ output_key }}", response_data)
+{%- elif output_name == 'tool_calls' %}
+# Tool calls not yet implemented in generated code
+self.memory.write("{{ output_key }}", [])
+{%- endif %}
+{%- endif %}
+{%- endfor %}

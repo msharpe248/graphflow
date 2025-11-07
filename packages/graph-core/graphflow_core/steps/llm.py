@@ -1,5 +1,7 @@
 """LLM and tool-calling agent step types."""
 
+import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from graphflow_core.steps.base import StepBase
 from graphflow_core.steps.registry import StepRegistry
@@ -190,6 +192,36 @@ class LLMStep(StepBase):
             },
             "description": "Writes LLM response and optionally tool calls to locations specified in outputs dict"
         }
+
+    @classmethod
+    def get_code_template(cls, framework: str) -> Optional[str]:
+        """
+        Return framework-specific code generation template for LLM step.
+
+        LLM steps require different implementations for different frameworks:
+        - Pydantic AI: Uses Agent API with structured outputs
+        - LangGraph: Uses ChatModel with message-based interface
+
+        Args:
+            framework: Target framework ('pydantic_ai' or 'langgraph')
+
+        Returns:
+            Jinja2 template string, or None if framework not supported
+        """
+        # Load template from package
+        template_dir = Path(__file__).parent / "templates" / "llm"
+        template_file = template_dir / f"{framework}.jinja"
+
+        if template_file.exists():
+            return template_file.read_text()
+
+        # Framework not supported
+        return None
+
+    @classmethod
+    def get_supported_frameworks(cls) -> List[str]:
+        """LLM step supports both Pydantic AI and LangGraph."""
+        return ["pydantic_ai", "langgraph"]
 
     def validate_config(self) -> List[str]:
         """Validate LLM step configuration."""

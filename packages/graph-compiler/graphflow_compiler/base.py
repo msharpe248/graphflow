@@ -1,10 +1,12 @@
 """Base classes for code generators."""
 
+import re
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
 from pathlib import Path
 import jinja2
 from graphflow_core.models import GraphDefinition, Step
+from graphflow_core.steps.registry import StepRegistry
 
 
 class CodeGenerator(ABC):
@@ -187,7 +189,13 @@ Generated: {graph.metadata.created}
 
     def get_step_execution_code(self, step: Step, graph: GraphDefinition) -> str:
         """
-        Generate execution code for a specific step.
+        Generate execution code for a specific step using step-level templates.
+
+        This method implements the template-based code generation system:
+        1. Get step class from registry
+        2. Ask step for framework-specific template
+        3. If template provided, render it with context
+        4. If no template, use generic default execution
 
         Args:
             step: Step definition
@@ -196,31 +204,141 @@ Generated: {graph.metadata.created}
         Returns:
             Python code to execute the step
         """
-        if step.type == "start":
-            return "# Start step - no operation"
+        # Get step class from registry
+        try:
+            step_class = StepRegistry.get(step.type)
+        except (KeyError, ValueError):
+            # Unknown step type - use generic execution
+            return self._generate_generic_step_code(step)
 
-        elif step.type == "output":
-            return self._generate_output_step_code(step)
+        # Check if step provides a framework-specific template
+        template_str = step_class.get_code_template(self.get_framework_name())
 
-        elif step.type == "transform":
-            return self._generate_transform_step_code(step)
-
-        elif step.type == "conditional":
-            return self._generate_conditional_step_code(step)
-
-        elif step.type == "llm":
-            return self._generate_llm_step_code(step, graph)
-
-        elif step.type == "http" or step.type.startswith("http."):
-            return self._generate_http_step_code(step)
-
-        elif step.type == "join":
-            return "# Join step - synchronization handled by execution flow"
-
+        if template_str:
+            # Step provides custom template - use it
+            return self._render_step_template(template_str, step, graph)
         else:
-            # Generic step execution
-            return f"""
-# Execute {step.type} step
+            # No custom template - use generic execution or legacy method
+            return self._generate_generic_step_code(step)
+
+    def _render_step_template(self, template_str: str, step: Step, graph: GraphDefinition) -> str:
+        """
+        Render a step template with context.
+
+        Args:
+            template_str: Jinja2 template string
+            step: Step definition
+            graph: Graph definition
+
+        Returns:
+            Rendered code
+        """
+        # Prepare template context
+        context = self._prepare_step_template_context(step, graph)
+
+        # Render template
+        template = self.jinja_env.from_string(template_str)
+        return template.render(**context)
+
+    def _prepare_step_template_context(self, step: Step, graph: GraphDefinition) -> Dict[str, Any]:
+        """
+        Prepare context variables for step template rendering.
+
+        Args:
+            step: Step definition
+            graph: Graph definition
+
+        Returns:
+            Dict of context variables
+        """
+        # Extract memory references from config and prompts
+        memory_refs = self._extract_memory_refs(step.config)
+
+        # Helper function to convert JSON types to Python types
+        def json_type_to_python(json_type: str) -> str:
+            type_map = {
+                "string": "str",
+                "number": "float",
+                "integer": "int",
+                "boolean": "bool",
+                "array": "list",
+                "object": "dict",
+                "any": "Any",
+            }
+            return type_map.get(json_type, "Any")
+
+        # Helper function for regex search
+        def regex_search(text: str, pattern: str):
+            """Helper for regex in templates."""
+            import re
+            match = re.search(pattern, text)
+            return match
+
+        return {
+            "step": step,
+            "graph": graph,
+            "config": step.config,
+            "outputs": step.outputs,
+            "memory_reads": step.memory_reads,
+            "memory_writes": step.memory_writes,
+            "memory_refs": memory_refs,
+            "framework": self.get_framework_name(),
+            "json_type_to_python": json_type_to_python,
+            "regex_search": regex_search,
+            # Extract specific config values for convenience
+            "provider": step.config.get("provider", "openrouter"),
+            "model": step.config.get("model"),
+            "system_prompt": step.config.get("system_prompt", ""),
+            "user_prompt": step.config.get("user_prompt", ""),
+            "output_schema": step.config.get("output_schema"),
+            "output_key": step.config.get("output_key"),
+            "temperature": step.config.get("temperature", 0.7),
+            "max_tokens": step.config.get("max_tokens"),
+            "api_key_secret": step.config.get("api_key_secret"),
+        }
+
+    def _extract_memory_refs(self, config: Dict[str, Any]) -> Set[str]:
+        """
+        Extract all memory references from config.
+
+        Looks for {memory.variable} pattern in config values.
+
+        Args:
+            config: Step configuration dict
+
+        Returns:
+            Set of memory keys referenced
+        """
+        refs = set()
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+
+        def extract_from_value(value):
+            if isinstance(value, str):
+                refs.update(pattern.findall(value))
+            elif isinstance(value, dict):
+                for v in value.values():
+                    extract_from_value(v)
+            elif isinstance(value, list):
+                for item in value:
+                    extract_from_value(item)
+
+        extract_from_value(config)
+        return refs
+
+    def _generate_generic_step_code(self, step: Step) -> str:
+        """
+        Generate generic step execution code.
+
+        This is the default fallback for steps that don't provide
+        custom templates. It instantiates the step class and calls execute().
+
+        Args:
+            step: Step definition
+
+        Returns:
+            Generic execution code
+        """
+        return f"""# Execute {step.type} step
 step_class = StepRegistry.get("{step.type}")
 step = step_class(
     id="{step.id}",
