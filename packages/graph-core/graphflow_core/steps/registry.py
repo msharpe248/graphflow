@@ -20,13 +20,14 @@ class StepRegistry:
         step_type: Optional[str] = None,
         category: str = "general",
         description: str = "",
-        framework_support: Optional[List[str]] = None
+        framework_support: Optional[List[str]] = None,
+        plugin: Optional[str] = None
     ):
         """
         Decorator to register a step class.
 
         Usage:
-            @StepRegistry.register(category="control")
+            @StepRegistry.register(category="control", plugin="my-plugin")
             class MyStep(StepBase):
                 @classmethod
                 def get_type(cls):
@@ -37,6 +38,7 @@ class StepRegistry:
             category: Category for UI organization
             description: Human-readable description
             framework_support: List of supported frameworks (None = all)
+            plugin: Plugin name (for plugin steps, None for built-in)
 
         Returns:
             Decorator function
@@ -54,6 +56,7 @@ class StepRegistry:
                 "description": description,
                 "framework_support": framework_support or ["pydantic_ai", "langgraph"],
                 "schema": step_class.get_schema(),
+                "plugin": plugin or "built-in",
             }
 
             return step_class

@@ -276,9 +276,12 @@ class PluginManager:
                 step_class = self.step_registry.get(step_type)
                 metadata = self.step_registry.get_metadata(step_type)
 
+                # Use plugin info from metadata if available
+                plugin_name = metadata.get("plugin", "built-in")
+
                 all_steps[step_type] = {
                     "type": step_type,
-                    "plugin": "built-in",
+                    "plugin": plugin_name,
                     "plugin_version": "1.0.0",
                     "label": getattr(step_class, "label", step_type.replace("_", " ").title()),
                     "description": metadata.get("description", ""),

@@ -10,7 +10,8 @@ from graphflow_core.memory.store import MemoryStore
 
 @StepRegistry.register(
     category="ai",
-    description="LLM call with tool support, prompts, and structured outputs"
+    description="LLM call with tool support, prompts, and structured outputs",
+    plugin="ai"
 )
 class LLMStep(StepBase):
     """
@@ -348,7 +349,8 @@ class LLMStep(StepBase):
 
 @StepRegistry.register(
     category="ai",
-    description="Wait for human input during execution"
+    description="Wait for human input during execution",
+    plugin="ai"
 )
 class HumanInputStep(StepBase):
     """
