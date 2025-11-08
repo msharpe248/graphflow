@@ -210,31 +210,45 @@ class PluginManager:
         Args:
             plugin_info: Plugin whose steps to register
         """
-        for step_type in plugin_info.steps:
+        for step_class_name in plugin_info.steps:
             # Get step class from plugin module
-            step_class = getattr(plugin_info.module, step_type, None)
+            step_class = getattr(plugin_info.module, step_class_name, None)
 
             if step_class is None:
                 logger.warning(
-                    f"Could not find step class '{step_type}' in plugin '{plugin_info.name}'"
+                    f"Could not find step class '{step_class_name}' in plugin '{plugin_info.name}'"
                 )
                 continue
 
-            # Create namespaced step type
-            namespaced_type = f"{plugin_info.name}.{step_type}"
-
-            # Register with step registry
-            # Note: This assumes StepRegistry will be enhanced to support
-            # programmatic registration (currently uses decorators)
+            # Get the actual step type from the class
             try:
-                self.step_registry.register_step(namespaced_type, step_class)
-                self.registered_steps[namespaced_type] = plugin_info.name
-                logger.debug(f"Registered step: {namespaced_type}")
+                actual_step_type = step_class.get_type()
             except Exception as e:
-                logger.error(
-                    f"Failed to register step '{namespaced_type}' "
-                    f"from plugin '{plugin_info.name}': {e}"
+                logger.warning(
+                    f"Could not get type from step class '{step_class_name}': {e}"
                 )
+                continue
+
+            # Check if step is already registered (via decorator)
+            if self.step_registry.is_registered(actual_step_type):
+                # Step already registered via decorator - just track it
+                self.registered_steps[actual_step_type] = plugin_info.name
+                logger.info(
+                    f"[PLUGIN] Step '{actual_step_type}' already registered, "
+                    f"associating with plugin '{plugin_info.name}'"
+                )
+            else:
+                # Step not registered yet - register it with namespaced type
+                namespaced_type = f"{plugin_info.name}.{step_class_name}"
+                try:
+                    self.step_registry.register_step(namespaced_type, step_class)
+                    self.registered_steps[namespaced_type] = plugin_info.name
+                    logger.info(f"[PLUGIN] Registered NEW step: {namespaced_type}")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to register step '{namespaced_type}' "
+                        f"from plugin '{plugin_info.name}': {e}"
+                    )
 
     def get_plugin(self, name: str) -> Optional[PluginInfo]:
         """
@@ -266,23 +280,24 @@ class PluginManager:
         """
         all_steps = {}
 
-        # First, add built-in steps from StepRegistry
+        # First, add all steps from StepRegistry (built-in and decorator-registered plugin steps)
         for step_type in self.step_registry.list_types():
-            # Skip plugin steps (they'll be added below with proper metadata)
-            if step_type in self.registered_steps:
-                continue
-
             try:
                 step_class = self.step_registry.get(step_type)
                 metadata = self.step_registry.get_metadata(step_type)
 
-                # Use plugin info from metadata if available
+                # Get plugin name and version
                 plugin_name = metadata.get("plugin", "built-in")
+                plugin_version = "1.0.0"
+
+                # If this is a plugin step, try to get the plugin version
+                if plugin_name != "built-in" and plugin_name in self.loaded_plugins:
+                    plugin_version = self.loaded_plugins[plugin_name].version
 
                 all_steps[step_type] = {
                     "type": step_type,
                     "plugin": plugin_name,
-                    "plugin_version": "1.0.0",
+                    "plugin_version": plugin_version,
                     "label": getattr(step_class, "label", step_type.replace("_", " ").title()),
                     "description": metadata.get("description", ""),
                     "category": metadata.get("category", "general"),
@@ -294,28 +309,41 @@ class PluginManager:
             except Exception as e:
                 logger.warning(f"Could not get metadata for step '{step_type}': {e}")
 
-        # Then, add plugin steps
+        # Then, add plugin steps that were registered via manifest
+        # (decorator-registered steps were already handled above)
         for plugin_info in self.loaded_plugins.values():
-            for step_type in plugin_info.steps:
-                namespaced_type = f"{plugin_info.name}.{step_type}"
-
+            for step_class_name in plugin_info.steps:
                 # Get step class
-                step_class = getattr(plugin_info.module, step_type, None)
+                step_class = getattr(plugin_info.module, step_class_name, None)
                 if step_class is None:
                     continue
+
+                # Get actual step type from class
+                try:
+                    actual_step_type = step_class.get_type()
+                except:
+                    actual_step_type = None
+
+                # Check if this step was already registered via decorator
+                if actual_step_type and actual_step_type in self.registered_steps:
+                    # Already handled in first loop above
+                    continue
+
+                # Not registered via decorator - use namespaced type
+                namespaced_type = f"{plugin_info.name}.{step_class_name}"
 
                 # Build step metadata
                 all_steps[namespaced_type] = {
                     "type": namespaced_type,
                     "plugin": plugin_info.name,
                     "plugin_version": plugin_info.version,
-                    "label": getattr(step_class, "label", step_type.replace("_", " ").title()),
+                    "label": getattr(step_class, "label", step_class_name.replace("_", " ").title()),
                     "description": getattr(step_class, "description", ""),
                     "category": getattr(step_class, "category", "general"),
                     "config_schema": step_class.get_schema() if hasattr(step_class, "get_schema") else {},
                     "inputs_schema": step_class.get_inputs_schema() if hasattr(step_class, "get_inputs_schema") else {},
                     "outputs_schema": step_class.get_outputs_schema() if hasattr(step_class, "get_outputs_schema") else {},
-                    "ui_component": plugin_info.ui_components.get(step_type),
+                    "ui_component": plugin_info.ui_components.get(step_class_name),
                 }
 
         return all_steps

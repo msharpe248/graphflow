@@ -91,6 +91,8 @@ export interface StepTypeInfo {
   category: StepCategory;
   label: string;
   description: string;
+  plugin?: string;
+  plugin_version?: string;
   icon?: string;
   color?: string;
   configSchema?: Record<string, any>;

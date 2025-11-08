@@ -46,6 +46,8 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
           category: step.category,
           label: step.label,
           description: step.description,
+          plugin: step.plugin,
+          plugin_version: step.plugin_version,
           color: getColorForCategory(step.category),
           icon: getIconForCategory(step.category),
           configSchema: step.config_schema,
@@ -103,10 +105,14 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
     const stepTypes = get().stepTypes;
 
     Object.values(stepTypes).forEach((stepType) => {
-      // Extract plugin name from namespaced type (e.g., "example.EmailStep" -> "example")
-      // Built-in steps don't have namespace
-      const parts = stepType.type.split('.');
-      const plugin = parts.length > 1 ? parts[0] : 'built-in';
+      // Use the plugin field from the step metadata
+      let plugin = stepType.plugin;
+
+      // If plugin field is missing or empty, fall back to parsing namespace
+      if (!plugin) {
+        const parts = stepType.type.split('.');
+        plugin = parts.length > 1 ? parts[0] : 'built-in';
+      }
 
       if (!grouped[plugin]) {
         grouped[plugin] = [];

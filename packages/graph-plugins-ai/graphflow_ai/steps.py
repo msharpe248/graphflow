@@ -8,11 +8,6 @@ from graphflow_core.steps.registry import StepRegistry
 from graphflow_core.memory.store import MemoryStore
 
 
-@StepRegistry.register(
-    category="ai",
-    description="LLM call with tool support, prompts, and structured outputs",
-    plugin="ai"
-)
 class LLMStep(StepBase):
     """
     LLM/Agent step - call an LLM with tools and structured outputs.
@@ -58,6 +53,9 @@ class LLMStep(StepBase):
         - If no output_schema: writes text response to specified key
         - Optionally writes tool calls to separate key
     """
+
+    label = "LLM"
+    description = "LLM call with tool support, prompts, and structured outputs"
 
     @classmethod
     def get_type(cls) -> str:
@@ -347,11 +345,6 @@ class LLMStep(StepBase):
         return rendered
 
 
-@StepRegistry.register(
-    category="ai",
-    description="Wait for human input during execution",
-    plugin="ai"
-)
 class HumanInputStep(StepBase):
     """
     Human input step - pause execution and wait for human input.
@@ -373,6 +366,9 @@ class HumanInputStep(StepBase):
             "output_key": "human_approval"
         }
     """
+
+    label = "Human Input"
+    description = "Wait for human input during execution"
 
     @classmethod
     def get_type(cls) -> str:

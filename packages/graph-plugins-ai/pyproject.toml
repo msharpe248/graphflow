@@ -49,7 +49,7 @@ where = ["."]
 include = ["graphflow_ai*"]
 
 [tool.setuptools.package-data]
-graphflow_ai = ["templates/**/*.jinja"]
+graphflow_ai = ["templates/**/*.jinja", "manifest.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
