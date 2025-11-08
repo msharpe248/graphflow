@@ -30,16 +30,23 @@ class BaseHTTPStep(StepBase, ABC):
 
         result = template
         for match in matches:
-            # Support nested keys with dot notation
-            keys = match.split('.')
-            value = memory.read(keys[0])
-
-            # Navigate nested structure
-            for key in keys[1:]:
-                if isinstance(value, dict):
-                    value = value.get(key)
-                else:
-                    break
+            # Try to read the full key first (supports dotted keys like "http.HTTPGetStep_2.params")
+            try:
+                value = memory.read(match)
+            except KeyError:
+                # If full key doesn't exist, try navigating nested structure
+                keys = match.split('.')
+                try:
+                    value = memory.read(keys[0])
+                    # Navigate nested structure
+                    for key in keys[1:]:
+                        if isinstance(value, dict):
+                            value = value.get(key)
+                        else:
+                            value = None
+                            break
+                except KeyError:
+                    value = None
 
             # Replace in template
             if value is not None:
@@ -51,6 +58,14 @@ class BaseHTTPStep(StepBase, ABC):
         """Render all string values in a dict through template engine."""
         if not data:
             return {}
+
+        # If data is a string (memory template), render it first
+        if isinstance(data, str):
+            rendered = self._render_template(data, memory)
+            # If the rendered value is not a dict, return empty dict
+            if not isinstance(rendered, dict):
+                return {}
+            data = rendered
 
         result = {}
         for key, value in data.items():

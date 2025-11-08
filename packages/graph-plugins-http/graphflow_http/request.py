@@ -116,11 +116,20 @@ class HTTPGetStep(BaseHTTPStep):
         url = self._render_template(self.config["url"], memory)
         params = self._render_dict(self.config.get("params", {}), memory)
         headers = self._render_dict(self.config.get("headers", {}), memory)
-        auth = self.config.get("auth")
-        timeout = self.config.get("timeout", 30)
-        retries = self.config.get("retries", 2)
-        verify_ssl = self.config.get("verify_ssl", True)
-        follow_redirects = self.config.get("follow_redirects", True)
+        auth = self._render_dict(self.config.get("auth", {}), memory) if self.config.get("auth") else None
+
+        # Render and convert numeric/boolean values
+        timeout_raw = self._render_template(str(self.config.get("timeout", 30)), memory)
+        timeout = int(timeout_raw) if timeout_raw else 30
+
+        retries_raw = self._render_template(str(self.config.get("retries", 2)), memory)
+        retries = int(retries_raw) if retries_raw else 2
+
+        verify_ssl_raw = self._render_template(str(self.config.get("verify_ssl", True)), memory)
+        verify_ssl = verify_ssl_raw not in ("False", "false", "0", "") if isinstance(verify_ssl_raw, str) else bool(verify_ssl_raw)
+
+        follow_redirects_raw = self._render_template(str(self.config.get("follow_redirects", True)), memory)
+        follow_redirects = follow_redirects_raw not in ("False", "false", "0", "") if isinstance(follow_redirects_raw, str) else bool(follow_redirects_raw)
 
         # Make request
         response = await self._make_request(
@@ -256,7 +265,7 @@ class HTTPPostStep(BaseHTTPStep):
         url = self._render_template(self.config["url"], memory)
         params = self._render_dict(self.config.get("params", {}), memory)
         headers = self._render_dict(self.config.get("headers", {}), memory)
-        auth = self.config.get("auth")
+        auth = self._render_dict(self.config.get("auth", {}), memory) if self.config.get("auth") else None
         timeout = self.config.get("timeout", 30)
         retries = self.config.get("retries", 2)
         verify_ssl = self.config.get("verify_ssl", True)
@@ -337,7 +346,7 @@ class HTTPPutStep(BaseHTTPStep):
         url = self._render_template(self.config["url"], memory)
         params = self._render_dict(self.config.get("params", {}), memory)
         headers = self._render_dict(self.config.get("headers", {}), memory)
-        auth = self.config.get("auth")
+        auth = self._render_dict(self.config.get("auth", {}), memory) if self.config.get("auth") else None
         timeout = self.config.get("timeout", 30)
         retries = self.config.get("retries", 2)
         verify_ssl = self.config.get("verify_ssl", True)
@@ -420,7 +429,7 @@ class HTTPPatchStep(BaseHTTPStep):
         url = self._render_template(self.config["url"], memory)
         params = self._render_dict(self.config.get("params", {}), memory)
         headers = self._render_dict(self.config.get("headers", {}), memory)
-        auth = self.config.get("auth")
+        auth = self._render_dict(self.config.get("auth", {}), memory) if self.config.get("auth") else None
         timeout = self.config.get("timeout", 30)
         retries = self.config.get("retries", 2)
         verify_ssl = self.config.get("verify_ssl", True)
@@ -503,7 +512,7 @@ class HTTPDeleteStep(BaseHTTPStep):
         url = self._render_template(self.config["url"], memory)
         params = self._render_dict(self.config.get("params", {}), memory)
         headers = self._render_dict(self.config.get("headers", {}), memory)
-        auth = self.config.get("auth")
+        auth = self._render_dict(self.config.get("auth", {}), memory) if self.config.get("auth") else None
         timeout = self.config.get("timeout", 30)
         retries = self.config.get("retries", 2)
         verify_ssl = self.config.get("verify_ssl", True)

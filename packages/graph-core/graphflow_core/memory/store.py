@@ -31,12 +31,18 @@ class MemoryStore:
         self._secrets: Dict[str, str] = {}
         self._initialized = False
 
-        # Initialize all intermediate and output fields with zero values
+        # Initialize all intermediate and output fields with defaults or zero values
         for key, field_def in schema.intermediate.items():
-            self._intermediate[key] = self._get_zero_value(field_def.type)
+            if field_def.default is not None:
+                self._intermediate[key] = field_def.default
+            else:
+                self._intermediate[key] = self._get_zero_value(field_def.type)
 
         for key, field_def in schema.outputs.items():
-            self._outputs[key] = self._get_zero_value(field_def.type)
+            if field_def.default is not None:
+                self._outputs[key] = field_def.default
+            else:
+                self._outputs[key] = self._get_zero_value(field_def.type)
 
     def _get_zero_value(self, field_type: str) -> Any:
         """Get the zero value for a field type."""

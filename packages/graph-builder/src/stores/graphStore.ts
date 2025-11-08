@@ -184,6 +184,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
           type: normalizeMemoryType(schema.type),
           description: schema.description || `${key} for ${id}`,
           required: false,
+          default: schema.default,
         };
 
         // Auto-bind config to memory location
