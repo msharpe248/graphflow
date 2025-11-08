@@ -1,0 +1,169 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "FetchURL",
+    "description": "Fetch a URL",
+    "version": "1.0",
+    "revision": 1,
+    "tags": [],
+    "author": "Michael Sharpe"
+  },
+  "memory": {
+    "inputs": {
+      "url": {
+        "type": "string",
+        "description": "",
+        "default": "http://www.google.com",
+        "required": false
+      }
+    },
+    "outputs": {
+      "page": {
+        "type": "string",
+        "description": ""
+      },
+      "page2": {
+        "type": "string",
+        "description": "",
+        "default": "",
+        "required": false
+      }
+    },
+    "intermediate": {
+      "http.HTTPGetStep_2.params": {
+        "type": "object",
+        "description": "Query parameters (key-value pairs)",
+        "required": false
+      },
+      "http.HTTPGetStep_2.headers": {
+        "type": "object",
+        "description": "Response headers",
+        "required": false
+      },
+      "http.HTTPGetStep_2.auth": {
+        "type": "object",
+        "description": "Authentication configuration",
+        "required": false
+      },
+      "http.HTTPGetStep_2.timeout": {
+        "type": "number",
+        "description": "Request timeout in seconds",
+        "required": false,
+        "default": 30
+      },
+      "http.HTTPGetStep_2.retries": {
+        "type": "number",
+        "description": "Number of retry attempts on failure",
+        "required": false,
+        "default": 2
+      },
+      "http.HTTPGetStep_2.verify_ssl": {
+        "type": "boolean",
+        "description": "Verify SSL certificates",
+        "required": false,
+        "default": true
+      },
+      "http.HTTPGetStep_2.follow_redirects": {
+        "type": "boolean",
+        "description": "Follow HTTP redirects",
+        "required": false,
+        "default": true
+      },
+      "http.HTTPGetStep_2.status_code": {
+        "type": "number",
+        "description": "HTTP status code",
+        "required": false
+      }
+    },
+    "secrets": {}
+  },
+  "steps": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "config": {},
+      "outputs": {},
+      "position": {
+        "x": 693,
+        "y": 193
+      }
+    },
+    {
+      "id": "http.HTTPGetStep_2",
+      "type": "http.HTTPGetStep",
+      "config": {
+        "url": "{memory.url}",
+        "params": "{memory.http.HTTPGetStep_2.params}",
+        "headers": "{memory.http.HTTPGetStep_2.headers}",
+        "auth": "{memory.http.HTTPGetStep_2.auth}",
+        "timeout": "{memory.http.HTTPGetStep_2.timeout}",
+        "retries": "{memory.http.HTTPGetStep_2.retries}",
+        "verify_ssl": "{memory.http.HTTPGetStep_2.verify_ssl}",
+        "follow_redirects": "{memory.http.HTTPGetStep_2.follow_redirects}"
+      },
+      "outputs": {
+        "response": "{memory.page}",
+        "status_code": "{memory.http.HTTPGetStep_2.status_code}",
+        "headers": "{memory.http.HTTPGetStep_2.headers}"
+      },
+      "position": {
+        "x": 814,
+        "y": 528
+      }
+    },
+    {
+      "id": "write-memory_3",
+      "type": "write-memory",
+      "config": {
+        "source": "{memory.page}"
+      },
+      "outputs": {
+        "value": "{memory.page2}"
+      },
+      "position": {
+        "x": 886,
+        "y": 878
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "estart_1-http.HTTPGetStep_2",
+      "from": "start_1",
+      "to": "http.HTTPGetStep_2"
+    },
+    {
+      "id": "ehttp.HTTPGetStep_2-write-memory_3",
+      "from": "http.HTTPGetStep_2",
+      "to": "write-memory_3"
+    }
+  ],
+  "shapes": [
+    {
+      "id": "shape_1",
+      "type": "rectangle",
+      "position": {
+        "x": 712,
+        "y": 438
+      },
+      "size": {
+        "width": 300,
+        "height": 200
+      },
+      "color": "#93c5fd",
+      "borderColor": "#64748b",
+      "opacity": 0.3,
+      "padding": 16,
+      "shadow": false,
+      "zIndex": 1,
+      "textAlign": "left",
+      "textVerticalAlign": "top",
+      "titleFontSize": 14,
+      "textFontSize": 12,
+      "textColor": "#1f2937",
+      "fontWeight": "semibold",
+      "title": "HTTP - Get",
+      "text": "Get the page"
+    }
+  ]
+}
