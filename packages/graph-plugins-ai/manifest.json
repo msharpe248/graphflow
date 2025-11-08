@@ -1,0 +1,13 @@
+{
+  "name": "ai",
+  "version": "1.0.0",
+  "description": "AI and human interaction steps for intelligent agents",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["ai", "llm", "human-input", "agent", "conversation", "gpt", "claude"],
+  "steps": [
+    "LLMStep",
+    "HumanInputStep"
+  ],
+  "ui_components": {}
+}

@@ -26,9 +26,6 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["graphflow_core*"]
 
-[tool.setuptools.package-data]
-graphflow_core = ["steps/templates/**/*.jinja"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

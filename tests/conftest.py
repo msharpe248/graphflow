@@ -8,6 +8,12 @@ import tempfile
 from pathlib import Path
 import pytest
 
+# Import AI plugin to register LLM and HumanInput steps
+try:
+    from graphflow_ai import LLMStep, HumanInputStep
+except ImportError:
+    # Plugin not installed - tests requiring LLM will skip
+    pass
 
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)

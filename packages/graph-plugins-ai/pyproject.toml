@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphflow-plugins-ai"
+version = "1.0.0"
+description = "AI and human interaction plugin for GraphFlow (LLM, Human Input)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "GraphFlow Contributors"}
+]
+keywords = ["graphflow", "ai", "llm", "human-input", "agent", "plugin"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # No additional dependencies - AI framework dependencies handled at runtime
+]
+
+# Note: graphflow-core must be installed separately (pip install -e packages/graph-core)
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/graphflow"
+Documentation = "https://github.com/your-org/graphflow/tree/main/packages/graph-plugins-ai"
+Repository = "https://github.com/your-org/graphflow"
+
+[project.entry-points."graphflow.plugins"]
+ai = "graphflow_ai"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["graphflow_ai*"]
+
+[tool.setuptools.package-data]
+graphflow_ai = ["templates/**/*.jinja"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -344,3 +344,95 @@ class LLMStep(StepBase):
                 pass
 
         return rendered
+
+
+@StepRegistry.register(
+    category="ai",
+    description="Wait for human input during execution"
+)
+class HumanInputStep(StepBase):
+    """
+    Human input step - pause execution and wait for human input.
+
+    This step is useful for human-in-the-loop workflows where
+    manual review or input is required.
+
+    Config:
+        prompt: str - Prompt to display to human (supports {{variable}} syntax)
+        input_type: str - Type of input ("text", "choice", "approval")
+        choices: List[str] - Available choices (for "choice" type)
+        output_key: str - Memory key to write human response
+        timeout: int - Timeout in seconds (optional)
+
+    Example:
+        {
+            "prompt": "Please review the following data: {{data}}. Approve?",
+            "input_type": "approval",
+            "output_key": "human_approval"
+        }
+    """
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "human_input"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Prompt template to display (supports {{variable}} syntax)"
+                },
+                "input_type": {
+                    "type": "string",
+                    "enum": ["text", "choice", "approval"],
+                    "default": "text",
+                    "description": "Type of human input required"
+                },
+                "choices": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Available choices (for 'choice' input type)"
+                },
+                "output_key": {
+                    "type": "string",
+                    "description": "Memory key to write human response"
+                },
+                "timeout": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Timeout in seconds (0 = no timeout)"
+                }
+            },
+            "required": ["prompt", "output_key"]
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """
+        Execute human input step.
+
+        This is a placeholder. Real implementation requires:
+        1. Runtime support for pausing execution
+        2. UI/API for collecting human input
+        3. Resuming execution with input
+        """
+        prompt = self.config["prompt"]
+        input_type = self.config.get("input_type", "text")
+        output_key = self.config["output_key"]
+
+        # Render prompt
+        rendered_prompt = self._render_template(prompt, memory)
+
+        # Mock human input
+        # In real implementation, would pause and wait for human
+        if input_type == "approval":
+            mock_response = True
+        elif input_type == "choice":
+            choices = self.config.get("choices", [])
+            mock_response = choices[0] if choices else "default"
+        else:  # text
+            mock_response = f"Mock human response to: {rendered_prompt[:50]}..."
+
+        memory.write(output_key, mock_response)
