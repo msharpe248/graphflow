@@ -54,7 +54,9 @@ myplugin = "my_plugin"
 
 ### 3. manifest.json
 
-**IMPORTANT**: The manifest.json file is required and must list all step types that your plugin provides. Steps not listed in the manifest will not be registered, even if they are properly imported in `__init__.py`.
+**IMPORTANT**: The manifest.json file is **required** and is the **only** way to register plugin steps. Steps not listed in the manifest will not be registered, even if they are properly imported in `__init__.py`.
+
+**Do NOT use decorators** like `@StepRegistry.register()` for plugin steps. All registration happens through the manifest.
 
 ```json
 {
@@ -74,9 +76,16 @@ The `steps` array must contain the class names of all steps you want to expose. 
 3. **Add the class name to the manifest.json `steps` array**
 4. Restart the GraphFlow runtime for changes to take effect
 
+Your step will appear in the UI with a namespaced type: `myplugin.MyCustomStep`
+
 ### 4. Implement Steps
 
-Create step classes that inherit from `StepBase`:
+Create step classes that inherit from `StepBase`. Steps are registered via the manifest.json file (not decorators) and will appear in the UI with namespaced types like `myplugin.MyCustomStep`.
+
+**Important**: Each step class must define:
+- `label` (str): Display name in the UI (e.g., "My Custom Step")
+- `description` (str): Help text shown in the UI
+- `get_type()` method: Returns a simple identifier (used internally, not shown in UI)
 
 ```python
 import re
@@ -85,13 +94,20 @@ from graphflow_core.steps.base import StepBase
 from graphflow_core.memory.store import MemoryStore
 
 class MyCustomStep(StepBase):
+    """
+    Example custom step.
+
+    This step will appear in the UI as 'myplugin.MyCustomStep'.
+    """
+
+    # Required class attributes for UI display
     label = "My Custom Step"
     description = "Does something custom"
-    category = "general"
 
     @classmethod
     def get_type(cls) -> str:
-        return "MyCustomStep"
+        """Internal type identifier (not shown in UI)."""
+        return "custom"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -165,13 +181,51 @@ class MyCustomStep(StepBase):
                 memory.write(output_key, result)
 ```
 
-## Step Metadata
+## Step Naming and Display
 
-Each step class should define these class attributes for the UI:
+### How Steps Appear in the UI
 
-- `label`: Display name in the UI
-- `description`: Help text
-- `category`: Category for grouping (control, ai, data, transform, general, notification, etc.)
+When you create a plugin step, it will be displayed with a **namespaced type**:
+
+- **Type in API/graphs**: `pluginname.ClassName` (e.g., `example.EmailStep`)
+- **Display name in UI**: Uses the `label` attribute (e.g., "Send Email")
+- **Description**: Uses the `description` attribute
+
+### Required Class Attributes
+
+Each step class **must** define these class attributes:
+
+- `label` (str): **Required**. Display name in the UI (e.g., "Send Email", "HTTP GET")
+- `description` (str): **Required**. Help text shown in the step palette (e.g., "Send email notifications with template support")
+
+### Optional Class Attributes
+
+- `category` (str): Category for grouping steps in the UI. If not specified, steps use their plugin's category. Common categories:
+  - `control` - Flow control (conditional, loop, etc.)
+  - `ai` - AI/LLM operations
+  - `data` - Data manipulation
+  - `transform` - Data transformation
+  - `notification` - Alerts and notifications
+  - `http` - HTTP/web operations
+  - `general` - General purpose
+
+### Example
+
+```python
+class EmailStep(StepBase):
+    label = "Send Email"  # Required - shown in UI
+    description = "Send email notifications with template support"  # Required
+    # category not specified - will use plugin's category
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "email"  # Internal identifier (not shown in UI)
+```
+
+Result in UI:
+- Type: `example.EmailStep`
+- Display: "Send Email"
+- Help text: "Send email notifications with template support"
 
 ## Configuration Schema
 
