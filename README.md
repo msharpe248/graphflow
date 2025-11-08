@@ -60,19 +60,34 @@ cd graphflow
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install core packages
+# Install all packages in editable mode (recommended for development)
+make install
+
+# Start development environment
+make dev-start
+```
+
+**For detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md)**
+
+### Alternative: Manual Installation
+
+```bash
+# Install packages manually
 pip install -e packages/graph-core
 pip install -e packages/graph-compiler
 pip install -e packages/graph-runtime
-
-# Install plugin packages (optional)
-pip install -e packages/graph-plugins-http  # HTTP client with 17 steps
-pip install -e packages/graphflow-plugin-example  # Example plugin
+pip install -e packages/graph-plugins-ai
+pip install -e packages/graph-plugins-http
+pip install -e packages/graphflow-plugin-example
 ```
 
 ### Visual UI (Recommended)
 
 ```bash
+# Using Makefile (easiest)
+make dev-start
+
+# Or manually:
 # Terminal 1: Start runtime server
 graphflow-runtime
 
