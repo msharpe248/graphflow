@@ -6,6 +6,8 @@ from graphflow_core.models import (
     MemorySchema,
     FieldDefinition,
     SecretDefinition,
+    ConfigDefinition,
+    EnvironmentDefinition,
     Step,
     Edge,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "MemorySchema",
     "FieldDefinition",
     "SecretDefinition",
+    "ConfigDefinition",
+    "EnvironmentDefinition",
     "Step",
     "Edge",
     "MemoryStore",
