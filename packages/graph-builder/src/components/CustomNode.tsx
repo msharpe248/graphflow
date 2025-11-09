@@ -4,11 +4,13 @@ import * as Icons from 'lucide-react';
 import { X } from 'lucide-react';
 import { NodeData } from '@/types/graph';
 import { useGraphStore } from '@/stores/graphStore';
+import { useAppStore } from '@/stores/appStore';
 
 function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
   const { step, stepTypeInfo } = data;
   const setSelectedNode = useGraphStore((state) => state.setSelectedNode);
   const deleteNode = useGraphStore((state) => state.deleteNode);
+  const showDataFlowEdges = useAppStore((state) => state.showDataFlowEdges);
 
   const handleClick = () => {
     setSelectedNode(id);
@@ -51,6 +53,7 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
         <Handle
           type="target"
           position={Position.Top}
+          id="top"
           className="!w-3 !h-3 !bg-gray-400"
         />
       )}
@@ -58,9 +61,24 @@ function CustomNode({ id, data, selected }: NodeProps<NodeData>) {
         <Handle
           type="source"
           position={Position.Bottom}
+          id="bottom"
           className="!w-3 !h-3 !bg-gray-400"
         />
       )}
+
+      {/* Data flow handles - always in DOM but only visible when data flow view is enabled */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className={`!w-2 !h-2 !bg-purple-500 ${!showDataFlowEdges ? '!opacity-0 !pointer-events-none' : ''}`}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className={`!w-2 !h-2 !bg-purple-500 ${!showDataFlowEdges ? '!opacity-0 !pointer-events-none' : ''}`}
+      />
 
       {/* Node content */}
       <div className="flex flex-col gap-1">

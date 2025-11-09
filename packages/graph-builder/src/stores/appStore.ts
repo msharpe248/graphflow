@@ -10,6 +10,7 @@ interface RuntimeContext {
 interface AppStore {
   activeView: View;
   runtimeContext: RuntimeContext | null;
+  showDataFlowEdges: boolean;
 
   // View switching
   setActiveView: (view: View, context?: RuntimeContext) => void;
@@ -18,11 +19,15 @@ interface AppStore {
 
   // Clear runtime context
   clearRuntimeContext: () => void;
+
+  // Data flow visualization
+  setShowDataFlowEdges: (show: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
   activeView: 'builder',
   runtimeContext: null,
+  showDataFlowEdges: false,
 
   setActiveView: (view, context) =>
     set({
@@ -45,5 +50,10 @@ export const useAppStore = create<AppStore>((set) => ({
   clearRuntimeContext: () =>
     set({
       runtimeContext: null,
+    }),
+
+  setShowDataFlowEdges: (show) =>
+    set({
+      showDataFlowEdges: show,
     }),
 }));

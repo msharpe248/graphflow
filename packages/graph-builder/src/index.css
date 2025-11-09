@@ -55,3 +55,16 @@
   stroke: transparent;
   fill: none;
 }
+
+/* Data flow edge customization */
+.react-flow__edge.dataflow .react-flow__edge-path {
+  stroke: #8b5cf6;
+  stroke-dasharray: 8, 4;
+  stroke-width: 2;
+}
+
+.react-flow__edge.dataflow.selected .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3;
+  stroke-dasharray: 8, 4;
+}

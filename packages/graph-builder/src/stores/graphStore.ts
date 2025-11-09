@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, MarkerType } from 'reactflow';
+import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, MarkerType, Position } from 'reactflow';
 import { GraphDefinition, Step, Metadata, MemorySchema, NodeData, Shape } from '@/types/graph';
 import { usePluginStore } from './pluginStore';
 import { validateGraph, ValidationResult } from '@/utils/graphValidator';
@@ -462,6 +462,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...connection,
         id: `e${connection.source}-${connection.target}`,
         type: 'default',
+        sourceHandle: connection.sourceHandle || 'bottom',
+        targetHandle: connection.targetHandle || 'top',
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
         deletable: true,
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -548,6 +552,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       id: edge.id,
       source: edge.from,
       target: edge.to,
+      sourceHandle: 'bottom',
+      targetHandle: 'top',
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
       type: 'default',
       deletable: true,
       markerEnd: {
