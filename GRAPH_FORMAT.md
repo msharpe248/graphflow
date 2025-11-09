@@ -95,12 +95,14 @@ Metadata provides descriptive information about the graph.
 
 ## Memory Schema
 
-The memory schema defines all data locations used by the graph. Memory is organized into four namespaces:
+The memory schema defines all data locations used by the graph. Memory is organized into six namespaces:
 
 1. **inputs**: Data provided when the graph starts
 2. **outputs**: Final results produced by the graph
 3. **intermediate**: Temporary data used during execution
 4. **secrets**: Sensitive data (API keys, passwords, etc.)
+5. **config**: Configuration values (runtime parameters)
+6. **environment**: Environment variable references
 
 ### Structure
 
@@ -132,6 +134,20 @@ The memory schema defines all data locations used by the graph. Memory is organi
         "key": "OPENAI_API_KEY",
         "description": "API key for OpenAI"
       }
+    },
+    "config": {
+      "max_retries": {
+        "type": "number",
+        "description": "Maximum number of retries for API calls"
+      }
+    },
+    "environment": {
+      "api_url": {
+        "type": "string",
+        "key": "API_BASE_URL",
+        "description": "Base URL for API",
+        "required": true
+      }
     }
   }
 }
@@ -157,6 +173,26 @@ Each field in `secrets` has:
 | `provider` | string | **Yes** | Where to retrieve secret: `env`, `vault`, `aws_secrets` |
 | `key` | string | **Yes** | Key name in the secret provider |
 | `description` | string | No | Human-readable description |
+
+### Config Definition
+
+Each field in `config` has:
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | string | **Yes** | Data type: `string`, `number`, `boolean` |
+| `description` | string | No | Human-readable description |
+
+### Environment Definition
+
+Each field in `environment` has:
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | string | **Yes** | Data type: `string`, `number`, `boolean` |
+| `key` | string | **Yes** | Environment variable name |
+| `description` | string | No | Human-readable description |
+| `required` | boolean | No | Whether the environment variable is required (default: `true`) |
 
 ### Memory Key Naming
 
@@ -205,21 +241,19 @@ Steps are the nodes in your graph. Each step represents a unit of work.
 | `start` | control | Entry point for the graph |
 | `output` | control | Maps intermediate values to output namespace |
 | `conditional` | control | Evaluates condition for branching |
-| `loop` | control | Iterates over a collection |
 | `join` | control | Synchronizes parallel branches |
-| `llm` | ai | Calls an LLM with optional tools and structured output |
+| `sleep` | control | Sleep/delay for a specified duration |
+| `loop` | control | Iterates over a collection |
 | `transform` | data | Executes Python code for data transformation |
 | `read-memory` | data | Copies values from any memory section |
 | `write-memory` | data | Writes values to any memory section |
-| `http` | integration | Basic HTTP request |
-| `db_query` | integration | Database query |
-| `human_input` | human | Waits for human input/approval |
 
 #### Plugin Step Types
 
-Plugin steps are namespaced with the plugin name (e.g., `http.HTTPGetStep` or `http-get`). See plugin documentation for details:
+Plugin steps are namespaced with the plugin name (e.g., `http.HTTPGetStep`, `ai.LLMStep`). See plugin documentation for details:
 
-- **HTTP Plugin**: 17 steps including `http-get`, `http-post`, `url-parse`, `json-parse`, `html-parse`, etc.
+- **HTTP Plugin**: HTTP requests, URL/JSON/HTML utilities (`http-get`, `http-post`, `url-parse`, `json-parse`, `html-parse`, etc.)
+- **AI Plugin**: LLM and human interaction steps (`ai.LLMStep`, `ai.HumanInputStep`)
 - **Custom Plugins**: See [Plugin Development Guide](packages/graphflow-plugin-example/README.md)
 
 ### Config Object
@@ -324,9 +358,10 @@ The `config` object is step-type specific. Each step type defines its own config
   "type": "transform",
   "config": {
     "operation": "clean_text",
-    "code": "return text.strip().lower()",
-    "input_keys": ["text"],
-    "output_key": "cleaned_text"
+    "code": "return {memory.text}.strip().lower()"
+  },
+  "outputs": {
+    "result": "{memory.cleaned_text}"
   },
   "description": "Clean and normalize text"
 }
@@ -651,9 +686,10 @@ Memory access is automatically tracked by parsing `{memory.field}` references in
       "type": "transform",
       "config": {
         "operation": "extract_profile",
-        "code": "return {'name': api_response['name'], 'email': api_response['email']}",
-        "input_keys": ["api_response"],
-        "output_key": "processed_data"
+        "code": "return {'name': {memory.api_response}['name'], 'email': {memory.api_response}['email']}"
+      },
+      "outputs": {
+        "result": "{memory.processed_data}"
       },
     },
     {
@@ -754,8 +790,10 @@ Memory access is automatically tracked by parsing `{memory.field}` references in
       "id": "simple_path",
       "type": "transform",
       "config": {
-        "code": "return 'Thanks for your question!'",
-        "output_key": "simple_answer"
+        "code": "return 'Thanks for your question!'"
+      },
+      "outputs": {
+        "result": "{memory.simple_answer}"
       },
     },
     {
@@ -852,4 +890,4 @@ graphflow-compile validate my_graph.json
 ---
 
 **Version:** 1.0
-**Last Updated:** 2025-11-02
+**Last Updated:** 2025-11-09
