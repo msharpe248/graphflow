@@ -205,27 +205,38 @@ class MyCustomStep(StepBase):
 
         Args:
             memory: Memory store for reading/writing values
+
+        Note:
+            - self.memory_reads: Auto-extracted from {memory.*} in config
+            - self.memory_writes: Auto-extracted from {memory.*} in outputs
         """
         # 1. Get configuration
         param1 = self.config.get("param1")
         param2 = self.config.get("param2", 50)
 
-        # 2. Read from memory (if needed)
+        # 2. Read from memory if needed
+        # Memory references in config are automatically parsed
         input_data = None
-        if self.memory_reads:
-            for key in self.memory_reads:
-                try:
-                    input_data = memory.read(key)
-                    break
-                except KeyError:
-                    pass
+        for key in self.memory_reads:
+            try:
+                input_data = memory.read(key)
+                break
+            except KeyError:
+                pass
 
         # 3. Perform your step logic
         result = self._do_work(param1, param2, input_data)
 
         # 4. Write results to memory
-        if self.memory_writes:
-            memory.write(self.memory_writes[0], result)
+        # Extract actual memory key from outputs dictionary
+        if "result" in self.outputs:
+            # Parse {memory.key} from output template
+            import re
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(self.outputs["result"])
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, result)
 
     def _do_work(self, param1, param2, input_data):
         """Your custom logic here."""
@@ -327,16 +338,60 @@ async def execute(self, memory: MemoryStore) -> None:
 - **Outputs**: Final results returned to the caller
 - **Intermediate**: Temporary values passed between steps
 
-Configure memory reads/writes in the graph definition:
+**Automatic Memory Tracking:**
+
+GraphFlow automatically tracks memory reads and writes by parsing your step configuration:
+
+- **Memory Reads**: Extracted from `{memory.*}` references in the `config` dictionary
+- **Memory Writes**: Extracted from `{memory.*}` references in the `outputs` dictionary
+
+Example in graph definition:
 
 ```json
 {
     "id": "step1",
     "type": "myplugin.MyCustomStep",
-    "config": {...},
-    "memory_reads": ["input_data"],
-    "memory_writes": ["processed_data"]
+    "config": {
+        "input_field": "{memory.input_data}"
+    },
+    "outputs": {
+        "result": "{memory.processed_data}"
+    }
 }
+```
+
+The framework will automatically:
+1. Set `self.memory_reads = ["input_data"]`
+2. Set `self.memory_writes = ["processed_data"]`
+3. Make these available as properties on your step instance
+
+**Helper Pattern for Writing Outputs:**
+
+Since extracting memory keys from outputs is common, consider this reusable pattern:
+
+```python
+import re
+
+def _write_output(self, memory: MemoryStore, output_name: str, value: any) -> None:
+    """
+    Helper to write an output value to memory.
+
+    Args:
+        memory: Memory store
+        output_name: Name of the output in self.outputs dict
+        value: Value to write
+    """
+    if output_name in self.outputs:
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = pattern.search(self.outputs[output_name])
+        if match:
+            memory_key = match.group(1)
+            memory.write(memory_key, value)
+
+# Usage in execute():
+async def execute(self, memory: MemoryStore) -> None:
+    result = {"status": "success", "data": "..."}
+    self._write_output(memory, "result", result)
 ```
 
 ## Complete Example
@@ -404,8 +459,14 @@ class WeatherLookupStep(StepBase):
             weather_data = response.json()
 
         # Write to memory
-        if self.memory_writes:
-            memory.write(self.memory_writes[0], weather_data)
+        # Extract memory key from outputs dictionary
+        if "result" in self.outputs:
+            import re
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(self.outputs["result"])
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, weather_data)
 ```
 
 ## Installation and Testing
@@ -487,22 +548,34 @@ Implement robust error handling in your steps:
 
 ```python
 async def execute(self, memory: MemoryStore) -> None:
+    import re
+
     try:
         # Your logic here
         result = await self._do_api_call()
 
-        if self.memory_writes:
-            memory.write(self.memory_writes[0], result)
+        # Write success result
+        if "result" in self.outputs:
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(self.outputs["result"])
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, result)
 
     except httpx.HTTPError as e:
         # Log the error
         logger.error(f"API call failed: {e}")
+
         # Optionally write error state
-        if self.memory_writes:
-            memory.write(self.memory_writes[0], {
-                "error": str(e),
-                "status": "failed"
-            })
+        if "result" in self.outputs:
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(self.outputs["result"])
+            if match:
+                output_key = match.group(1)
+                memory.write(output_key, {
+                    "error": str(e),
+                    "status": "failed"
+                })
         # Re-raise to stop graph execution
         raise
 ```
@@ -610,8 +683,7 @@ async def test_my_custom_step():
     step = MyCustomStep(
         id="test",
         config={"param1": "value"},
-        memory_reads=["input"],
-        memory_writes=["output"]
+        outputs={"result": "{memory.output}"}
     )
 
     # Create memory store
