@@ -52,14 +52,13 @@ def create_fastapi_app():
 
     # Define input/output models
     class AgentInput(BaseModel):
-{%- for key, field in graph.memory.inputs.items() %}
+{% for key, field in graph.memory.inputs.items() %}
         {{ key }}: {% if field.type == "string" %}str{% elif field.type == "number" %}float{% elif field.type == "boolean" %}bool{% else %}Any{% endif %} = Field(description="{{ field.description or '' }}")
-{%- endfor %}
-
+{% endfor %}
     class AgentOutput(BaseModel):
-{%- for key, field in graph.memory.outputs.items() %}
+{% for key, field in graph.memory.outputs.items() %}
         {{ key }}: {% if field.type == "string" %}str{% elif field.type == "number" %}float{% elif field.type == "boolean" %}bool{% else %}Any{% endif %} = Field(description="{{ field.description or '' }}")
-{%- endfor %}
+{% endfor %}
 
     @app.post("/invoke", response_model=AgentOutput)
     async def invoke(input_data: AgentInput) -> AgentOutput:

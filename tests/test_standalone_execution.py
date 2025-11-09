@@ -306,9 +306,7 @@ class TestDifferentGraphTypes:
                     "type": "transform",
                     "config": {
                         "operation": "uppercase",
-                        "code": "return input.upper()",
-                        "input_keys": ["input"],
-                        "output_key": "output1"
+                        "code": "return {memory.input}.upper()"
                     },
                     "outputs": {"result": "{memory.output1}"},
                 },
@@ -317,9 +315,7 @@ class TestDifferentGraphTypes:
                     "type": "transform",
                     "config": {
                         "operation": "lowercase",
-                        "code": "return input.lower()",
-                        "input_keys": ["input"],
-                        "output_key": "output2"
+                        "code": "return {memory.input}.lower()"
                     },
                     "outputs": {"result": "{memory.output2}"},
                 },

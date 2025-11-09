@@ -8,6 +8,7 @@ from graphflow_runtime.storage.database import init_db
 from graphflow_runtime.executor.async_executor import AsyncExecutor
 from graphflow_runtime.api import routes
 from graphflow_core.plugins.manager import PluginManager
+from graphflow_core.steps import builtin  # noqa: F401 - Import to register builtin steps
 
 
 # Global instances

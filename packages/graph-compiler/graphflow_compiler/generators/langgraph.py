@@ -276,24 +276,36 @@ class LangGraphGenerator(CodeGenerator):
     def _generate_transform_step_code_langgraph(self, step: Step) -> str:
         """Generate code for transform step (LangGraph version)."""
         code = step.config.get("code", "")
+
         # Extract output key from outputs dict
         output_key = None
-        if "response" in step.outputs:
-            pattern = re.compile(r'\{memory\.([^}]+)\}')
-            match = pattern.search(step.outputs["response"])
-            if match:
-                output_key = match.group(1)
-        input_keys = step.config.get("input_keys", step.memory_reads)
+        # Check both "result" and "response" keys
+        for key in ["result", "response"]:
+            if key in step.outputs:
+                pattern = re.compile(r'\{memory\.([^}]+)\}')
+                match = pattern.search(step.outputs[key])
+                if match:
+                    output_key = match.group(1)
+                    break
 
-        # Build context
+        # Extract memory references from code using {memory.*} syntax
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        memory_refs = set(pattern.findall(code))
+
+        # Build context - extract variables from state
         context_lines = ["# Transform step"]
-        for key in input_keys:
-            var_name = key.replace('.', '_')
-            context_lines.append(f'{var_name} = state.get("{key}", "")')
+        adjusted_code = code
+
+        for memory_key in sorted(memory_refs):
+            # Prefix with _mem_ to avoid shadowing Python built-ins
+            var_name = '_mem_' + memory_key.replace('.', '_')
+            context_lines.append(f'{var_name} = state.get("{memory_key}", "")')
+            # Replace {memory.variable} with var_name in code
+            adjusted_code = adjusted_code.replace(f'{{memory.{memory_key}}}', var_name)
 
         # Execute transform
         context_lines.append("def _transform():")
-        for line in code.split('\n'):
+        for line in adjusted_code.split('\n'):
             context_lines.append(f"    {line}")
 
         context_lines.append(f'_result = _transform()')

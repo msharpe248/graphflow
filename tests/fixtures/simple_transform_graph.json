@@ -33,9 +33,7 @@
       "type": "transform",
       "config": {
         "operation": "uppercase",
-        "code": "return user_input.upper()",
-        "input_keys": ["user_input"],
-        "output_key": "uppercase_text"
+        "code": "return {memory.user_input}.upper()"
       },
       "outputs": {
         "result": "{memory.uppercase_text}"
@@ -46,9 +44,7 @@
       "type": "transform",
       "config": {
         "operation": "add_prefix",
-        "code": "return 'RESULT: ' + uppercase_text",
-        "input_keys": ["uppercase_text"],
-        "output_key": "result"
+        "code": "return 'RESULT: ' + {memory.uppercase_text}"
       },
       "outputs": {
         "result": "{memory.result}"

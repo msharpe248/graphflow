@@ -195,7 +195,8 @@ class ConditionalStep(StepBase):
 
         for match in pattern.finditer(condition):
             memory_key = match.group(1)
-            var_name = memory_key.replace('.', '_')
+            # Prefix with _mem_ to avoid shadowing Python built-ins
+            var_name = '_mem_' + memory_key.replace('.', '_')
 
             try:
                 eval_context[var_name] = memory.read(memory_key)
@@ -305,7 +306,8 @@ class TransformStep(StepBase):
 
         for match in pattern.finditer(code):
             memory_key = match.group(1)
-            var_name = memory_key.replace('.', '_')
+            # Prefix with _mem_ to avoid shadowing Python built-ins like input, id, etc.
+            var_name = '_mem_' + memory_key.replace('.', '_')
 
             try:
                 exec_context[var_name] = memory.read(memory_key)
@@ -602,3 +604,108 @@ class WriteMemoryStep(StepBase):
             raise KeyError(
                 f"WriteMemoryStep {self.id}: Cannot read from {source_template}: {e}"
             )
+
+
+@StepRegistry.register(category="control", description="Sleep/delay for a specified duration")
+class SleepStep(StepBase):
+    """
+    Sleep step - pause execution for a specified duration.
+
+    Useful for:
+    - Rate limiting API calls
+    - Testing time-sensitive workflows
+    - Simulating long-running operations
+    - Adding delays between steps
+
+    Config:
+        duration: float - Duration in seconds (can use {memory.*} syntax)
+
+    Example:
+        {"duration": 2.5}  # Sleep for 2.5 seconds
+        {"duration": "{memory.delay_seconds}"}  # Read from memory
+    """
+
+    name = "Sleep"
+    label = "Sleep"
+
+    @classmethod
+    def get_type(cls) -> str:
+        return "sleep"
+
+    @classmethod
+    def get_schema(cls) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "duration": {
+                    "type": ["number", "string"],
+                    "description": "Duration in seconds (can use {memory.*} syntax to read from memory)",
+                    "minimum": 0
+                }
+            },
+            "required": ["duration"]
+        }
+
+    @classmethod
+    def get_inputs_schema(cls) -> Dict[str, Any]:
+        """SleepStep may read duration from memory."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": True,
+            "description": "May read duration from memory if using {memory.*} syntax"
+        }
+
+    @classmethod
+    def get_outputs_schema(cls) -> Dict[str, Any]:
+        """SleepStep has no outputs."""
+        return {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+            "description": "Sleep has no outputs"
+        }
+
+    async def execute(self, memory: MemoryStore) -> None:
+        """Sleep for the specified duration."""
+        import re
+        import asyncio
+
+        duration_config = self.config.get("duration")
+        if duration_config is None:
+            raise ValueError(f"SleepStep {self.id}: duration not specified")
+
+        # Check if duration is a memory reference
+        if isinstance(duration_config, str):
+            pattern = re.compile(r'\{memory\.([^}]+)\}')
+            match = pattern.search(duration_config)
+            if match:
+                # Read duration from memory
+                memory_key = match.group(1)
+                try:
+                    duration = memory.read(memory_key)
+                    # Convert to float
+                    duration = float(duration)
+                except KeyError:
+                    raise KeyError(f"SleepStep {self.id}: Memory key not found: {memory_key}")
+                except (TypeError, ValueError):
+                    raise ValueError(f"SleepStep {self.id}: Duration must be a number, got {type(duration)}")
+            else:
+                # Try to parse as number
+                try:
+                    duration = float(duration_config)
+                except ValueError:
+                    raise ValueError(f"SleepStep {self.id}: Invalid duration: {duration_config}")
+        else:
+            # Assume it's a number
+            try:
+                duration = float(duration_config)
+            except (TypeError, ValueError):
+                raise ValueError(f"SleepStep {self.id}: Duration must be a number, got {type(duration_config)}")
+
+        # Validate duration is non-negative
+        if duration < 0:
+            raise ValueError(f"SleepStep {self.id}: Duration must be non-negative, got {duration}")
+
+        # Sleep
+        await asyncio.sleep(duration)

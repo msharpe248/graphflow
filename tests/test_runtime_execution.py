@@ -58,9 +58,9 @@ def runtime_server():
     for _ in range(30):  # 30 seconds max
         time.sleep(1)
         try:
-            response = requests.get(f"{base_url}/health", timeout=2)
+            response = requests.get(f"{base_url}/api/v1/health", timeout=2)
             if response.status_code == 200:
-                server_ready = False
+                server_ready = True
                 break
         except requests.exceptions.RequestException:
             pass
@@ -89,7 +89,7 @@ class TestRuntimeServerHealth:
         """Test runtime health endpoint."""
         base_url = runtime_server["base_url"]
 
-        response = requests.get(f"{base_url}/health", timeout=5)
+        response = requests.get(f"{base_url}/api/v1/health", timeout=5)
         assert response.status_code == 200
 
     def test_root_endpoint(self, runtime_server):
@@ -127,7 +127,7 @@ class TestAgentCRUD:
             timeout=30,
         )
 
-        assert response.status_code == 200, f"Failed to create agent: {response.text}"
+        assert response.status_code == 201, f"Failed to create agent: {response.text}"
         data = response.json()
         assert "id" in data
         assert data["name"] == "Test Agent Pydantic"
@@ -154,7 +154,7 @@ class TestAgentCRUD:
             timeout=30,
         )
 
-        assert response.status_code == 200, f"Failed to create agent: {response.text}"
+        assert response.status_code == 201, f"Failed to create agent: {response.text}"
         data = response.json()
         assert data["framework"] == "langgraph"
 
@@ -179,7 +179,7 @@ class TestAgentCRUD:
                 },
                 timeout=30,
             )
-            assert response.status_code == 200
+            assert response.status_code == 201
             agent_ids.append(response.json()["id"])
 
         # List agents
@@ -298,7 +298,7 @@ class TestAgentExecution:
             timeout=30,
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert "id" in data
         assert data["status"] in ["pending", "running", "completed"]
@@ -361,34 +361,80 @@ class TestAgentExecution:
         assert isinstance(data, list)
         assert len(data) >= 2
 
-    def test_stop_run(self, test_agent):
+    def test_stop_run(self, runtime_server):
         """Test stopping a running agent."""
-        base_url = test_agent["base_url"]
-        agent_id = test_agent["agent_id"]
+        base_url = runtime_server["base_url"]
 
-        # Start run
+        # Create an agent with a sleep step to ensure it runs long enough to be stopped
+        slow_graph = {
+            "version": "1.0",
+            "metadata": {"name": "Slow Test Agent", "description": "Agent with sleep for stop testing"},
+            "memory": {
+                "inputs": {"input": {"type": "string"}},
+                "outputs": {"output": {"type": "string"}},
+                "intermediate": {}
+            },
+            "steps": [
+                {
+                    "id": "sleep_1",
+                    "type": "sleep",
+                    "config": {"duration": 5},  # Sleep for 5 seconds
+                },
+                {
+                    "id": "output_1",
+                    "type": "output",
+                    "config": {},
+                    "outputs": {"output": "{memory.input}"}
+                }
+            ],
+            "edges": [{"id": "edge_1", "from": "sleep_1", "to": "output_1"}]
+        }
+
+        # Create agent
         response = requests.post(
-            f"{base_url}/api/v1/agents/{agent_id}/runs",
-            json={"inputs": {"user_input": "test"}},
+            f"{base_url}/api/v1/agents",
+            json={
+                "name": "Slow Test Agent",
+                "framework": "pydantic_ai",
+                "graph_definition": slow_graph,
+            },
             timeout=30,
         )
-        run_id = response.json()["id"]
+        agent_id = response.json()["id"]
 
-        # Stop run
-        response = requests.post(
-            f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}/stop",
-            timeout=10,
-        )
-        assert response.status_code in [200, 204]
+        try:
+            # Start run
+            response = requests.post(
+                f"{base_url}/api/v1/agents/{agent_id}/runs",
+                json={"inputs": {"input": "test"}},
+                timeout=30,
+            )
+            run_id = response.json()["id"]
 
-        # Check status
-        time.sleep(1)
-        response = requests.get(
-            f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
-            timeout=10,
-        )
-        data = response.json()
-        assert data["status"] in ["stopped", "completed"]  # May have completed before stop
+            # Give it a moment to start
+            time.sleep(0.5)
+
+            # Stop run while it's sleeping
+            response = requests.post(
+                f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}/stop",
+                timeout=10,
+            )
+            assert response.status_code in [200, 204]
+
+            # Check status
+            time.sleep(1)
+            response = requests.get(
+                f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
+                timeout=10,
+            )
+            data = response.json()
+            # Stop is represented as "failed" status with "stopped by user" error message
+            assert data["status"] in ["stopped", "completed", "failed"]
+            if data["status"] == "failed":
+                assert "stopped by user" in data.get("error", "").lower()
+        finally:
+            # Cleanup
+            requests.delete(f"{base_url}/api/v1/agents/{agent_id}", timeout=10)
 
     def test_delete_run(self, test_agent):
         """Test deleting a run."""

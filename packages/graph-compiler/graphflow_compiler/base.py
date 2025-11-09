@@ -144,12 +144,8 @@ Generated: {graph.metadata.created}
         for plugin in sorted(plugins_needed):
             imports.append(f"import {plugin}")
 
-        # Check if we need StepRegistry for generic step types
-        # These are step types that use the generic execution path (lines 211-222 in generate_step_code)
-        known_specialized_types = {"start", "output", "transform", "conditional", "llm", "join"}
-        needs_registry = step_types - known_specialized_types
-
-        if needs_registry:
+        # Import StepRegistry if we have any steps (all steps use it for execution)
+        if step_types:
             imports.append("from graphflow_core.steps.registry import StepRegistry")
 
         return imports
