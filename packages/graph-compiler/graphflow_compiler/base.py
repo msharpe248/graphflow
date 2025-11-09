@@ -131,11 +131,23 @@ Generated: {graph.metadata.created}
         if "llm" in step_types:
             imports.append("# LLM step will use framework-specific implementation")
 
+        # Check for plugin imports based on step type patterns
+        plugins_needed = set()
+        for step_type in step_types:
+            if step_type.startswith("http."):
+                plugins_needed.add("graphflow_http")
+            # Add more plugin patterns here as needed
+            # elif step_type.startswith("database."):
+            #     plugins_needed.add("graphflow_database")
+
+        # Add plugin imports (must come before StepRegistry to trigger registration)
+        for plugin in sorted(plugins_needed):
+            imports.append(f"import {plugin}")
+
         # Check if we need StepRegistry for generic step types
         # These are step types that use the generic execution path (lines 211-222 in generate_step_code)
         known_specialized_types = {"start", "output", "transform", "conditional", "llm", "join"}
-        http_types = {t for t in step_types if t == "http" or t.startswith("http.")}
-        needs_registry = step_types - known_specialized_types - http_types
+        needs_registry = step_types - known_specialized_types
 
         if needs_registry:
             imports.append("from graphflow_core.steps.registry import StepRegistry")

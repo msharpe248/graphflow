@@ -19,7 +19,14 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
 
   // Dialog-specific state
   const [inputDialogSearch, setInputDialogSearch] = useState('');
-  const [inputDialogSections, setInputDialogSections] = useState({ inputs: true, intermediate: true, outputs: true });
+  const [inputDialogSections, setInputDialogSections] = useState({
+    inputs: true,
+    intermediate: false,
+    outputs: false,
+    config: false,
+    environment: false,
+    secrets: false
+  });
   const [outputDialogSearch, setOutputDialogSearch] = useState('');
   const [outputDialogSections, setOutputDialogSections] = useState({ intermediate: true, outputs: true });
 
@@ -923,6 +930,246 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                     {filterMemoryEntries(Object.entries(memory.outputs), inputDialogSearch).length === 0 && (
                       <p className="text-xs text-gray-500 italic text-center py-2">
                         {inputDialogSearch ? 'No matching outputs' : 'No outputs defined'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Config Section */}
+              <div>
+                <button
+                  onClick={() => setInputDialogSections(prev => ({ ...prev, config: !prev.config }))}
+                  className="w-full flex items-center justify-between mb-2 p-2 hover:bg-gray-50 rounded transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {inputDialogSections.config ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                    <h4 className="text-sm font-semibold text-gray-700">Config</h4>
+                    <span className="text-xs text-gray-500">
+                      ({Object.keys(memory.config || {}).length})
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const key = prompt('Enter new config name:');
+                      if (key && !(memory.config || {})[key]) {
+                        setMemory({
+                          config: {
+                            ...(memory.config || {}),
+                            [key]: { type: 'string', description: '' }
+                          }
+                        });
+                      }
+                    }}
+                    className="text-xs text-green-600 hover:text-green-700 px-2 py-1"
+                  >
+                    + Add
+                  </button>
+                </button>
+                {inputDialogSections.config && (
+                  <div className="space-y-1 ml-2">
+                    {Object.entries(memory.config || {}).map(([key, field]) => {
+                      const binding = `{config.${key}}`;
+                      const isCurrentBinding = binding === bindingDialog.currentValue;
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
+                        const configStr = JSON.stringify(n.data.step.config);
+                        return configStr.includes(binding);
+                      }).map(n => n.data.step.id);
+
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            handleConfigChange(bindingDialog.configKey, binding);
+                            setBindingDialog(null);
+                            setInputDialogSearch('');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded border text-sm ${
+                            isCurrentBinding
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-medium">{key}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'}</span>
+                          </div>
+                          {stepsUsing.length > 0 && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Used by: {stepsUsing.join(', ')}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {Object.keys(memory.config || {}).length === 0 && (
+                      <p className="text-xs text-gray-500 italic text-center py-2">
+                        No config values defined
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Environment Section */}
+              <div>
+                <button
+                  onClick={() => setInputDialogSections(prev => ({ ...prev, environment: !prev.environment }))}
+                  className="w-full flex items-center justify-between mb-2 p-2 hover:bg-gray-50 rounded transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {inputDialogSections.environment ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                    <h4 className="text-sm font-semibold text-gray-700">Environment</h4>
+                    <span className="text-xs text-gray-500">
+                      ({Object.keys(memory.environment || {}).length})
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const key = prompt('Enter new environment variable name:');
+                      if (key && !(memory.environment || {})[key]) {
+                        setMemory({
+                          environment: {
+                            ...(memory.environment || {}),
+                            [key]: { type: 'string', key: key.toUpperCase(), description: '', required: false }
+                          }
+                        });
+                      }
+                    }}
+                    className="text-xs text-green-600 hover:text-green-700 px-2 py-1"
+                  >
+                    + Add
+                  </button>
+                </button>
+                {inputDialogSections.environment && (
+                  <div className="space-y-1 ml-2">
+                    {Object.entries(memory.environment || {}).map(([key, field]) => {
+                      const binding = `{env.${key}}`;
+                      const isCurrentBinding = binding === bindingDialog.currentValue;
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
+                        const configStr = JSON.stringify(n.data.step.config);
+                        return configStr.includes(binding);
+                      }).map(n => n.data.step.id);
+
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            handleConfigChange(bindingDialog.configKey, binding);
+                            setBindingDialog(null);
+                            setInputDialogSearch('');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded border text-sm ${
+                            isCurrentBinding
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-medium">{key}</span>
+                            <span className="text-xs text-gray-500">{field.type || 'string'} → {field.key}</span>
+                          </div>
+                          {stepsUsing.length > 0 && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Used by: {stepsUsing.join(', ')}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {Object.keys(memory.environment || {}).length === 0 && (
+                      <p className="text-xs text-gray-500 italic text-center py-2">
+                        No environment variables defined
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Secrets Section */}
+              <div>
+                <button
+                  onClick={() => setInputDialogSections(prev => ({ ...prev, secrets: !prev.secrets }))}
+                  className="w-full flex items-center justify-between mb-2 p-2 hover:bg-gray-50 rounded transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {inputDialogSections.secrets ? (
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    )}
+                    <h4 className="text-sm font-semibold text-gray-700">Secrets</h4>
+                    <span className="text-xs text-gray-500">
+                      ({Object.keys(memory.secrets || {}).length})
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const key = prompt('Enter new secret name:');
+                      if (key && !(memory.secrets || {})[key]) {
+                        setMemory({
+                          secrets: {
+                            ...(memory.secrets || {}),
+                            [key]: { provider: 'env', key: key.toUpperCase(), description: '' }
+                          }
+                        });
+                      }
+                    }}
+                    className="text-xs text-green-600 hover:text-green-700 px-2 py-1"
+                  >
+                    + Add
+                  </button>
+                </button>
+                {inputDialogSections.secrets && (
+                  <div className="space-y-1 ml-2">
+                    {Object.entries(memory.secrets || {}).map(([key, field]) => {
+                      const binding = `{secrets.${key}}`;
+                      const isCurrentBinding = binding === bindingDialog.currentValue;
+                      const stepsUsing = nodes.filter(n => n.type === 'custom' && n.data.step).filter(n => {
+                        const configStr = JSON.stringify(n.data.step.config);
+                        return configStr.includes(binding);
+                      }).map(n => n.data.step.id);
+
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            handleConfigChange(bindingDialog.configKey, binding);
+                            setBindingDialog(null);
+                            setInputDialogSearch('');
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded border text-sm ${
+                            isCurrentBinding
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-medium">{key}</span>
+                            <span className="text-xs text-gray-500">{field.provider} → {field.key}</span>
+                          </div>
+                          {stepsUsing.length > 0 && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              Used by: {stepsUsing.join(', ')}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {Object.keys(memory.secrets || {}).length === 0 && (
+                      <p className="text-xs text-gray-500 italic text-center py-2">
+                        No secrets defined
                       </p>
                     )}
                   </div>

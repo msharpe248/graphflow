@@ -8,17 +8,24 @@ interface MemoryPanelProps {
   setIsCollapsed: (collapsed: boolean) => void;
 }
 
+type MemoryNamespace = 'inputs' | 'outputs' | 'intermediate' | 'config' | 'environment' | 'secrets';
+
 export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanelProps) {
   const { memory, setMemory, nodes } = useGraphStore();
-  const [expandedSection, setExpandedSection] = useState<'inputs' | 'outputs' | 'intermediate'>('inputs');
+  const [expandedSection, setExpandedSection] = useState<MemoryNamespace>('inputs');
 
-  // Find which steps are using each memory field
-  const getStepsUsingMemory = (memoryKey: string): string[] => {
+  // Find which steps are using each memory field (supports all namespaces)
+  const getStepsUsingMemory = (namespace: MemoryNamespace, memoryKey: string): string[] => {
     const stepsUsing: string[] = [];
+
+    // Determine the binding pattern based on namespace
+    const bindingPattern = namespace === 'inputs' || namespace === 'intermediate' || namespace === 'outputs'
+      ? `{memory.${memoryKey}}`
+      : `{${namespace}.${memoryKey}}`;
 
     // Recursive function to scan any value for the specific memory key
     const scanValue = (value: any): boolean => {
-      if (typeof value === 'string' && value.includes(`{memory.${memoryKey}}`)) {
+      if (typeof value === 'string' && value.includes(bindingPattern)) {
         return true;
       } else if (typeof value === 'object' && value !== null) {
         return Object.values(value).some(scanValue);
@@ -43,24 +50,38 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
     return stepsUsing;
   };
 
-  const handleAddField = (namespace: 'inputs' | 'outputs' | 'intermediate') => {
-    const key = prompt('Enter memory field name:');
+  const handleAddField = (namespace: MemoryNamespace) => {
+    const key = prompt('Enter field name:');
     if (!key) return;
+
+    // Create appropriate field definition based on namespace
+    let newField: any;
+
+    if (namespace === 'config') {
+      newField = { type: 'string', description: '' };
+    } else if (namespace === 'environment') {
+      newField = { type: 'string', key: key.toUpperCase(), description: '', required: false };
+    } else if (namespace === 'secrets') {
+      newField = { provider: 'env', key: key.toUpperCase(), description: '' };
+    } else {
+      // inputs, intermediate, outputs
+      newField = {
+        type: 'string',
+        description: '',
+        required: namespace === 'inputs' ? false : undefined,
+      };
+    }
 
     setMemory({
       [namespace]: {
-        ...memory[namespace],
-        [key]: {
-          type: 'string',
-          description: '',
-          required: namespace === 'inputs' ? false : undefined,
-        },
+        ...(memory[namespace] || {}),
+        [key]: newField,
       },
     });
   };
 
-  const handleRemoveField = (namespace: 'inputs' | 'outputs' | 'intermediate', key: string) => {
-    const updated = { ...memory[namespace] };
+  const handleRemoveField = (namespace: MemoryNamespace, key: string) => {
+    const updated = { ...(memory[namespace] || {}) };
     delete updated[key];
     setMemory({
       [namespace]: updated,
@@ -68,23 +89,23 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
   };
 
   const handleUpdateField = (
-    namespace: 'inputs' | 'outputs' | 'intermediate',
+    namespace: MemoryNamespace,
     key: string,
     updates: any
   ) => {
     setMemory({
       [namespace]: {
-        ...memory[namespace],
+        ...(memory[namespace] || {}),
         [key]: {
-          ...memory[namespace][key],
+          ...(memory[namespace] as any)?.[key],
           ...updates,
         },
       },
     });
   };
 
-  const renderField = (namespace: 'inputs' | 'outputs' | 'intermediate', key: string, field: any) => {
-    const stepsUsing = getStepsUsingMemory(key);
+  const renderField = (namespace: MemoryNamespace, key: string, field: any) => {
+    const stepsUsing = getStepsUsingMemory(namespace, key);
 
     return (
       <div key={key} className="bg-white rounded border border-gray-200 p-2 mb-2">
@@ -110,59 +131,144 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
-          <select
-            value={field.type}
-            onChange={(e) => handleUpdateField(namespace, key, { type: e.target.value })}
-            className="px-1.5 py-0.5 border border-gray-300 rounded text-xs"
-          >
-            <option value="string">string</option>
-            <option value="number">number</option>
-            <option value="boolean">boolean</option>
-            <option value="object">object</option>
-            <option value="array">array</option>
-          </select>
+        {/* Render different controls based on namespace type */}
+        {(namespace === 'inputs' || namespace === 'outputs' || namespace === 'intermediate') && (
+          <>
+            <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+              <select
+                value={field.type}
+                onChange={(e) => handleUpdateField(namespace, key, { type: e.target.value })}
+                className="px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+              >
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="object">object</option>
+                <option value="array">array</option>
+              </select>
 
-          {namespace === 'inputs' && (
-            <label className="flex items-center gap-1 cursor-pointer">
+              {namespace === 'inputs' && (
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={field.required || false}
+                    onChange={(e) => handleUpdateField(namespace, key, { required: e.target.checked })}
+                    className="rounded border-gray-300 w-3 h-3"
+                  />
+                  <span className="text-xs">Required</span>
+                </label>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Default Value</label>
+              {(() => {
+                const editorConfig = getEditorForType({ type: field.type });
+                const EditorComponent = editorConfig.component;
+
+                return (
+                  <EditorComponent
+                    value={field.default !== undefined ? field.default : ''}
+                    onChange={(newValue) => handleUpdateField(namespace, key, { default: newValue })}
+                    schema={{ type: field.type, description: 'Value' }}
+                  />
+                );
+              })()}
+            </div>
+          </>
+        )}
+
+        {namespace === 'config' && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <select
+              value={field.type}
+              onChange={(e) => handleUpdateField(namespace, key, { type: e.target.value })}
+              className="px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+            >
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="boolean">boolean</option>
+            </select>
+            <span className="text-xs text-gray-500 italic">Read-only at runtime</span>
+          </div>
+        )}
+
+        {namespace === 'environment' && (
+          <>
+            <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+              <select
+                value={field.type}
+                onChange={(e) => handleUpdateField(namespace, key, { type: e.target.value })}
+                className="px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+              >
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+              </select>
+
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={field.required || false}
+                  onChange={(e) => handleUpdateField(namespace, key, { required: e.target.checked })}
+                  className="rounded border-gray-300 w-3 h-3"
+                />
+                <span className="text-xs">Required</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Environment Variable Name</label>
               <input
-                type="checkbox"
-                checked={field.required || false}
-                onChange={(e) => handleUpdateField(namespace, key, { required: e.target.checked })}
-                className="rounded border-gray-300 w-3 h-3"
+                type="text"
+                value={field.key || ''}
+                onChange={(e) => handleUpdateField(namespace, key, { key: e.target.value })}
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                placeholder="ENV_VAR_NAME"
               />
-              <span className="text-xs">Required</span>
-            </label>
-          )}
-        </div>
+            </div>
+          </>
+        )}
 
-        <div>
-          <label className="text-xs text-gray-600 block mb-1">Value</label>
-          {(() => {
-            // Get the appropriate editor based on type only
-            const editorConfig = getEditorForType({ type: field.type });
-            const EditorComponent = editorConfig.component;
+        {namespace === 'secrets' && (
+          <>
+            <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+              <select
+                value={field.provider || 'env'}
+                onChange={(e) => handleUpdateField(namespace, key, { provider: e.target.value })}
+                className="px-1.5 py-0.5 border border-gray-300 rounded text-xs"
+              >
+                <option value="env">Environment Variable</option>
+                <option value="vault">Vault</option>
+                <option value="aws_secrets">AWS Secrets Manager</option>
+              </select>
+            </div>
 
-            return (
-              <EditorComponent
-                value={field.default !== undefined ? field.default : ''}
-                onChange={(newValue) => handleUpdateField(namespace, key, { default: newValue })}
-                schema={{ type: field.type, description: 'Value' }}
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">
+                {field.provider === 'env' ? 'Environment Variable Name' : 'Secret Key'}
+              </label>
+              <input
+                type="text"
+                value={field.key || ''}
+                onChange={(e) => handleUpdateField(namespace, key, { key: e.target.value })}
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                placeholder={field.provider === 'env' ? 'SECRET_ENV_VAR' : 'secret/path/key'}
               />
-            );
-          })()}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     );
   };
 
   const renderSection = (
-    namespace: 'inputs' | 'outputs' | 'intermediate',
+    namespace: MemoryNamespace,
     title: string,
     description: string
   ) => {
     const isExpanded = expandedSection === namespace;
-    const fields = Object.entries(memory[namespace]);
+    const fields = Object.entries(memory[namespace] || {});
     const requiredCount = fields.filter(([_, f]) => f.required).length;
 
     return (
@@ -241,6 +347,21 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
               'Outputs',
               'Final results returned when the graph completes'
             )}
+            {renderSection(
+              'config',
+              'Config',
+              'System configuration values (read-only at runtime)'
+            )}
+            {renderSection(
+              'environment',
+              'Environment',
+              'Environment variables from the runtime environment'
+            )}
+            {renderSection(
+              'secrets',
+              'Secrets',
+              'Sensitive values loaded from secret providers'
+            )}
           </div>
 
           <div className="p-3 border-t border-gray-200 bg-blue-50">
@@ -249,7 +370,10 @@ export default function MemoryPanel({ isCollapsed, setIsCollapsed }: MemoryPanel
               <div>
                 <p className="text-xs text-blue-900 font-medium">Memory Bindings</p>
                 <p className="text-xs text-blue-700 mt-1">
-                  Reference memory in config fields using <code className="bg-blue-100 px-1 rounded">{'{memory.field_name}'}</code>
+                  Use: <code className="bg-blue-100 px-1 rounded">{'{memory.field}'}</code>{' '}
+                  <code className="bg-blue-100 px-1 rounded">{'{config.field}'}</code>{' '}
+                  <code className="bg-blue-100 px-1 rounded">{'{env.field}'}</code>{' '}
+                  <code className="bg-blue-100 px-1 rounded">{'{secrets.field}'}</code>
                 </p>
               </div>
             </div>

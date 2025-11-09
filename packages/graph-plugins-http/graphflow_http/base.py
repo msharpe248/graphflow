@@ -19,38 +19,33 @@ class BaseHTTPStep(StepBase, ABC):
         """
         Render template string with memory values.
 
-        Supports {memory.variable} syntax for memory binding.
+        Supports namespaced syntax:
+        - {memory.variable}
+        - {config.variable}
+        - {env.variable}
+        - {secrets.variable}
         """
         if not template:
             return ""
 
-        # Find all {memory.variable} patterns
-        pattern = r'\{memory\.(\w+(?:\.\w+)*)\}'
+        # Find all {namespace.variable} patterns
+        pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
         matches = re.findall(pattern, template)
 
         result = template
-        for match in matches:
-            # Try to read the full key first (supports dotted keys like "http.HTTPGetStep_2.params")
+        for namespace, field in matches:
+            # Create the full namespaced key
+            full_key = f"{namespace}.{field}"
+
+            # Try to read from memory using namespaced key
             try:
-                value = memory.read(match)
+                value = memory.read(full_key)
             except KeyError:
-                # If full key doesn't exist, try navigating nested structure
-                keys = match.split('.')
-                try:
-                    value = memory.read(keys[0])
-                    # Navigate nested structure
-                    for key in keys[1:]:
-                        if isinstance(value, dict):
-                            value = value.get(key)
-                        else:
-                            value = None
-                            break
-                except KeyError:
-                    value = None
+                value = None
 
             # Replace in template
             if value is not None:
-                result = result.replace(f'{{memory.{match}}}', str(value))
+                result = result.replace(f'{{{full_key}}}', str(value))
 
         return result
 
@@ -211,9 +206,12 @@ class BaseHTTPStep(StepBase, ABC):
             return
 
         output_template = self.outputs[output_name]
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        # Support all namespaces: {memory.*}, {config.*}, {env.*}, {secrets.*}
+        pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
         match = pattern.search(output_template)
 
         if match:
-            memory_key = match.group(1)
-            memory.write(memory_key, value)
+            namespace = match.group(1)
+            field_key = match.group(2)
+            # Write with full namespaced key
+            memory.write(f"{namespace}.{field_key}", value)

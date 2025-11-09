@@ -59,6 +59,9 @@ class MemoryResponse(BaseModel):
     inputs: dict
     outputs: dict
     intermediate: dict
+    config: dict = {}
+    environment: dict = {}
+    secrets: dict = {}
 
 
 class HealthResponse(BaseModel):
@@ -383,7 +386,19 @@ async def get_memory(
     if memory_state is None:
         raise HTTPException(404, f"Memory not available (run may have completed or been released)")
 
-    return memory_state
+    # Flatten the nested structure from to_dict()
+    # to_dict() returns: {"memory": {"inputs": ..., "outputs": ..., "intermediate": ...}, "config": ..., "environment": ..., "secrets": ...}
+    # API expects: {"inputs": ..., "outputs": ..., "intermediate": ..., "config": ..., "environment": ..., "secrets": ...}
+    flattened = {
+        "inputs": memory_state.get("memory", {}).get("inputs", {}),
+        "outputs": memory_state.get("memory", {}).get("outputs", {}),
+        "intermediate": memory_state.get("memory", {}).get("intermediate", {}),
+        "config": memory_state.get("config", {}),
+        "environment": memory_state.get("environment", {}),
+        "secrets": memory_state.get("secrets", {}),
+    }
+
+    return flattened
 
 
 @router.get("/agents/{agent_id}/runs/{run_id}/memory/{key}")

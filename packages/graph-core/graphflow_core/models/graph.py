@@ -46,41 +46,82 @@ class SecretDefinition(BaseModel):
         return v
 
 
+class ConfigDefinition(BaseModel):
+    """Definition of a configuration value."""
+    type: str  # string, number, boolean
+    description: Optional[str] = None
+
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        valid_types = {'string', 'number', 'boolean'}
+        if v not in valid_types:
+            raise ValueError(f'type must be one of {valid_types}')
+        return v
+
+
+class EnvironmentDefinition(BaseModel):
+    """Definition of an environment variable reference."""
+    type: str  # string, number, boolean
+    key: str  # Environment variable name
+    description: Optional[str] = None
+    required: bool = True
+
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        valid_types = {'string', 'number', 'boolean'}
+        if v not in valid_types:
+            raise ValueError(f'type must be one of {valid_types}')
+        return v
+
+
 class MemorySchema(BaseModel):
     """Schema for memory store."""
     inputs: Dict[str, FieldDefinition] = Field(default_factory=dict)
     outputs: Dict[str, FieldDefinition] = Field(default_factory=dict)
     intermediate: Dict[str, FieldDefinition] = Field(default_factory=dict)
     secrets: Dict[str, SecretDefinition] = Field(default_factory=dict)
+    config: Dict[str, ConfigDefinition] = Field(default_factory=dict)
+    environment: Dict[str, EnvironmentDefinition] = Field(default_factory=dict)
 
 
 def parse_memory_references(config: Dict[str, Any], outputs: Dict[str, str]) -> Tuple[Set[str], Set[str]]:
     """
     Parse config and outputs dicts to extract memory references.
 
+    Supports namespaced syntax:
+    - {memory.field} - Regular memory (inputs/intermediate/outputs)
+    - {config.field} - Configuration values
+    - {env.field} - Environment variables
+    - {secrets.field} - Secrets
+
     Args:
         config: Step configuration dict
         outputs: Step outputs dict (maps output names to memory locations)
 
     Returns:
-        Tuple of (reads, writes) where each is a set of memory keys
+        Tuple of (reads, writes) where each is a set of memory keys with namespace prefix
+        Example: {"memory.user_input", "config.backend_url", "env.API_KEY"}
     """
     reads = set()
     writes = set()
 
-    # Pattern to match {memory.variable} or {memory.nested.path}
-    pattern = re.compile(r'\{memory\.([^}]+)\}')
+    # Pattern to match {namespace.variable} where namespace is memory, config, env, or secrets
+    pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
     def scan_value(value: Any, is_output: bool = False):
         """Recursively scan a value for memory references."""
         if isinstance(value, str):
-            # Find all {memory.field} references
+            # Find all {namespace.field} references
             for match in pattern.finditer(value):
-                memory_key = match.group(1)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                full_key = f"{namespace}.{field_key}"
                 if is_output:
-                    writes.add(memory_key)
+                    writes.add(full_key)
                 else:
-                    reads.add(memory_key)
+                    reads.add(full_key)
         elif isinstance(value, dict):
             for v in value.values():
                 scan_value(v, is_output)
@@ -205,30 +246,34 @@ class GraphDefinition(BaseModel):
             seen_edge_ids.add(edge.id)
 
         # Check that memory references in config and outputs point to valid memory keys
-        all_memory_keys = (
-            set(self.memory.inputs.keys()) |
-            set(self.memory.outputs.keys()) |
-            set(self.memory.intermediate.keys())
+        # Build set of namespaced keys (e.g., "memory.url", "config.api_url")
+        all_namespaced_keys = (
+            {f"memory.{k}" for k in self.memory.inputs.keys()} |
+            {f"memory.{k}" for k in self.memory.outputs.keys()} |
+            {f"memory.{k}" for k in self.memory.intermediate.keys()} |
+            {f"config.{k}" for k in self.memory.config.keys()} |
+            {f"env.{k}" for k in self.memory.environment.keys()} |
+            {f"secrets.{k}" for k in self.memory.secrets.keys()}
         )
 
         for step in self.steps:
             # Parse memory references from config and outputs
             reads, writes = parse_memory_references(step.config, step.outputs)
 
-            # Validate reads - check for exact key match only
-            # (nested navigation is handled at runtime, not validated at build time)
+            # Validate reads - check for namespaced key match
             for key in reads:
-                if key not in all_memory_keys:
+                if key not in all_namespaced_keys:
                     errors.append(
-                        f"Step {step.id}: memory reference '{{memory.{key}}}' in config "
+                        f"Step {step.id}: memory reference '{{{key}}}' in config "
                         f"references undeclared memory key '{key}'"
                     )
 
-            # Validate writes - check for exact key match only
+            # Validate writes - check for namespaced key match
+            # Only memory namespace can be written to (config/env/secrets validated at runtime)
             for key in writes:
-                if key not in all_memory_keys:
+                if key.startswith("memory.") and key not in all_namespaced_keys:
                     errors.append(
-                        f"Step {step.id}: memory reference '{{memory.{key}}}' in outputs "
+                        f"Step {step.id}: memory reference '{{{key}}}' in outputs "
                         f"references undeclared memory key '{key}'"
                     )
 

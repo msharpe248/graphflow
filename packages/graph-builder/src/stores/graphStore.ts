@@ -118,6 +118,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     outputs: {},
     intermediate: {},
     secrets: {},
+    config: {},
+    environment: {},
   },
   nodes: [],
   edges: [],

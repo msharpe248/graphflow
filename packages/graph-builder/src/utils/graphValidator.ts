@@ -26,10 +26,12 @@ export interface ValidationResult {
   hasIssues: boolean;
 }
 
-const MEMORY_PATTERN = /\{memory\.([^}]+)\}/g;
+// Pattern to match both legacy {memory.field} and new namespaced {namespace.field}
+const MEMORY_PATTERN = /\{(memory|config|env|secrets)\.([^}]+)\}/g;
 
 /**
- * Extract memory keys from a value (string, object, or array)
+ * Extract memory references from a value (string, object, or array)
+ * Returns full namespaced references like "memory.field", "config.field", etc.
  */
 function extractMemoryReferences(value: any): string[] {
   const refs: string[] = [];
@@ -37,7 +39,9 @@ function extractMemoryReferences(value: any): string[] {
   if (typeof value === 'string') {
     const matches = value.matchAll(MEMORY_PATTERN);
     for (const match of matches) {
-      refs.push(match[1]);
+      const namespace = match[1];
+      const field = match[2];
+      refs.push(`${namespace}.${field}`);
     }
   } else if (typeof value === 'object' && value !== null) {
     Object.values(value).forEach(v => {
@@ -50,10 +54,11 @@ function extractMemoryReferences(value: any): string[] {
 
 /**
  * Check if a value is a valid memory binding
+ * Supports: {memory.field}, {config.field}, {env.field}, {secrets.field}
  */
 function isValidMemoryBinding(value: string): boolean {
   if (typeof value !== 'string') return false;
-  return value.startsWith('{memory.') && value.endsWith('}');
+  return /^\{(memory|config|env|secrets)\.[^}]+\}$/.test(value);
 }
 
 /**
@@ -89,16 +94,24 @@ function validateStep(
 
   // Check that config memory references exist
   const configRefs = extractMemoryReferences(step.config);
-  for (const ref of configRefs) {
-    if (!allMemoryKeys.has(ref)) {
+  for (const fullRef of configRefs) {
+    // fullRef is like "memory.field" or "config.field" or "memory.nested.field"
+    const dotIndex = fullRef.indexOf('.');
+    const namespace = fullRef.substring(0, dotIndex);
+    const field = fullRef.substring(dotIndex + 1);
+
+    // For memory namespace, check against memory keys
+    if (namespace === 'memory' && !allMemoryKeys.has(field)) {
       issues.push({
         type: 'error',
         field: 'config',
-        message: `Config references unknown memory key: {memory.${ref}}`,
+        message: `Config references unknown memory key: {memory.${field}}`,
         stepId: step.id,
         suggestion: `Create this memory field in the Memory panel or fix the reference`
       });
     }
+    // For other namespaces (config, env, secrets), we'll skip validation for now
+    // as those are defined in their own schemas and validated at runtime
   }
 
   // Check outputs are properly configured
@@ -122,19 +135,26 @@ function validateStep(
           field: `outputs.${outputKey}`,
           message: `Output "${outputKey}" has invalid format: ${outputValue}`,
           stepId: step.id,
-          suggestion: `Use {memory.variable} syntax`
+          suggestion: `Use {memory.variable}, {env.variable}, or {secrets.variable} syntax`
         });
       } else {
-        // Extract the memory key and check if it exists
-        const match = outputValue.match(/\{memory\.([^}]+)\}/);
-        if (match && !allMemoryKeys.has(match[1])) {
-          issues.push({
-            type: 'warning',
-            field: `outputs.${outputKey}`,
-            message: `Output references memory key that doesn't exist yet: ${match[1]}`,
-            stepId: step.id,
-            suggestion: `This will be auto-created, but you may want to define it in Memory panel`
-          });
+        // Extract the memory key and check if it exists (for memory namespace only)
+        const match = outputValue.match(/\{(memory|env|secrets)\.([^}]+)\}/);
+        if (match) {
+          const namespace = match[1];
+          const field = match[2];
+
+          // Only validate memory namespace keys exist in schema
+          // env and secrets can be created at runtime
+          if (namespace === 'memory' && !allMemoryKeys.has(field)) {
+            issues.push({
+              type: 'warning',
+              field: `outputs.${outputKey}`,
+              message: `Output references memory key that doesn't exist yet: ${field}`,
+              stepId: step.id,
+              suggestion: `This will be auto-created, but you may want to define it in Memory panel`
+            });
+          }
         }
       }
     }
@@ -153,7 +173,7 @@ export function validateGraph(
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  // Build set of all memory keys
+  // Build set of all memory keys from schema
   const allMemoryKeys = new Set<string>();
   Object.keys(graph.memory.inputs).forEach(k => allMemoryKeys.add(k));
   Object.keys(graph.memory.outputs).forEach(k => allMemoryKeys.add(k));
@@ -222,7 +242,16 @@ export function validateGraph(
   // Check that graph inputs are used somewhere
   const allConfigRefs = new Set<string>();
   graph.steps.forEach(step => {
-    extractMemoryReferences(step.config).forEach(ref => allConfigRefs.add(ref));
+    extractMemoryReferences(step.config).forEach(ref => {
+      // ref is like "memory.field" or "config.field"
+      // Extract just the field part for memory namespace
+      const dotIndex = ref.indexOf('.');
+      const namespace = ref.substring(0, dotIndex);
+      const field = ref.substring(dotIndex + 1);
+      if (namespace === 'memory') {
+        allConfigRefs.add(field);
+      }
+    });
   });
 
   Object.keys(graph.memory.inputs).forEach(inputKey => {

@@ -1,10 +1,10 @@
 {
   "version": "1.0",
   "metadata": {
-    "name": "FetchURL",
-    "description": "Fetch a URL",
+    "name": "Fetch URL",
+    "description": "Fetches a URL",
     "version": "1.0",
-    "revision": 1,
+    "revision": 2,
     "tags": [],
     "author": "Michael Sharpe"
   },
@@ -13,20 +13,14 @@
       "url": {
         "type": "string",
         "description": "",
-        "default": "http://www.google.com",
-        "required": false
+        "required": false,
+        "default": "https://www.google.com"
       }
     },
     "outputs": {
       "page": {
         "type": "string",
         "description": ""
-      },
-      "page2": {
-        "type": "string",
-        "description": "",
-        "default": "",
-        "required": false
       }
     },
     "intermediate": {
@@ -69,13 +63,20 @@
         "required": false,
         "default": true
       },
+      "http.HTTPGetStep_2.response": {
+        "type": "string",
+        "description": "HTTP response body",
+        "required": false
+      },
       "http.HTTPGetStep_2.status_code": {
         "type": "number",
         "description": "HTTP status code",
         "required": false
       }
     },
-    "secrets": {}
+    "secrets": {},
+    "config": {},
+    "environment": {}
   },
   "steps": [
     {
@@ -84,8 +85,8 @@
       "config": {},
       "outputs": {},
       "position": {
-        "x": 693,
-        "y": 193
+        "x": 728,
+        "y": 159
       }
     },
     {
@@ -102,27 +103,27 @@
         "follow_redirects": "{memory.http.HTTPGetStep_2.follow_redirects}"
       },
       "outputs": {
-        "response": "{memory.page}",
+        "response": "{memory.http.HTTPGetStep_2.response}",
         "status_code": "{memory.http.HTTPGetStep_2.status_code}",
         "headers": "{memory.http.HTTPGetStep_2.headers}"
       },
       "position": {
-        "x": 814,
-        "y": 528
+        "x": 825,
+        "y": 443
       }
     },
     {
       "id": "write-memory_3",
       "type": "write-memory",
       "config": {
-        "source": "{memory.page}"
+        "source": "{memory.http.HTTPGetStep_2.response}"
       },
       "outputs": {
-        "value": "{memory.page2}"
+        "value": "{memory.page}"
       },
       "position": {
-        "x": 886,
-        "y": 878
+        "x": 949,
+        "y": 805
       }
     }
   ],
@@ -143,12 +144,12 @@
       "id": "shape_1",
       "type": "rectangle",
       "position": {
-        "x": 712,
-        "y": 438
+        "x": 693,
+        "y": 351
       },
       "size": {
-        "width": 300,
-        "height": 200
+        "width": 366,
+        "height": 231
       },
       "color": "#93c5fd",
       "borderColor": "#64748b",
@@ -162,8 +163,8 @@
       "textFontSize": 12,
       "textColor": "#1f2937",
       "fontWeight": "semibold",
-      "title": "HTTP - Get",
-      "text": "Get the page"
+      "title": "HTTP - get",
+      "text": "Fetch the URL"
     }
   ]
 }

@@ -12,6 +12,7 @@ import uuid
 from graphflow_core.memory import MemoryStore
 from graphflow_core.models import GraphDefinition
 from graphflow_compiler import compile_graph
+from graphflow_runtime.config import runtime_config
 
 
 class AsyncExecutor:
@@ -96,6 +97,9 @@ class AsyncExecutor:
 
             # Store memory reference for inspection
             self._memory_stores[run_id] = agent.memory
+
+            # Inject runtime config values into memory
+            agent.memory.populate_config(runtime_config.get_all())
 
             # Run agent
             outputs = await agent.run(inputs)

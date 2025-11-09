@@ -4,17 +4,23 @@ import os
 from typing import Any, Dict, Optional
 from graphflow_core.models import MemorySchema
 
+# Global runtime config registry
+# This is populated by the runtime executor before agent execution
+# Allows config namespace to redirect to runtime config without circular dependency
+_RUNTIME_CONFIG: Dict[str, Any] = {}
+
 
 class MemoryStore:
     """
     Runtime memory store for graph execution.
 
-    Manages three separate namespaces:
-    - inputs: Values provided at agent start
-    - outputs: Final results from execution
-    - intermediate: Temporary storage for step results
+    Manages six separate namespaces:
+    - memory.* (inputs/intermediate/outputs): User inputs and step results
+    - config.*: System configuration (read-only)
+    - env.*: Environment variables (read/write)
+    - secrets.*: Sensitive values from secret providers
 
-    Additionally handles secrets loaded from configured providers.
+    Supports namespaced syntax: {memory.field}, {config.field}, {env.field}, {secrets.field}
     """
 
     def __init__(self, schema: MemorySchema):
@@ -22,13 +28,15 @@ class MemoryStore:
         Initialize memory store with schema.
 
         Args:
-            schema: Memory schema defining inputs, outputs, intermediate, and secrets
+            schema: Memory schema defining all namespaces
         """
         self.schema = schema
         self._inputs: Dict[str, Any] = {}
         self._outputs: Dict[str, Any] = {}
         self._intermediate: Dict[str, Any] = {}
         self._secrets: Dict[str, str] = {}
+        # Note: config is NOT stored, it proxies to global _RUNTIME_CONFIG
+        # Note: environment is NOT stored, it proxies directly to os.environ
         self._initialized = False
 
         # Initialize all intermediate and output fields with defaults or zero values
@@ -89,10 +97,12 @@ class MemoryStore:
         """
         Read value from memory.
 
-        Searches in order: inputs, intermediate, outputs
+        Supports both legacy format and namespaced format:
+        - Legacy: "field_name" (searches inputs → intermediate → outputs)
+        - Namespaced: "memory.field", "config.field", "env.field", "secrets.field"
 
         Args:
-            key: Memory key (exact match, no nested navigation)
+            key: Memory key
 
         Returns:
             Value from memory
@@ -100,36 +110,114 @@ class MemoryStore:
         Raises:
             KeyError: If key not found in any namespace
         """
-        # Find value in namespaces (exact key match)
-        if key in self._inputs:
-            return self._inputs[key]
-        elif key in self._intermediate:
-            return self._intermediate[key]
-        elif key in self._outputs:
-            return self._outputs[key]
+        # Check if namespaced
+        if "." in key:
+            namespace, field_key = key.split(".", 1)
+
+            if namespace == "memory":
+                # Search in memory namespaces
+                if field_key in self._inputs:
+                    return self._inputs[field_key]
+                elif field_key in self._intermediate:
+                    return self._intermediate[field_key]
+                elif field_key in self._outputs:
+                    return self._outputs[field_key]
+                else:
+                    raise KeyError(f"Memory key not found: {field_key}")
+
+            elif namespace == "config":
+                # Proxy to global runtime config
+                if field_key in _RUNTIME_CONFIG:
+                    return _RUNTIME_CONFIG[field_key]
+                else:
+                    raise KeyError(f"Config key not found: {field_key}")
+
+            elif namespace == "env":
+                # Proxy to os.environ - get the actual env var name from schema
+                if field_key in self.schema.environment:
+                    env_var_name = self.schema.environment[field_key].key
+                    value = os.getenv(env_var_name)
+                    if value is None:
+                        raise KeyError(f"Environment variable not set: {env_var_name}")
+                    return value
+                else:
+                    raise KeyError(f"Environment key not in schema: {field_key}")
+
+            elif namespace == "secrets":
+                return self.get_secret(field_key)
+
+            else:
+                raise KeyError(f"Unknown namespace: {namespace}")
+
         else:
-            raise KeyError(f"Memory key not found: {key}")
+            # Legacy format: search in order
+            if key in self._inputs:
+                return self._inputs[key]
+            elif key in self._intermediate:
+                return self._intermediate[key]
+            elif key in self._outputs:
+                return self._outputs[key]
+            else:
+                raise KeyError(f"Memory key not found: {key}")
 
     def write(self, key: str, value: Any) -> None:
         """
         Write value to memory.
 
-        Determines target namespace based on schema.
+        Supports both legacy format and namespaced format:
+        - Legacy: "field_name" (writes to outputs or intermediate)
+        - Namespaced: "memory.field", "env.field", "secrets.field"
+
+        Note: Config namespace is read-only and cannot be written to.
 
         Args:
-            key: Memory key (exact match, no nested navigation)
+            key: Memory key
             value: Value to write
 
         Raises:
             KeyError: If key not in schema
+            ValueError: If attempting to write to read-only namespace
         """
-        # Determine target namespace (exact key match)
-        if key in self.schema.outputs:
-            self._outputs[key] = value
-        elif key in self.schema.intermediate:
-            self._intermediate[key] = value
+        # Check if namespaced
+        if "." in key:
+            namespace, field_key = key.split(".", 1)
+
+            if namespace == "memory":
+                # Write to memory namespaces
+                if field_key in self.schema.outputs:
+                    self._outputs[field_key] = value
+                elif field_key in self.schema.intermediate:
+                    self._intermediate[field_key] = value
+                else:
+                    raise KeyError(f"Memory key not in schema: {field_key}")
+
+            elif namespace == "config":
+                raise ValueError("Config namespace is read-only")
+
+            elif namespace == "env":
+                # Steps can create/update environment variables at runtime
+                # Proxy to os.environ - get the actual env var name from schema
+                if field_key in self.schema.environment:
+                    env_var_name = self.schema.environment[field_key].key
+                    os.environ[env_var_name] = str(value)
+                else:
+                    raise KeyError(f"Environment key not in schema: {field_key}")
+
+            elif namespace == "secrets":
+                # Steps can create/update secrets at runtime
+                self._secrets[field_key] = str(value)
+
+            else:
+                raise KeyError(f"Unknown namespace: {namespace}")
+
         else:
-            raise KeyError(f"Memory key not in schema (outputs or intermediate): {key}")
+            # Legacy format
+            if key in self.schema.outputs:
+                self._outputs[key] = value
+            elif key in self.schema.intermediate:
+                self._intermediate[key] = value
+            else:
+                raise KeyError(f"Memory key not in schema (outputs or intermediate): {key}")
 
     def set_input(self, key: str, value: Any) -> None:
         """
@@ -185,6 +273,83 @@ class MemoryStore:
 
         return self._secrets[key]
 
+    def populate_config(self, config_values: Dict[str, Any]) -> None:
+        """
+        Populate configuration values into global runtime config.
+
+        Called by runtime to set system configuration values like:
+        - cwd: Current working directory
+        - runtime_url: Runtime API URL
+        - ui_url: Builder URL
+        - runtime_id: Runtime instance ID
+
+        Like environment variables, config is stored globally and shared
+        across all MemoryStore instances. This allows runtime to manage
+        config centrally without schema restrictions.
+
+        Args:
+            config_values: Dictionary of config key -> value
+        """
+        global _RUNTIME_CONFIG
+        _RUNTIME_CONFIG.update(config_values)
+
+    def populate_environment(self, env_filter: Optional[list] = None) -> None:
+        """
+        Validate environment variables are available.
+
+        Note: Environment namespace proxies directly to os.environ,
+        so this method just validates that required vars exist.
+
+        Args:
+            env_filter: Optional list of schema keys to validate (for filtering).
+                       If None, validates all env vars defined in schema.
+        """
+        import logging
+
+        for schema_key, env_def in self.schema.environment.items():
+            # Check whitelist if provided
+            if env_filter is not None and schema_key not in env_filter:
+                continue
+
+            env_var_name = env_def.key
+            value = os.getenv(env_var_name)
+
+            if value is None and env_def.required:
+                # Log warning but don't fail (per plan requirements)
+                logging.warning(f"Required environment variable not set: {env_var_name}")
+
+    def validate_references(self) -> list:
+        """
+        Validate that all required config/env/secrets exist.
+
+        Returns:
+            List of warning messages for missing values
+        """
+        warnings = []
+
+        # Check config (from global runtime config)
+        for key in self.schema.config:
+            if key not in _RUNTIME_CONFIG:
+                warnings.append(f"Config value not set: {key}")
+
+        # Check environment (proxy to os.environ)
+        for schema_key, env_def in self.schema.environment.items():
+            if env_def.required and os.getenv(env_def.key) is None:
+                warnings.append(f"Required environment variable not set: {env_def.key}")
+
+        # Check secrets
+        for key, secret_def in self.schema.secrets.items():
+            try:
+                # Try to resolve secret (will use cached value if already loaded)
+                if secret_def.provider == "env":
+                    value = os.getenv(secret_def.key)
+                    if value is None:
+                        warnings.append(f"Secret not available (env var not set): {secret_def.key}")
+            except Exception as e:
+                warnings.append(f"Secret resolution failed for {key}: {str(e)}")
+
+        return warnings
+
     def has_key(self, key: str) -> bool:
         """Check if key exists in any namespace."""
         return (
@@ -205,17 +370,40 @@ class MemoryStore:
         """Get copy of all intermediate values."""
         return self._intermediate.copy()
 
+    def get_all_config(self) -> Dict[str, Any]:
+        """
+        Get copy of all config values from global runtime config.
+
+        Like environment, config redirects to a global registry rather than
+        storing values locally. This allows runtime to manage config centrally.
+        """
+        return _RUNTIME_CONFIG.copy()
+
+    def get_all_environment(self) -> Dict[str, Any]:
+        """
+        Get all environment variables from os.environ.
+
+        Returns all env vars, not just ones defined in schema.
+        This allows runtime visibility of the full environment.
+        """
+        return dict(os.environ)
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Return complete memory state as dictionary.
 
         Returns:
-            Dictionary with 'inputs', 'outputs', and 'intermediate' keys
+            Dictionary with all namespaces
         """
         return {
-            "inputs": self._inputs.copy(),
-            "outputs": self._outputs.copy(),
-            "intermediate": self._intermediate.copy(),
+            "memory": {
+                "inputs": self._inputs.copy(),
+                "outputs": self._outputs.copy(),
+                "intermediate": self._intermediate.copy(),
+            },
+            "config": self.get_all_config(),  # Read from global runtime config
+            "environment": self.get_all_environment(),  # Read from os.environ
+            "secrets": {k: "<exists>" for k in self._secrets.keys()},  # Don't expose values
         }
 
     def clear_intermediate(self) -> None:
@@ -226,5 +414,8 @@ class MemoryStore:
         return (
             f"MemoryStore(inputs={len(self._inputs)}, "
             f"outputs={len(self._outputs)}, "
-            f"intermediate={len(self._intermediate)})"
+            f"intermediate={len(self._intermediate)}, "
+            f"config={len(_RUNTIME_CONFIG)}, "
+            f"env={len(self.schema.environment)}, "
+            f"secrets={len(self._secrets)})"
         )

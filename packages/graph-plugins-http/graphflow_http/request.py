@@ -2,9 +2,11 @@
 from typing import Any, Dict
 
 from graphflow_core.memory import MemoryStore
+from graphflow_core.steps.registry import StepRegistry
 from .base import BaseHTTPStep
 
 
+@StepRegistry.register(step_type="http.HTTPGetStep", category="http", description="Perform HTTP GET request", plugin="http")
 class HTTPGetStep(BaseHTTPStep):
     """HTTP GET request step."""
 
@@ -14,7 +16,7 @@ class HTTPGetStep(BaseHTTPStep):
 
     @classmethod
     def get_type(cls) -> str:
-        return "http-get"
+        return "http.HTTPGetStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -151,6 +153,7 @@ class HTTPGetStep(BaseHTTPStep):
         self._write_output(memory, "headers", dict(response.headers))
 
 
+@StepRegistry.register(step_type="http.HTTPPostStep", category="http", description="Perform HTTP POST request", plugin="http")
 class HTTPPostStep(BaseHTTPStep):
     """HTTP POST request step."""
 
@@ -160,7 +163,7 @@ class HTTPPostStep(BaseHTTPStep):
 
     @classmethod
     def get_type(cls) -> str:
-        return "http-post"
+        return "http.HTTPPostStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -299,6 +302,7 @@ class HTTPPostStep(BaseHTTPStep):
         self._write_output(memory, "headers", dict(response.headers))
 
 
+@StepRegistry.register(step_type="http.HTTPPutStep", category="http", description="Perform HTTP PUT request", plugin="http")
 class HTTPPutStep(BaseHTTPStep):
     """HTTP PUT request step."""
 
@@ -308,7 +312,7 @@ class HTTPPutStep(BaseHTTPStep):
 
     @classmethod
     def get_type(cls) -> str:
-        return "http-put"
+        return "http.HTTPPutStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -383,6 +387,7 @@ class HTTPPutStep(BaseHTTPStep):
         self._write_output(memory, "headers", dict(response.headers))
 
 
+@StepRegistry.register(step_type="http.HTTPPatchStep", category="http", description="Perform HTTP PATCH request", plugin="http")
 class HTTPPatchStep(BaseHTTPStep):
     """HTTP PATCH request step."""
 
@@ -392,7 +397,7 @@ class HTTPPatchStep(BaseHTTPStep):
 
     @classmethod
     def get_type(cls) -> str:
-        return "http-patch"
+        return "http.HTTPPatchStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -466,6 +471,7 @@ class HTTPPatchStep(BaseHTTPStep):
         self._write_output(memory, "headers", dict(response.headers))
 
 
+@StepRegistry.register(step_type="http.HTTPDeleteStep", category="http", description="Perform HTTP DELETE request", plugin="http")
 class HTTPDeleteStep(BaseHTTPStep):
     """HTTP DELETE request step."""
 
@@ -475,7 +481,7 @@ class HTTPDeleteStep(BaseHTTPStep):
 
     @classmethod
     def get_type(cls) -> str:
-        return "http-delete"
+        return "http.HTTPDeleteStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:

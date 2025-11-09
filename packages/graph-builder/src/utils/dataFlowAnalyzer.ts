@@ -2,12 +2,16 @@ import { Node, Edge, Position, MarkerType } from 'reactflow';
 import { NodeData, MemorySchema } from '../types/graph';
 
 /**
- * Extracts memory binding key from a value like "{memory.field}" or "{memory.step.result}"
+ * Extracts memory binding from a value like "{memory.field}", "{config.field}", etc.
+ * Returns the full namespaced key like "memory.field" or "config.ui_url"
  */
 function extractMemoryBinding(value: any): string | null {
   if (typeof value !== 'string') return null;
-  const match = value.match(/^\{memory\.(.+)\}$/);
-  return match ? match[1] : null;
+  const match = value.match(/^\{(memory|config|env|secrets)\.(.+)\}$/);
+  if (match) {
+    return `${match[1]}.${match[2]}`; // Return "namespace.field"
+  }
+  return null;
 }
 
 /**

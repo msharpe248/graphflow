@@ -31,9 +31,21 @@ export interface Shape {
 }
 
 export interface SecretDefinition {
-  source: string;
+  provider: string; // 'env', 'vault', 'aws_secrets'
   key: string;
   description?: string;
+}
+
+export interface ConfigDefinition {
+  type: string; // 'string', 'number', 'boolean'
+  description?: string;
+}
+
+export interface EnvironmentDefinition {
+  type: string; // 'string', 'number', 'boolean'
+  key: string; // Environment variable name
+  description?: string;
+  required?: boolean;
 }
 
 export interface MemorySchema {
@@ -41,6 +53,8 @@ export interface MemorySchema {
   outputs: Record<string, FieldDefinition>;
   intermediate: Record<string, FieldDefinition>;
   secrets?: Record<string, SecretDefinition>;
+  config?: Record<string, ConfigDefinition>;
+  environment?: Record<string, EnvironmentDefinition>;
 }
 
 export interface Metadata {

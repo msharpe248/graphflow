@@ -304,6 +304,128 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                     </p>
                   )}
                 </div>
+
+                {/* Config namespace */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Config ({Object.keys(memory.config || {}).length})
+                  </h4>
+                  {memory.config && Object.keys(memory.config).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.config).map(([key, value]) => (
+                        <div key={key} className="bg-orange-50 border border-orange-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-orange-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-orange-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No config values
+                    </p>
+                  )}
+                </div>
+
+                {/* Environment namespace */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Environment ({Object.keys(memory.environment || {}).length})
+                  </h4>
+                  {memory.environment && Object.keys(memory.environment).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.environment).map(([key, value]) => (
+                        <div key={key} className="bg-yellow-50 border border-yellow-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-yellow-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-yellow-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No environment variables
+                    </p>
+                  )}
+                </div>
+
+                {/* Secrets namespace */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Secrets ({Object.keys(memory.secrets || {}).length})
+                  </h4>
+                  {memory.secrets && Object.keys(memory.secrets).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(memory.secrets).map(([key, value]) => (
+                        <div key={key} className="bg-red-50 border border-red-200 rounded p-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-xs font-semibold text-red-900">
+                              {key}
+                            </span>
+                          </div>
+                          <div
+                            className="mt-1 bg-white border border-red-100 rounded p-2 text-xs font-mono"
+                            style={{
+                              maxHeight: '128px',
+                              overflow: 'auto',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {typeof value === 'string' && value.length > 0
+                              ? '••••••••'
+                              : typeof value === 'string'
+                              ? '(empty)'
+                              : JSON.stringify(value, null, 2).split('\n').map((line, idx) => (
+                                  <div key={idx} style={{ whiteSpace: 'nowrap' }}>
+                                    {line}
+                                  </div>
+                                ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded border border-gray-200">
+                      No secrets
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-500">Memory not available</p>

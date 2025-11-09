@@ -26,6 +26,16 @@ class GeneratedAgent:
         # Initialize memory with inputs
         self.memory.initialize_inputs(inputs)
 
+        # Populate config and environment namespaces
+        # Note: Runtime config values are injected by the executor before run()
+        # This allows runtime to inject cwd, runtime_url, and other system values
+
+        # Environment variables from os.environ
+{% if graph.memory.environment %}
+        env_filter = [{% for key in graph.memory.environment.keys() %}"{{ key }}"{{ ", " if not loop.last else "" }}{% endfor %}]
+        self.memory.populate_environment(env_filter=env_filter)
+{% endif %}
+
         # Execute steps in order
 {% for step_id in execution_order %}
 {% set step = graph.steps | selectattr('id', 'equalto', step_id) | first %}

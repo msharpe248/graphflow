@@ -570,22 +570,27 @@ class WriteMemoryStep(StepBase):
         if not source_template:
             raise ValueError(f"WriteMemoryStep {self.id}: source not specified")
 
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        # Support all namespaces: {memory.*}, {config.*}, {env.*}, {secrets.*}
+        pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
         try:
             # Extract source key
             match = pattern.search(source_template)
             if match:
-                source_key = match.group(1)
-                value = memory.read(source_key)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                # Read with full namespaced key
+                value = memory.read(f"{namespace}.{field_key}")
 
                 # Write to output location
                 if self.outputs and 'value' in self.outputs:
                     output_template = self.outputs['value']
                     output_match = pattern.search(output_template)
                     if output_match:
-                        output_key = output_match.group(1)
-                        memory.write(output_key, value)
+                        output_namespace = output_match.group(1)
+                        output_field_key = output_match.group(2)
+                        # Write with full namespaced key
+                        memory.write(f"{output_namespace}.{output_field_key}", value)
                     else:
                         raise ValueError(f"WriteMemoryStep {self.id}: Invalid output reference '{output_template}'")
                 else:
