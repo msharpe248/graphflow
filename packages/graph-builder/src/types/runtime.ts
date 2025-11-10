@@ -20,6 +20,12 @@ export interface AgentRun {
   execution_log?: ExecutionLogEntry[];
   started_at: string;        // Always present, set when run is created
   completed_at?: string;      // Optional, set when run finishes
+  // Debug mode fields
+  debug_mode?: boolean;
+  current_step_id?: string;
+  breakpoints?: string[];
+  step_execution_counts?: Record<string, number>;
+  debug_state?: 'before_start' | 'before_step' | 'after_step' | 'completed';
 }
 
 export interface ExecutionLogEntry {
@@ -47,9 +53,29 @@ export interface CreateAgentRequest {
 
 export interface CreateRunRequest {
   inputs: Record<string, any>;
+  debug_mode?: boolean;
+  breakpoints?: string[];
 }
 
 export interface HealthCheck {
   status: string;
   active_runs: number;
+}
+
+export interface DebugState {
+  current_step_id?: string;
+  breakpoints: string[];
+  step_execution_counts: Record<string, number>;
+  status: 'running' | 'paused' | 'completed';
+}
+
+export interface DebugEvent {
+  type: 'step_started' | 'step_completed' | 'paused' | 'resumed' | 'breakpoint_added' | 'breakpoint_removed' | 'memory_updated';
+  step_id?: string;
+  timestamp: string;
+  execution_count?: number;
+  reason?: 'breakpoint' | 'step' | 'user';
+  namespace?: string;
+  key?: string;
+  value?: any;
 }

@@ -13,9 +13,17 @@ class GeneratedAgent:
     {{ graph.metadata.description or '' }}
     """
 
-    def __init__(self):
-        """Initialize agent with LangGraph."""
-        self.memory = MemoryStore(schema=MEMORY_SCHEMA)
+    def __init__(self, use_logging=True, execution_controller=None):
+        """Initialize agent with LangGraph and optional debug controller."""
+        if use_logging:
+            from graphflow_runtime.executor.logging_memory import LoggingMemoryStore
+            self.memory = LoggingMemoryStore(schema=MEMORY_SCHEMA)
+        else:
+            self.memory = MemoryStore(schema=MEMORY_SCHEMA)
+
+        # Store execution controller for debug mode
+        self.execution_controller = execution_controller
+
         self.graph = self._build_graph()
         self.app = self.graph.compile()
 
@@ -56,7 +64,22 @@ class GeneratedAgent:
 {% for step_id, step_code in step_execution_map.items() %}
     async def _node_{{ step_id }}(self, state: AgentState) -> AgentState:
         """Node for step: {{ step_id }}"""
+        # Wait if paused before step (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.wait_if_paused("{{ step_id }}")
+
+        # Set current step for logging
+        if hasattr(self.memory, 'set_current_step'):
+            self.memory.set_current_step("{{ step_id }}", "{{ step_id }}")
+
+        # Execute step
 {{ step_code | indent(8, first=False) }}
+
+        # Notify step completed (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.step_completed("{{ step_id }}")
+
+        return state
 
 {% endfor %}
 
@@ -70,6 +93,13 @@ class GeneratedAgent:
         Returns:
             Dictionary of output values
         """
+        # Initialize memory with inputs
+        self.memory.initialize_inputs(inputs)
+
+        # Wait if paused before start (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.wait_if_paused('__start__')
+
         # Initialize state with inputs
         state = AgentState(**inputs)
 
@@ -85,7 +115,16 @@ class GeneratedAgent:
 
         return outputs
 
+    def get_memory(self) -> MemoryStore:
+        """Get memory store for inspection."""
+        return self.memory
+
     def get_memory_state(self) -> Dict[str, Any]:
-        """Get current memory state (from last run)."""
-        # LangGraph manages state internally
-        return {"note": "LangGraph manages state during execution"}
+        """Get current memory state as dictionary."""
+        return self.memory.to_dict()
+
+    def get_execution_log(self) -> list:
+        """Get execution log if using LoggingMemoryStore."""
+        if hasattr(self.memory, 'get_log'):
+            return self.memory.get_log()
+        return []

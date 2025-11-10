@@ -5,13 +5,16 @@ class GeneratedAgent:
     {{ graph.metadata.description or '' }}
     """
 
-    def __init__(self, use_logging=True):
-        """Initialize agent with memory store."""
+    def __init__(self, use_logging=True, execution_controller=None):
+        """Initialize agent with memory store and optional debug controller."""
         if use_logging:
             from graphflow_runtime.executor.logging_memory import LoggingMemoryStore
             self.memory = LoggingMemoryStore(schema=MEMORY_SCHEMA)
         else:
             self.memory = MemoryStore(schema=MEMORY_SCHEMA)
+
+        # Store execution controller for debug mode
+        self.execution_controller = execution_controller
 
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -36,13 +39,27 @@ class GeneratedAgent:
         self.memory.populate_environment(env_filter=env_filter)
 {% endif %}
 
+        # Wait if paused before start (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.wait_if_paused('__start__')
+
         # Execute steps in order
 {% for step_id in execution_order %}
 {% set step = graph.steps | selectattr('id', 'equalto', step_id) | first %}
+        # Wait if paused before step (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.wait_if_paused("{{ step.id }}")
+
         # Set current step for logging
         if hasattr(self.memory, 'set_current_step'):
             self.memory.set_current_step("{{ step.id }}", "{{ step.label }}")
+
+        # Execute step
         await self._execute_{{ step_id | pythonize }}()
+
+        # Notify step completed (debug mode)
+        if self.execution_controller:
+            await self.execution_controller.step_completed("{{ step.id }}")
 {% endfor %}
 
         # Return outputs

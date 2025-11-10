@@ -338,6 +338,8 @@ async def execute(self, memory: MemoryStore) -> None:
 - **Outputs**: Final results returned to the caller
 - **Intermediate**: Temporary values passed between steps
 
+> **Note on Debugging:** When running in debug mode, users can edit memory values while execution is paused. Your step may receive modified or unexpected values. Implement defensive validation to handle this gracefully.
+
 **Automatic Memory Tracking:**
 
 GraphFlow automatically tracks memory reads and writes by parsing your step configuration:
@@ -542,6 +544,21 @@ pip install my-graphflow-plugin
 
 ## Advanced Topics
 
+### Debugging Support
+
+GraphFlow includes a built-in debugger that allows users to:
+- Set breakpoints before and after step execution
+- Step through graph execution one node at a time
+- Pause/resume execution
+- Inspect and edit memory values while paused
+
+**Good news:** This is completely transparent to plugin developers. The debugging infrastructure wraps your step's `execute()` method automatically - you don't need to add any debugging hooks or special code.
+
+**What you should know:**
+- Your step may pause mid-execution if the user sets a breakpoint
+- Memory values may be modified by users during debugging (see Input Validation best practices)
+- Execution timing may be affected during debug runs
+
 ### Error Handling
 
 Implement robust error handling in your steps:
@@ -667,6 +684,30 @@ This feature is planned for future releases.
 - Use the secrets system for sensitive configuration
 - Validate all user inputs
 - Sanitize data from external sources
+
+### Input Validation
+
+Always validate data read from memory, especially since:
+- Memory values can be edited by users during debugging
+- Previous steps may fail or produce unexpected output
+- Type coercion may be needed for robustness
+
+```python
+async def execute(self, memory: MemoryStore) -> None:
+    # Read and validate
+    value = memory.read("input_data")
+
+    # Type checking
+    if not isinstance(value, str):
+        raise ValueError(f"Expected string, got {type(value).__name__}")
+
+    # Range validation
+    if len(value) > 1000:
+        raise ValueError("Input too large (max 1000 characters)")
+
+    # Process validated data
+    result = self._process(value)
+```
 
 ### Testing
 

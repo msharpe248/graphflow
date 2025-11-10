@@ -1,4 +1,4 @@
-import { Agent, AgentRun, CreateAgentRequest, CreateRunRequest, MemoryState, HealthCheck } from '@/types/runtime';
+import { Agent, AgentRun, CreateAgentRequest, CreateRunRequest, MemoryState, HealthCheck, DebugState } from '@/types/runtime';
 
 const API_BASE = '/api/v1';
 
@@ -71,3 +71,45 @@ export const getMemory = (agentId: string, runId: string): Promise<MemoryState> 
 
 export const getMemoryKey = (agentId: string, runId: string, key: string): Promise<any> =>
   apiCall(`/agents/${agentId}/runs/${runId}/memory/${key}`);
+
+// Debug Control
+export const pauseRun = (agentId: string, runId: string): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/pause`, {
+    method: 'POST',
+  });
+
+export const resumeRun = (agentId: string, runId: string): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/resume`, {
+    method: 'POST',
+  });
+
+export const stepRun = (agentId: string, runId: string): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/step`, {
+    method: 'POST',
+  });
+
+export const setBreakpoint = (agentId: string, runId: string, stepId: string): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/breakpoints`, {
+    method: 'POST',
+    body: JSON.stringify({ step_id: stepId }),
+  });
+
+export const clearBreakpoint = (agentId: string, runId: string, stepId: string): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/breakpoints/${stepId}`, {
+    method: 'DELETE',
+  });
+
+export const updateMemory = (
+  agentId: string,
+  runId: string,
+  namespace: string,
+  key: string,
+  value: any
+): Promise<void> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/memory`, {
+    method: 'PUT',
+    body: JSON.stringify({ namespace, key, value }),
+  });
+
+export const getDebugState = (agentId: string, runId: string): Promise<DebugState> =>
+  apiCall(`/agents/${agentId}/runs/${runId}/debug/state`);

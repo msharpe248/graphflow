@@ -10,6 +10,7 @@ const keys = {
   runs: (agentId: string) => ['agents', agentId, 'runs'],
   run: (agentId: string, runId: string) => ['agents', agentId, 'runs', runId],
   memory: (agentId: string, runId: string) => ['agents', agentId, 'runs', runId, 'memory'],
+  debugState: (agentId: string, runId: string) => ['agents', agentId, 'runs', runId, 'debug'],
 };
 
 // Health
@@ -129,3 +130,95 @@ export const useMemory = (agentId: string | null, runId: string | null) =>
     enabled: !!agentId && !!runId,
     refetchInterval: 1000, // Poll memory every second
   });
+
+// Debug Control
+export const useDebugState = (agentId: string | null, runId: string | null, isActive: boolean = true) =>
+  useQuery({
+    queryKey: keys.debugState(agentId!, runId!),
+    queryFn: () => runtime.getDebugState(agentId!, runId!),
+    enabled: !!agentId && !!runId && isActive,
+    refetchInterval: isActive ? 500 : false, // Poll only when active
+    retry: 1, // Reduce retries to prevent hanging
+  });
+
+export const usePauseRun = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, runId }: { agentId: string; runId: string }) =>
+      runtime.pauseRun(agentId, runId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      queryClient.invalidateQueries({ queryKey: keys.debugState(variables.agentId, variables.runId) });
+    },
+  });
+};
+
+export const useResumeRun = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, runId }: { agentId: string; runId: string }) =>
+      runtime.resumeRun(agentId, runId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      queryClient.invalidateQueries({ queryKey: keys.debugState(variables.agentId, variables.runId) });
+    },
+  });
+};
+
+export const useStepRun = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, runId }: { agentId: string; runId: string }) =>
+      runtime.stepRun(agentId, runId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      queryClient.invalidateQueries({ queryKey: keys.debugState(variables.agentId, variables.runId) });
+    },
+  });
+};
+
+export const useSetBreakpoint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, runId, stepId }: { agentId: string; runId: string; stepId: string }) =>
+      runtime.setBreakpoint(agentId, runId, stepId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      queryClient.invalidateQueries({ queryKey: keys.debugState(variables.agentId, variables.runId) });
+    },
+  });
+};
+
+export const useClearBreakpoint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, runId, stepId }: { agentId: string; runId: string; stepId: string }) =>
+      runtime.clearBreakpoint(agentId, runId, stepId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.run(variables.agentId, variables.runId) });
+      queryClient.invalidateQueries({ queryKey: keys.debugState(variables.agentId, variables.runId) });
+    },
+  });
+};
+
+export const useUpdateMemory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      agentId,
+      runId,
+      namespace,
+      key,
+      value,
+    }: {
+      agentId: string;
+      runId: string;
+      namespace: string;
+      key: string;
+      value: any;
+    }) => runtime.updateMemory(agentId, runId, namespace, key, value),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.memory(variables.agentId, variables.runId) });
+    },
+  });
+};

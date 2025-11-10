@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Loader2, AlertCircle, CheckCircle, Clock, Square, Database, List } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Clock, Square, Database, List, Network } from 'lucide-react';
 import { useRun, useMemory } from '@/hooks/useRuntime';
+import GraphDebugView from './GraphDebugView';
 
 interface RunDetailProps {
   agentId: string;
@@ -18,7 +19,14 @@ const STATUS_CONFIG = {
 export default function RunDetail({ agentId, runId }: RunDetailProps) {
   const { data: run, isLoading: runLoading } = useRun(agentId, runId);
   const { data: memory, isLoading: memoryLoading } = useMemory(agentId, runId);
-  const [activeTab, setActiveTab] = useState<'details' | 'memory' | 'execution'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'memory' | 'execution' | 'graph'>('details');
+
+  // Auto-switch to graph tab if in debug mode
+  useState(() => {
+    if (run?.debug_mode && activeTab === 'details') {
+      setActiveTab('graph');
+    }
+  });
 
   if (runLoading) {
     return (
@@ -73,6 +81,22 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
 
         {/* Tabs */}
         <div className="flex gap-2 border-b border-gray-200">
+          {run.debug_mode && (
+            <button
+              onClick={() => setActiveTab('graph')}
+              className={`
+                flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors border-b-2
+                ${
+                  activeTab === 'graph'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }
+              `}
+            >
+              <Network className="w-4 h-4" />
+              Graph
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('details')}
             className={`
@@ -118,8 +142,10 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 min-w-0">
-        {activeTab === 'details' ? (
+      <div className="flex-1 overflow-y-auto min-w-0" style={{ padding: activeTab === 'graph' ? 0 : '1rem' }}>
+        {activeTab === 'graph' ? (
+          <GraphDebugView agentId={agentId} runId={runId} />
+        ) : activeTab === 'details' ? (
           <div className="space-y-4">
             {/* Timestamps */}
             <div>

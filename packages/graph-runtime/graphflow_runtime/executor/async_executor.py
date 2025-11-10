@@ -13,6 +13,7 @@ from graphflow_core.memory import MemoryStore
 from graphflow_core.models import GraphDefinition
 from graphflow_compiler import compile_graph
 from graphflow_runtime.config import runtime_config
+from graphflow_runtime.executor.execution_controller import ExecutionController
 
 
 class AsyncExecutor:
@@ -31,6 +32,7 @@ class AsyncExecutor:
         self._running_tasks: Dict[str, asyncio.Task] = {}
         self._memory_stores: Dict[str, MemoryStore] = {}
         self._temp_modules: Dict[str, str] = {}  # run_id -> module_path
+        self._execution_controllers: Dict[str, ExecutionController] = {}  # run_id -> controller
 
     async def compile_and_run(
         self,
@@ -38,6 +40,8 @@ class AsyncExecutor:
         graph: GraphDefinition,
         inputs: Dict[str, Any],
         framework: str = "pydantic_ai",
+        debug_mode: bool = False,
+        breakpoints: Optional[list] = None,
         on_complete: Optional[callable] = None,
         on_error: Optional[callable] = None
     ) -> None:
@@ -49,6 +53,8 @@ class AsyncExecutor:
             graph: Graph definition to compile and execute
             inputs: Input values for the agent
             framework: Framework to use for compilation
+            debug_mode: Whether to run in debug mode
+            breakpoints: Initial breakpoints (list of step IDs)
             on_complete: Callback for successful completion
             on_error: Callback for errors
         """
@@ -61,12 +67,22 @@ class AsyncExecutor:
         module_path.write_text(code)
         self._temp_modules[run_id] = str(module_path)
 
+        # Create debug controller if in debug mode
+        controller = None
+        if debug_mode:
+            controller = ExecutionController(
+                run_id=run_id,
+                initial_breakpoints=set(breakpoints) if breakpoints else set()
+            )
+            self._execution_controllers[run_id] = controller
+
         # Create background task
         task = asyncio.create_task(
             self._execute_agent(
                 run_id=run_id,
                 module_path=module_path,
                 inputs=inputs,
+                controller=controller,
                 on_complete=on_complete,
                 on_error=on_error
             )
@@ -78,6 +94,7 @@ class AsyncExecutor:
         run_id: str,
         module_path: Path,
         inputs: Dict[str, Any],
+        controller: Optional[ExecutionController] = None,
         on_complete: Optional[callable] = None,
         on_error: Optional[callable] = None
     ) -> None:
@@ -92,8 +109,11 @@ class AsyncExecutor:
             sys.modules[f"agent_{run_id}"] = module
             spec.loader.exec_module(module)
 
-            # Create agent instance with logging enabled
-            agent = module.GeneratedAgent(use_logging=True)
+            # Create agent instance with logging enabled and controller if debugging
+            agent = module.GeneratedAgent(
+                use_logging=True,
+                execution_controller=controller
+            )
 
             # Store memory reference for inspection
             self._memory_stores[run_id] = agent.memory
@@ -228,3 +248,148 @@ class AsyncExecutor:
         # Cleanup all memory stores
         for run_id in list(self._memory_stores.keys()):
             self.release_memory(run_id)
+
+    # Debug control methods
+
+    def get_controller(self, run_id: str) -> Optional[ExecutionController]:
+        """Get execution controller for a run."""
+        return self._execution_controllers.get(run_id)
+
+    async def pause_run(self, run_id: str) -> bool:
+        """
+        Pause a running debug session.
+
+        Args:
+            run_id: Run identifier
+
+        Returns:
+            True if paused, False if not found or not in debug mode
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            return await controller.pause()
+        return False
+
+    async def resume_run(self, run_id: str) -> bool:
+        """
+        Resume a paused debug session.
+
+        Args:
+            run_id: Run identifier
+
+        Returns:
+            True if resumed, False if not found or not paused
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            return await controller.resume()
+        return False
+
+    async def step_run(self, run_id: str) -> bool:
+        """
+        Execute one step in debug session.
+
+        Args:
+            run_id: Run identifier
+
+        Returns:
+            True if stepped, False if not found
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            return await controller.step()
+        return False
+
+    async def set_breakpoint(self, run_id: str, step_id: str) -> bool:
+        """
+        Set a breakpoint on a step.
+
+        Args:
+            run_id: Run identifier
+            step_id: Step ID to break on
+
+        Returns:
+            True if set, False if run not found
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            await controller.set_breakpoint(step_id)
+            return True
+        return False
+
+    async def clear_breakpoint(self, run_id: str, step_id: str) -> bool:
+        """
+        Clear a breakpoint from a step.
+
+        Args:
+            run_id: Run identifier
+            step_id: Step ID to remove breakpoint from
+
+        Returns:
+            True if cleared, False if run not found
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            return await controller.clear_breakpoint(step_id)
+        return False
+
+    def get_debug_state(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get debug state for a run.
+
+        Args:
+            run_id: Run identifier
+
+        Returns:
+            Debug state dict or None
+        """
+        controller = self.get_controller(run_id)
+        if controller:
+            return controller.get_state()
+        return None
+
+    def update_memory_value(self, run_id: str, namespace: str, key: str, value: Any) -> bool:
+        """
+        Update a memory value while paused (for testing).
+
+        Args:
+            run_id: Run identifier
+            namespace: Memory namespace (inputs, outputs, intermediate, etc.)
+            key: Memory key
+            value: New value
+
+        Returns:
+            True if updated, False if run not found or not paused
+        """
+        memory = self.get_memory(run_id)
+        controller = self.get_controller(run_id)
+
+        if not memory or not controller:
+            return False
+
+        # Only allow editing when paused
+        state = controller.get_state()
+        if state['status'] != 'paused':
+            return False
+
+        # Update memory value based on namespace
+        try:
+            if namespace == 'inputs':
+                memory.set_input(key, value)
+            elif namespace == 'outputs':
+                memory.set_output(key, value)
+            elif namespace == 'intermediate':
+                memory.set_intermediate(key, value)
+            elif namespace == 'config':
+                memory.set_config(key, value)
+            elif namespace == 'environment':
+                memory.set_environment(key, value)
+            elif namespace == 'secrets':
+                # Reject edits to secrets for security
+                return False
+            else:
+                return False
+
+            return True
+        except Exception:
+            return False

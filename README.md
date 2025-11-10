@@ -10,12 +10,14 @@ GraphFlow is a comprehensive agent development platform that lets you:
 - **Build** agents visually with drag-and-drop interface
 - **Compile** graphs to executable Python (Pydantic AI or LangGraph)
 - **Execute** agents in a managed runtime environment
+- **Debug** with breakpoints, step-through execution, and memory editing
 - **Monitor** execution with real-time memory inspection
 
 ## ✨ Key Features
 
 - **Visual Graph Builder**: Drag-and-drop UI with ReactFlow for building agent workflows
 - **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding, usage tracking, and editable outputs
+- **Interactive Debugger**: Set breakpoints before/after steps, step through execution, pause/resume, inspect and edit memory values in real-time
 - **Plugin System**: Extensible architecture with dynamically loaded step types, categorization, and search
 - **Decoupled Control & Data Flow**: Edges define control flow, memory store handles data independently
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
@@ -25,7 +27,7 @@ GraphFlow is a comprehensive agent development platform that lets you:
   - Memory manipulation steps (read-memory, write-memory)
 - **Runtime Environment**: Long-running agents with queryable memory and full lifecycle management
 - **CLI Tools**: `graphflow-compile` and `graphflow-runtime`
-- **REST API**: 15+ endpoints for complete agent lifecycle management
+- **REST API**: 20+ endpoints for complete agent lifecycle and debug management
 
 ## 🏗️ Architecture
 
@@ -101,7 +103,11 @@ npm run dev
 #   - Step Palette: Browse steps by category or plugin
 #   - Properties Panel: Configure step settings and memory bindings
 #   - Memory Schema Panel: Manage inputs, outputs, and intermediate memory
-# - Runtime tab: Monitor running agents (coming soon)
+# - Runtime tab: Monitor and debug running agents
+#   - View all agents and their runs
+#   - Enable debug mode with breakpoints and step-through execution
+#   - Inspect and edit memory values in real-time
+#   - View execution logs and step properties
 ```
 
 ### Example 1: Compile and Run Standalone Agent
@@ -255,6 +261,34 @@ The visual graph builder provides an intuitive interface for creating agent work
 - Change bindings to hardcoded values or different memory locations
 - Visual highlighting of bound fields with blue background
 - Autocomplete suggestions for memory field names
+
+## 🐛 Interactive Debugger
+
+GraphFlow includes a full-featured debugger for troubleshooting and understanding agent execution:
+
+**Debugging Controls**
+- **Debug Mode**: Enable when starting a run to pause before execution begins
+- **Breakpoints**: Click connection handles on nodes to set breakpoints before or after step execution
+  - Gray handle: No breakpoint
+  - Red handle: Breakpoint set
+  - Yellow pulsing: Execution paused here
+  - Blue pulsing: Currently executing
+- **Execution Controls**: Step, Resume, Pause buttons to control execution flow
+- **Debug State**: Real-time display of execution status and current step
+
+**Memory Inspection & Editing**
+- **Live Memory View**: See all memory values update in real-time as execution progresses
+- **Rich Property Editors**: View step inputs/outputs with syntax highlighting (JSON, Code, Markdown, etc.)
+- **Memory Editing**: Modify memory values while paused to test different scenarios
+  - Editable when paused (green "(editable while paused)" indicator)
+  - Read-only when running
+  - Smart namespace detection for memory bindings
+- **Step Properties Panel**: Inspect configuration, current values, and outputs for each step
+
+**Framework Support**
+- Works with both Pydantic AI and LangGraph compiled agents
+- Transparent to plugin developers - no special code required
+- Full debugging API for programmatic control
 
 ## 🔌 Plugin System
 
@@ -435,6 +469,15 @@ graphflow-runtime --reload
 **Memory**:
 - `GET /api/v1/agents/{id}/runs/{run_id}/memory` - Get memory state
 - `GET /api/v1/agents/{id}/runs/{run_id}/memory/{key}` - Get specific value
+- `PUT /api/v1/agents/{id}/runs/{run_id}/memory/{namespace}/{key}` - Update memory value (debug mode)
+
+**Debug Control**:
+- `GET /api/v1/agents/{id}/runs/{run_id}/debug/state` - Get debug state
+- `POST /api/v1/agents/{id}/runs/{run_id}/debug/pause` - Pause execution
+- `POST /api/v1/agents/{id}/runs/{run_id}/debug/resume` - Resume execution
+- `POST /api/v1/agents/{id}/runs/{run_id}/debug/step` - Execute one step
+- `POST /api/v1/agents/{id}/runs/{run_id}/debug/breakpoints/{step_id}` - Set breakpoint
+- `DELETE /api/v1/agents/{id}/runs/{run_id}/debug/breakpoints/{step_id}` - Clear breakpoint
 
 **Step Types**:
 - `GET /api/v1/step-types` - List all available step types with schemas
@@ -450,6 +493,10 @@ graphflow-runtime --reload
 | Multi-Framework Compile | ✅ | ❌ | ⚠️ |
 | Standalone Generation | ✅ | ❌ | ❌ |
 | Visual Graph Builder | 🚧 POC | ✅ | ✅ |
+| Interactive Debugger | ✅ | ❌ | ❌ |
+| Breakpoint Support | ✅ | ❌ | ❌ |
+| Step-Through Execution | ✅ | ❌ | ❌ |
+| Runtime Memory Editing | ✅ | ❌ | ❌ |
 | Memory Schema Management | ✅ | ⚠️ | ⚠️ |
 | Memory Inspection | ✅ | ⚠️ | ⚠️ |
 | Runtime API | ✅ | ✅ | ✅ |
@@ -469,8 +516,12 @@ graphflow-runtime --reload
 - ✅ Runtime monitoring view with agents/runs/details
 - ✅ Execution log with horizontal scrollbars
 - ✅ Upload to runtime and execute graphs
+- ✅ Auto-refresh for runtime view (polling-based)
+- ✅ Interactive debugger with breakpoints
+- ✅ Step-through execution (step/pause/resume)
+- ✅ Real-time memory inspection and editing
+- ✅ Rich property editors in debug mode
 - 🚧 Graph templates
-- 🚧 Auto-refresh for runtime view
 - 🚧 Compile from UI
 
 **Future**:

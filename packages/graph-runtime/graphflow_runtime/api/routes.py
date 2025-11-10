@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -39,6 +39,8 @@ class RunCreate(BaseModel):
     """Request to start a run."""
     inputs: dict = Field(..., description="Input values for the agent")
     run_id: Optional[str] = Field(None, description="Optional custom run ID")
+    debug_mode: bool = Field(False, description="Enable debug mode")
+    breakpoints: Optional[List[str]] = Field(None, description="Initial breakpoints (list of step IDs)")
 
 
 class RunResponse(BaseModel):
@@ -52,6 +54,11 @@ class RunResponse(BaseModel):
     execution_log: Optional[list]
     started_at: datetime
     completed_at: Optional[datetime]
+    debug_mode: Optional[bool]
+    current_step_id: Optional[str]
+    breakpoints: Optional[list]
+    step_execution_counts: Optional[dict]
+    debug_state: Optional[str]
 
 
 class MemoryResponse(BaseModel):
@@ -227,7 +234,11 @@ async def start_run(
         id=run_id,
         agent_id=agent_id,
         status="running",
-        inputs=run_data.inputs
+        inputs=run_data.inputs,
+        debug_mode=run_data.debug_mode,
+        breakpoints=run_data.breakpoints or [],
+        step_execution_counts={},
+        debug_state='before_start' if run_data.debug_mode else None
     )
 
     db.add(run)
@@ -271,6 +282,8 @@ async def start_run(
         graph=graph,
         inputs=run_data.inputs,
         framework=agent.framework,
+        debug_mode=run_data.debug_mode,
+        breakpoints=run_data.breakpoints,
         on_complete=on_complete,
         on_error=on_error
     )
@@ -453,3 +466,216 @@ async def list_plugins(pm: PluginManager = Depends(get_plugin_manager)):
     their version, provided step types, and custom UI components.
     """
     return pm.get_plugin_info_dict()
+
+
+# Debug endpoints
+
+class DebugStateResponse(BaseModel):
+    """Debug state response."""
+    current_step_id: Optional[str]
+    breakpoints: List[str]
+    step_execution_counts: dict
+    status: str
+
+
+class BreakpointRequest(BaseModel):
+    """Request to set a breakpoint."""
+    step_id: str = Field(..., description="Step ID to break on")
+
+
+class MemoryUpdateRequest(BaseModel):
+    """Request to update memory value."""
+    namespace: str = Field(..., description="Memory namespace")
+    key: str = Field(..., description="Memory key")
+    value: Any = Field(..., description="New value")
+
+
+@router.post("/agents/{agent_id}/runs/{run_id}/debug/pause", status_code=204)
+async def pause_debug_run(
+    agent_id: str,
+    run_id: str,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Pause a running debug session."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Pause execution
+    if not await exec.pause_run(run_id):
+        raise HTTPException(400, "Could not pause run (already paused or stopped)")
+
+
+@router.post("/agents/{agent_id}/runs/{run_id}/debug/resume", status_code=204)
+async def resume_debug_run(
+    agent_id: str,
+    run_id: str,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Resume a paused debug session."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Resume execution
+    if not await exec.resume_run(run_id):
+        raise HTTPException(400, "Could not resume run (not paused)")
+
+
+@router.post("/agents/{agent_id}/runs/{run_id}/debug/step", status_code=204)
+async def step_debug_run(
+    agent_id: str,
+    run_id: str,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Execute one step in debug session."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Step execution
+    if not await exec.step_run(run_id):
+        raise HTTPException(400, "Could not step run")
+
+
+@router.post("/agents/{agent_id}/runs/{run_id}/debug/breakpoints", status_code=204)
+async def set_breakpoint(
+    agent_id: str,
+    run_id: str,
+    breakpoint_data: BreakpointRequest,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Set a breakpoint on a step."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Set breakpoint
+    if await exec.set_breakpoint(run_id, breakpoint_data.step_id):
+        # Update database
+        if run.breakpoints is None:
+            run.breakpoints = []
+        if breakpoint_data.step_id not in run.breakpoints:
+            run.breakpoints.append(breakpoint_data.step_id)
+            db.commit()
+    else:
+        raise HTTPException(400, "Could not set breakpoint (run not found)")
+
+
+@router.delete("/agents/{agent_id}/runs/{run_id}/debug/breakpoints/{step_id}", status_code=204)
+async def clear_breakpoint(
+    agent_id: str,
+    run_id: str,
+    step_id: str,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Remove a breakpoint from a step."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Clear breakpoint
+    if await exec.clear_breakpoint(run_id, step_id):
+        # Update database
+        if run.breakpoints and step_id in run.breakpoints:
+            run.breakpoints.remove(step_id)
+            db.commit()
+
+
+@router.put("/agents/{agent_id}/runs/{run_id}/debug/memory", status_code=204)
+async def update_memory(
+    agent_id: str,
+    run_id: str,
+    memory_data: MemoryUpdateRequest,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Update a memory value while paused."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Update memory
+    if not exec.update_memory_value(run_id, memory_data.namespace, memory_data.key, memory_data.value):
+        raise HTTPException(400, "Could not update memory (not paused, invalid namespace, or run not found)")
+
+
+@router.get("/agents/{agent_id}/runs/{run_id}/debug/state", response_model=DebugStateResponse)
+async def get_debug_state(
+    agent_id: str,
+    run_id: str,
+    db: Session = Depends(get_db),
+    exec: AsyncExecutor = Depends(get_executor)
+):
+    """Get current debug state."""
+    # Verify run exists and is in debug mode
+    run = (
+        db.query(AgentRun)
+        .filter(AgentRun.id == run_id, AgentRun.agent_id == agent_id)
+        .first()
+    )
+    if not run:
+        raise HTTPException(404, f"Run not found: {run_id}")
+
+    if not run.debug_mode:
+        raise HTTPException(400, "Run is not in debug mode")
+
+    # Get debug state
+    state = exec.get_debug_state(run_id)
+    if state is None:
+        raise HTTPException(404, "Debug state not available (run may have completed)")
+
+    return state

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, DateTime, JSON, Text, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, JSON, Text, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -42,6 +42,13 @@ class AgentRun(Base):
     execution_log = Column(JSON, nullable=True)  # List of execution log entries
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
+
+    # Debug mode fields
+    debug_mode = Column(Boolean, nullable=True, default=False)  # Whether run is in debug mode
+    current_step_id = Column(String, nullable=True)  # Current/paused step ID
+    breakpoints = Column(JSON, nullable=True)  # List of step IDs with breakpoints
+    step_execution_counts = Column(JSON, nullable=True)  # Dict: step_id -> execution count
+    debug_state = Column(String, nullable=True)  # 'before_start'|'before_step'|'after_step'|'completed'
 
     # Relationships
     agent = relationship("Agent", back_populates="runs")

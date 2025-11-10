@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { X, AlertCircle, AlertTriangle, Code2, FileText } from 'lucide-react';
+import { X, AlertCircle, AlertTriangle, Code2, FileText, Bug } from 'lucide-react';
 import { ValidationResult, ValidationIssue, formatValidationIssue } from '@/utils/graphValidator';
 import { MemorySchema } from '@/types/graph';
 
 interface RunInputModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRun: (inputs: Record<string, any>) => void;
+  onRun: (inputs: Record<string, any>, debugMode?: boolean) => void;
   graphName: string;
   memory: MemorySchema;
   validation: ValidationResult;
@@ -24,6 +24,7 @@ export default function RunInputModal({
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [jsonText, setJsonText] = useState<string>('{}');
   const [jsonError, setJsonError] = useState<string>('');
+  const [debugMode, setDebugMode] = useState<boolean>(false);
 
   // Initialize inputs with defaults
   useMemo(() => {
@@ -86,7 +87,7 @@ export default function RunInputModal({
       return;
     }
 
-    onRun(inputs);
+    onRun(inputs, debugMode);
   };
 
   const renderIssue = (issue: ValidationIssue) => {
@@ -313,6 +314,28 @@ export default function RunInputModal({
                   </p>
                 </div>
               )}
+
+              {/* Debug Mode Toggle */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="debugMode"
+                    checked={debugMode}
+                    onChange={(e) => setDebugMode(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="debugMode" className="flex items-center gap-2 text-sm font-medium text-blue-900 cursor-pointer">
+                      <Bug className="w-4 h-4" />
+                      Enable Debug Mode
+                    </label>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Run will pause before execution starts. You can step through each step, set breakpoints, and inspect memory.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>

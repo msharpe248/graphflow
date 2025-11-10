@@ -66,7 +66,7 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
     setShowRunModal(true);
   };
 
-  const handleRunWithInputs = async (inputs: Record<string, any>) => {
+  const handleRunWithInputs = async (inputs: Record<string, any>, debugMode?: boolean) => {
     try {
       const graph = exportGraph();
 
@@ -96,7 +96,10 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
       // Create and start the run
       const runResult = await createRun.mutateAsync({
         agentId: targetAgentId,
-        data: { inputs },
+        data: {
+          inputs,
+          debug_mode: debugMode,
+        },
       });
 
       // Close modal

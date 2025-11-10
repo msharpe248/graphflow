@@ -62,13 +62,16 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
     setShowRunModal(true);
   };
 
-  const handleRunWithInputs = async (inputs: Record<string, any>) => {
+  const handleRunWithInputs = async (inputs: Record<string, any>, debugMode?: boolean) => {
     if (!agentToRun) return;
 
     try {
       await createRun.mutateAsync({
         agentId: agentToRun.id,
-        data: { inputs },
+        data: {
+          inputs,
+          debug_mode: debugMode,
+        },
       });
 
       // Close modal and select agent to view the new run
