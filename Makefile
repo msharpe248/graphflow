@@ -1,4 +1,4 @@
-.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop dev-start dev-stop status
+.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop dev-start dev-stop status stats loc
 
 # Colors for output
 BLUE := \033[0;34m
@@ -148,5 +148,43 @@ format: ## Format code
 	@echo "$(GREEN)✓ Code formatted$(NC)"
 
 reset: dev-stop clean install dev-start ## Full reset: stop everything, clean, reinstall, restart
+
+stats: ## Show code statistics (lines of code by file type)
+	@echo "$(BLUE)╔═══════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║    GraphFlow Code Statistics                 ║$(NC)"
+	@echo "$(BLUE)╚═══════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@PY_LINES=$$(find . -type f -name "*.py" ! -path "*/node_modules/*" ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/__pycache__/*" ! -path "*/.pytest_cache/*" ! -path "*/dist/*" ! -path "*/build/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	TS_LINES=$$(find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/dist/*" ! -path "*/build/*" ! -path "*/.next/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	MD_LINES=$$(find . -type f -name "*.md" ! -path "*/node_modules/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	JSON_LINES=$$(find . -type f -name "*.json" ! -path "*/node_modules/*" ! -path "*/dist/*" ! -path "*/build/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	JINJA_LINES=$$(find . -type f -name "*.jinja" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	CSS_LINES=$$(find . -type f -name "*.css" ! -path "*/node_modules/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	CFG_LINES=$$(find . -type f \( -name "*.toml" -o -name "*.yaml" -o -name "*.yml" \) ! -path "*/node_modules/*" -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $$1}'); \
+	TOTAL=$$((PY_LINES + TS_LINES + MD_LINES + JSON_LINES + JINJA_LINES + CSS_LINES + CFG_LINES)); \
+	PY_PCT=$$((PY_LINES * 100 / TOTAL)); \
+	TS_PCT=$$((TS_LINES * 100 / TOTAL)); \
+	MD_PCT=$$((MD_LINES * 100 / TOTAL)); \
+	printf "  $(GREEN)%-35s$(NC) %7s  (%2d%%)\n" "Python (.py)" "$$(printf "%'d" $$PY_LINES)" $$PY_PCT; \
+	printf "  $(BLUE)%-35s$(NC) %7s  (%2d%%)\n" "TypeScript/JavaScript (.ts/.tsx/.js/.jsx)" "$$(printf "%'d" $$TS_LINES)" $$TS_PCT; \
+	printf "  $(YELLOW)%-35s$(NC) %7s  (%2d%%)\n" "Markdown (.md)" "$$(printf "%'d" $$MD_LINES)" $$MD_PCT; \
+	printf "  %-35s %7s\n" "JSON (.json)" "$$(printf "%'d" $$JSON_LINES)"; \
+	printf "  %-35s %7s\n" "Jinja Templates (.jinja)" "$$(printf "%'d" $$JINJA_LINES)"; \
+	printf "  %-35s %7s\n" "CSS (.css)" "$$(printf "%'d" $$CSS_LINES)"; \
+	printf "  %-35s %7s\n" "Config (.toml/.yaml/.yml)" "$$(printf "%'d" $$CFG_LINES)"; \
+	echo "  $(BLUE)─────────────────────────────────────────────$(NC)"; \
+	printf "  $(GREEN)%-35s %7s$(NC)\n" "TOTAL" "$$(printf "%'d" $$TOTAL)"; \
+	echo ""; \
+	PY_FILES=$$(find . -type f -name "*.py" ! -path "*/node_modules/*" ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/__pycache__/*" ! -path "*/.pytest_cache/*" ! -path "*/dist/*" ! -path "*/build/*" | wc -l | xargs); \
+	TS_FILES=$$(find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) ! -path "*/node_modules/*" ! -path "*/dist/*" ! -path "*/build/*" ! -path "*/.next/*" | wc -l | xargs); \
+	MD_FILES=$$(find . -type f -name "*.md" ! -path "*/node_modules/*" | wc -l | xargs); \
+	JSON_FILES=$$(find . -type f -name "*.json" ! -path "*/node_modules/*" ! -path "*/dist/*" ! -path "*/build/*" | wc -l | xargs); \
+	echo "$(BLUE)File Counts:$(NC)"; \
+	printf "  Python files:         %4s\n" "$$PY_FILES"; \
+	printf "  TS/JS files:          %4s\n" "$$TS_FILES"; \
+	printf "  Markdown files:       %4s\n" "$$MD_FILES"; \
+	printf "  JSON files:           %4s\n" "$$JSON_FILES"
+
+loc: stats ## Alias for stats (show lines of code)
 
 .DEFAULT_GOAL := help
