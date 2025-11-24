@@ -1,5 +1,6 @@
 // Export all editors
 export { default as StringEditor } from './StringEditor';
+export { default as SelectEditor } from './SelectEditor';
 export { default as NumberEditor } from './NumberEditor';
 export { default as BooleanEditor } from './BooleanEditor';
 export { default as JsonEditor } from './JsonEditor';

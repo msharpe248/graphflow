@@ -1,5 +1,6 @@
 import { EditorConfig } from './types';
 import StringEditor from './StringEditor';
+import SelectEditor from './SelectEditor';
 import NumberEditor from './NumberEditor';
 import BooleanEditor from './BooleanEditor';
 import JsonEditor from './JsonEditor';
@@ -15,6 +16,10 @@ import DateTimePicker from './DateTimePicker';
 const EDITOR_REGISTRY: Record<string, EditorConfig> = {
   'string': {
     component: StringEditor,
+    displayMode: 'inline',
+  },
+  'select': {
+    component: SelectEditor,
     displayMode: 'inline',
   },
   'number': {
@@ -79,8 +84,8 @@ export function getEditorForType(schema: Record<string, any>): EditorConfig {
   }
 
   if (type === 'string' && schema.enum) {
-    // For string enums, use string editor (could add dropdown in future)
-    return EDITOR_REGISTRY['string'];
+    // For string enums, use select editor with dropdown + typeahead
+    return EDITOR_REGISTRY['select'];
   }
 
   if (type === 'string') {
