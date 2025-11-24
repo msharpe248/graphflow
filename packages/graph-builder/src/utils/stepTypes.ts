@@ -35,12 +35,31 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
     configSchema: {
       provider: {
         type: 'string',
-        enum: ['openrouter', 'openai', 'anthropic', 'ollama'],
-        default: 'openrouter',
+        enum: [
+          'openai',           // OpenAI (base_url optional)
+          'anthropic',        // Anthropic (native)
+          'ollama',           // Ollama (native, local)
+          'lmstudio',         // LM Studio (native, local)
+          'groq',             // Groq (native)
+          'mistral',          // Mistral (native)
+          'google',           // Google Gemini (native)
+          'openrouter',       // OpenRouter (OpenAI-compatible)
+          'azure',            // Azure OpenAI (requires base_url)
+          'openai_compatible' // Any OpenAI-compatible endpoint (requires base_url)
+        ],
+        default: 'openai',
       },
       model: {
         type: 'string',
-        description: 'Model name',
+        description: 'Model name (e.g., gpt-4-turbo, claude-3-5-sonnet, llama3.2)',
+      },
+      base_url: {
+        type: 'string',
+        description: 'Custom base URL for API. Required for azure/openai_compatible. Optional for openai, ollama, lmstudio.',
+      },
+      api_key_secret: {
+        type: 'string',
+        description: 'Secret key for API key (from secrets store)',
       },
       system_prompt: {
         type: 'string',

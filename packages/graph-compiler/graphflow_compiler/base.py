@@ -294,7 +294,7 @@ Generated: {graph.metadata.created}
             "json_type_to_python": json_type_to_python,
             "regex_search": regex_search,
             # Extract specific config values for convenience
-            "provider": step.config.get("provider", "openrouter"),
+            "provider": step.config.get("provider", "openai"),
             "model": step.config.get("model"),
             "system_prompt": step.config.get("system_prompt", ""),
             "user_prompt": step.config.get("user_prompt", ""),
@@ -303,6 +303,7 @@ Generated: {graph.metadata.created}
             "temperature": step.config.get("temperature", 0.7),
             "max_tokens": step.config.get("max_tokens"),
             "api_key_secret": step.config.get("api_key_secret"),
+            "base_url": step.config.get("base_url"),
         }
 
     def _extract_memory_refs(self, config: Dict[str, Any]) -> Set[str]:

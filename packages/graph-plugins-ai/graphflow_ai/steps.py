@@ -8,6 +8,7 @@ from graphflow_core.steps.registry import StepRegistry
 from graphflow_core.memory.store import MemoryStore
 
 
+@StepRegistry.register(category="ai", description="LLM call with tool support, prompts, and structured outputs")
 class LLMStep(StepBase):
     """
     LLM/Agent step - call an LLM with tools and structured outputs.
@@ -69,13 +70,24 @@ class LLMStep(StepBase):
                 # Provider configuration
                 "provider": {
                     "type": "string",
-                    "enum": ["openrouter", "openai", "anthropic", "azure", "custom"],
-                    "default": "openrouter",
+                    "enum": [
+                        "openai",           # OpenAI (base_url optional, defaults to api.openai.com)
+                        "anthropic",        # Anthropic (native)
+                        "ollama",           # Ollama (native, local)
+                        "lmstudio",         # LM Studio (native, local)
+                        "groq",             # Groq (native)
+                        "mistral",          # Mistral (native)
+                        "google",           # Google Gemini (native)
+                        "openrouter",       # OpenRouter (OpenAI-compatible with fixed base_url)
+                        "azure",            # Azure OpenAI (OpenAI-compatible, requires base_url)
+                        "openai_compatible" # Any OpenAI-compatible endpoint (requires base_url)
+                    ],
+                    "default": "openai",
                     "description": "LLM provider"
                 },
                 "model": {
                     "type": "string",
-                    "description": "Model identifier (e.g., 'gpt-4-turbo', 'anthropic/claude-3.5-sonnet')"
+                    "description": "Model identifier (e.g., 'gpt-4-turbo', 'claude-3-5-sonnet', 'llama3.2')"
                 },
                 "api_key_secret": {
                     "type": "string",
@@ -83,7 +95,7 @@ class LLMStep(StepBase):
                 },
                 "base_url": {
                     "type": "string",
-                    "description": "Custom base URL for API calls (for custom providers)"
+                    "description": "Custom base URL for API calls. Required for azure/openai_compatible. Optional for openai (defaults to api.openai.com), ollama (defaults to localhost:11434), lmstudio (defaults to localhost:1234/v1)."
                 },
 
                 # Prompts
@@ -240,14 +252,22 @@ class LLMStep(StepBase):
             errors.append(f"LLMStep {self.id}: temperature must be between 0 and 2")
 
         # Validate provider
-        provider = self.config.get("provider", "openrouter")
-        valid_providers = {"openrouter", "openai", "anthropic", "azure", "custom"}
+        provider = self.config.get("provider", "openai")
+        valid_providers = {
+            "openai", "anthropic", "ollama", "lmstudio", "groq",
+            "mistral", "google", "openrouter", "azure", "openai_compatible"
+        }
         if provider not in valid_providers:
             errors.append(f"LLMStep {self.id}: invalid provider '{provider}'")
 
-        # If custom provider, base_url is required
-        if provider == "custom" and not self.config.get("base_url"):
-            errors.append(f"LLMStep {self.id}: 'base_url' required for custom provider")
+        # azure and openai_compatible require base_url
+        if provider in ("azure", "openai_compatible") and not self.config.get("base_url"):
+            errors.append(f"LLMStep {self.id}: 'base_url' required for {provider} provider")
+
+        # Local providers (ollama, lmstudio) don't require API key
+        local_providers = {"ollama", "lmstudio"}
+        # Cloud providers require API key (via api_key_secret or environment)
+        cloud_providers = {"openai", "anthropic", "groq", "mistral", "google", "openrouter", "azure", "openai_compatible"}
 
         # Check outputs
         if not self.outputs or 'response' not in self.outputs:
@@ -345,6 +365,7 @@ class LLMStep(StepBase):
         return rendered
 
 
+@StepRegistry.register(category="ai", description="Wait for human input during execution")
 class HumanInputStep(StepBase):
     """
     Human input step - pause execution and wait for human input.

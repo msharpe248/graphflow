@@ -5,7 +5,22 @@ import sys
 from pathlib import Path
 import click
 from graphflow_core.models import GraphDefinition
+from graphflow_core.plugins.loader import PluginLoader
 from graphflow_compiler import compile_graph, CompilerRegistry
+
+
+def _load_plugins():
+    """Load all available GraphFlow plugins to register their steps."""
+    loader = PluginLoader()
+    plugins = loader.discover_plugins()
+
+    # Also try to import graphflow_ai directly if available
+    try:
+        import graphflow_ai
+    except ImportError:
+        pass
+
+    return plugins
 
 
 @click.group()
@@ -28,7 +43,8 @@ def cli():
         # Validate graph without compiling
         graphflow-compile validate graph.json
     """
-    pass
+    # Load plugins on CLI startup
+    _load_plugins()
 
 
 @cli.command()

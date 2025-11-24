@@ -1,6 +1,59 @@
 # LLM Tool Editor Feature - Implementation Plan
 
+## ✅ LLM Provider Enhancement (Completed)
+
+Before implementing the tool editor, the LLM provider system was enhanced to support multiple providers.
+
+### Supported Providers
+
+| Provider | Type | base_url | api_key | Notes |
+|----------|------|----------|---------|-------|
+| `openai` | Native | Optional | Required | Defaults to api.openai.com. Custom base_url for Azure/custom. |
+| `anthropic` | Native | - | Required | Uses `anthropic:model` in Pydantic AI |
+| `ollama` | OpenAI-compat | Optional | - | Defaults to localhost:11434. Local LLM. Uses OpenAI Provider API. |
+| `lmstudio` | OpenAI-compat | Optional | - | Defaults to localhost:1234/v1. Local LLM. |
+| `groq` | Native | - | Required | Uses `groq:model` in Pydantic AI |
+| `mistral` | Native | - | Required | Uses `mistral:model` in Pydantic AI |
+| `google` | Native | - | Required | Uses `google-gla:model` in Pydantic AI |
+| `openrouter` | OpenAI-compat | Fixed | Required | Fixed to openrouter.ai/api/v1 |
+| `azure` | OpenAI-compat | Required | Required | Azure OpenAI deployments |
+| `openai_compatible` | OpenAI-compat | Required | Required | Any OpenAI-compatible endpoint |
+
+### Implementation Notes (Pydantic AI v1.22.0)
+
+The Pydantic AI library v1.22.0 introduced breaking changes:
+- `OpenAIModel` renamed to `OpenAIChatModel`
+- `base_url` must be passed via `OpenAIProvider`, not directly to the model
+- `result.data` changed to `result.output`
+- Native `ollama:model` provider is broken - must use OpenAI-compatible endpoint instead
+
+For ollama, the implementation uses:
+```python
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+_provider = OpenAIProvider(base_url="http://localhost:11434/v1", api_key="ollama")
+model_ref = OpenAIChatModel("llama3.1", provider=_provider)
+```
+
+### Files Modified
+
+- `packages/graph-plugins-ai/graphflow_ai/steps.py` - Provider enum, validation, and @StepRegistry.register decorator
+- `packages/graph-plugins-ai/graphflow_ai/templates/llm/pydantic_ai.jinja` - Updated for Pydantic AI v1.22.0 API
+- `packages/graph-plugins-ai/graphflow_ai/templates/llm/langgraph.jinja` - LangGraph template with all providers
+- `packages/graph-compiler/graphflow_compiler/generators/langgraph.py` - Fixed `_generate_llm_step_code` for all providers
+- `packages/graph-compiler/graphflow_compiler/base.py` - Added `base_url` to template context
+- `packages/graph-compiler/graphflow_compiler/cli.py` - Added plugin loading on startup
+- `packages/graph-builder/src/utils/stepTypes.ts` - Frontend provider list
+
+### Tested
+
+- ✅ Pydantic AI with ollama (llama3.1)
+- ✅ LangGraph with ollama (llama3.1)
+
+---
+
 ## Overview
+
 Create a specialized editor for LLM steps that allows defining tools by mapping existing steps to tool definitions. Users can select which properties the LLM should control and which properties should be provided by the runtime environment (from memory or constants). This enables secure, controlled tool calling where sensitive information (credentials, URLs, etc.) remains hidden from the LLM.
 
 Tool definitions are stored in the graph JSON and compiled into framework-specific tool implementations (Pydantic AI, LangGraph/LangChain) at runtime.

@@ -30,11 +30,34 @@ class LangGraphGenerator(CodeGenerator):
         # Check if we need LangChain (for LLM steps)
         has_llm = any(step.type == "llm" for step in graph.steps)
         if has_llm:
-            imports.extend([
-                "from langchain_core.messages import HumanMessage, SystemMessage",
-                "from langchain_openai import ChatOpenAI",
-                "from langchain_anthropic import ChatAnthropic",
-            ])
+            imports.append("from langchain_core.messages import HumanMessage, SystemMessage")
+
+            # Check which providers are used and add appropriate imports
+            providers_used = {
+                step.config.get("provider", "openai")
+                for step in graph.steps
+                if step.type == "llm"
+            }
+
+            # OpenAI-compatible providers (openai, openrouter, azure, openai_compatible, lmstudio)
+            openai_compatible_providers = {"openai", "openrouter", "azure", "openai_compatible", "lmstudio"}
+            if providers_used & openai_compatible_providers:
+                imports.append("from langchain_openai import ChatOpenAI")
+
+            if "anthropic" in providers_used:
+                imports.append("from langchain_anthropic import ChatAnthropic")
+
+            if "ollama" in providers_used:
+                imports.append("from langchain_ollama import ChatOllama")
+
+            if "groq" in providers_used:
+                imports.append("from langchain_groq import ChatGroq")
+
+            if "mistral" in providers_used:
+                imports.append("from langchain_mistralai import ChatMistralAI")
+
+            if "google" in providers_used:
+                imports.append("from langchain_google_genai import ChatGoogleGenerativeAI")
 
         # Check if we need HTTP client
         has_http = any(step.type == "http" for step in graph.steps)
@@ -108,13 +131,22 @@ class LangGraphGenerator(CodeGenerator):
     def _generate_llm_step_code(self, step: Step, graph: GraphDefinition) -> str:
         """Generate LangGraph specific LLM step code."""
         config = step.config
-        provider = config.get("provider", "openrouter")
+        provider = config.get("provider", "openai")
         model = config.get("model")
         system_prompt = config.get("system_prompt", "")
         user_prompt = config.get("user_prompt", "")
-        output_key = config.get("output_key")
         temperature = config.get("temperature", 0.7)
-        max_tokens = config.get("max_tokens")
+        base_url = config.get("base_url")
+
+        # Extract output key from outputs dict
+        output_key = None
+        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        for key in ["response", "result"]:
+            if key in step.outputs:
+                match = pattern.search(step.outputs[key])
+                if match:
+                    output_key = match.group(1)
+                    break
 
         lines = [
             "# LLM step using LangChain",
@@ -123,13 +155,11 @@ class LangGraphGenerator(CodeGenerator):
 
         # Render prompts with state values
         lines.append("# Render prompts from state")
-        # Extract memory references from prompts
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
         memory_refs = set()
         for prompt in [system_prompt, user_prompt]:
             if prompt:
                 memory_refs.update(pattern.findall(prompt))
-        
+
         for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
             lines.append(f'{var_name} = state.get("{key}", "")')
@@ -139,14 +169,7 @@ class LangGraphGenerator(CodeGenerator):
         # Build prompt
         if user_prompt:
             lines.append(f'user_prompt_template = {repr(user_prompt)}')
-            # Extract memory references from prompts
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-        memory_refs = set()
-        for prompt in [system_prompt, user_prompt]:
-            if prompt:
-                memory_refs.update(pattern.findall(prompt))
-        
-        for key in sorted(memory_refs):
+            for key in sorted(memory_refs):
                 var_name = key.replace('.', '_')
                 lines.append(f'user_prompt_template = user_prompt_template.replace("{{memory.{key}}}", str({var_name}))')
         else:
@@ -157,26 +180,41 @@ class LangGraphGenerator(CodeGenerator):
         # Get API key from environment or state
         api_key_secret = config.get("api_key_secret")
         if api_key_secret:
-            lines.append(f'# API key should be in environment')
-            lines.append(f'import os')
+            lines.append('# API key from environment')
+            lines.append('import os')
             lines.append(f'api_key = os.getenv("{api_key_secret.upper()}", "")')
         else:
-            lines.append(f'api_key = None')
+            lines.append('api_key = None')
 
         lines.append("")
 
-        # Create LLM
+        # Create LLM based on provider
         lines.append("# Create LangChain LLM")
-        if provider == "anthropic":
+        if provider == "openai":
+            if base_url:
+                lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature}, base_url="{base_url}", api_key=api_key)')
+            else:
+                lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature})')
+        elif provider == "anthropic":
             lines.append(f'llm = ChatAnthropic(model="{model}", temperature={temperature})')
+        elif provider == "ollama":
+            ollama_url = base_url or "http://localhost:11434"
+            lines.append(f'llm = ChatOllama(model="{model}", temperature={temperature}, base_url="{ollama_url}")')
+        elif provider == "groq":
+            lines.append(f'llm = ChatGroq(model="{model}", temperature={temperature})')
+        elif provider == "mistral":
+            lines.append(f'llm = ChatMistralAI(model="{model}", temperature={temperature})')
+        elif provider == "google":
+            lines.append(f'llm = ChatGoogleGenerativeAI(model="{model}", temperature={temperature})')
+        elif provider == "lmstudio":
+            lmstudio_url = base_url or "http://localhost:1234/v1"
+            lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature}, base_url="{lmstudio_url}", api_key="lm-studio")')
         elif provider == "openrouter":
-            lines.append(f'llm = ChatOpenAI(')
-            lines.append(f'    model="{model}",')
-            lines.append(f'    temperature={temperature},')
-            lines.append(f'    openai_api_base="https://openrouter.ai/api/v1",')
-            lines.append(f'    openai_api_key=api_key,')
-            lines.append(f')')
+            lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature}, base_url="https://openrouter.ai/api/v1", api_key=api_key)')
+        elif provider in ["azure", "openai_compatible"]:
+            lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature}, base_url="{base_url}", api_key=api_key)')
         else:
+            # Default: treat as OpenAI
             lines.append(f'llm = ChatOpenAI(model="{model}", temperature={temperature})')
 
         lines.append("")
@@ -320,29 +358,20 @@ class LangGraphGenerator(CodeGenerator):
         result_key = step.config.get("result_key")
 
         lines = ["# Conditional step"]
-        # Extract memory references from prompts
+
+        # Extract memory references from condition
         pattern = re.compile(r'\{memory\.([^}]+)\}')
-        memory_refs = set()
-        for prompt in [system_prompt, user_prompt]:
-            if prompt:
-                memory_refs.update(pattern.findall(prompt))
-        
+        memory_refs = set(pattern.findall(condition or ""))
+
         for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
             lines.append(f'{var_name} = state.get("{key}", "")')
 
-        # Adjust condition for dotted keys
+        # Adjust condition to use local variables
         adjusted_condition = condition
-        # Extract memory references from prompts
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-        memory_refs = set()
-        for prompt in [system_prompt, user_prompt]:
-            if prompt:
-                memory_refs.update(pattern.findall(prompt))
-        
         for key in sorted(memory_refs):
-            if '.' in key:
-                adjusted_condition = adjusted_condition.replace(key, key.replace('.', '_'))
+            var_name = key.replace('.', '_')
+            adjusted_condition = adjusted_condition.replace(f'{{memory.{key}}}', var_name)
 
         lines.append(f'_condition_result = {adjusted_condition}')
         lines.append(f'state["{result_key}"] = bool(_condition_result)')
