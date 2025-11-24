@@ -34,7 +34,7 @@ class LangGraphGenerator(CodeGenerator):
 
             # Check which providers are used and add appropriate imports
             providers_used = {
-                step.config.get("provider", "openai")
+                step.config.get("provider", "ollama")
                 for step in graph.steps
                 if step.type == "llm"
             }
@@ -131,7 +131,7 @@ class LangGraphGenerator(CodeGenerator):
     def _generate_llm_step_code(self, step: Step, graph: GraphDefinition) -> str:
         """Generate LangGraph specific LLM step code."""
         config = step.config
-        provider = config.get("provider", "openai")
+        provider = config.get("provider", "ollama")
         model = config.get("model")
         system_prompt = config.get("system_prompt", "")
         user_prompt = config.get("user_prompt", "")

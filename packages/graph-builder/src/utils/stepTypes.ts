@@ -47,15 +47,17 @@ export const STEP_TYPES: Record<string, StepTypeInfo> = {
           'azure',            // Azure OpenAI (requires base_url)
           'openai_compatible' // Any OpenAI-compatible endpoint (requires base_url)
         ],
-        default: 'openai',
+        default: 'ollama',
       },
       model: {
         type: 'string',
-        description: 'Model name (e.g., gpt-4-turbo, claude-3-5-sonnet, llama3.2)',
+        default: 'llama3.1',
+        description: 'Model name (e.g., llama3.1, gpt-4-turbo, claude-3-5-sonnet)',
       },
       base_url: {
         type: 'string',
-        description: 'Custom base URL for API. Required for azure/openai_compatible. Optional for openai, ollama, lmstudio.',
+        default: 'http://localhost:11434',
+        description: 'Base URL for API calls. Defaults to localhost:11434 for Ollama.',
       },
       api_key_secret: {
         type: 'string',

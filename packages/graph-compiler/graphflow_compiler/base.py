@@ -294,7 +294,7 @@ Generated: {graph.metadata.created}
             "json_type_to_python": json_type_to_python,
             "regex_search": regex_search,
             # Extract specific config values for convenience
-            "provider": step.config.get("provider", "openai"),
+            "provider": step.config.get("provider", "ollama"),
             "model": step.config.get("model"),
             "system_prompt": step.config.get("system_prompt", ""),
             "user_prompt": step.config.get("user_prompt", ""),

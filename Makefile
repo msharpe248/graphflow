@@ -46,11 +46,11 @@ clean-install: clean install ## Clean everything and reinstall packages
 
 runtime-start: ## Start the GraphFlow runtime server
 	@echo "$(BLUE)Starting GraphFlow runtime...$(NC)"
-	@lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:8000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	graphflow-runtime > /tmp/graphflow-runtime.log 2>&1 &
 	@sleep 2
-	@if lsof -ti:8000 > /dev/null; then \
+	@if lsof -ti:8000 -sTCP:LISTEN > /dev/null; then \
 		echo "$(GREEN)✓ Runtime started on http://localhost:8000$(NC)"; \
 	else \
 		echo "$(RED)✗ Runtime failed to start. Check /tmp/graphflow-runtime.log$(NC)"; \
@@ -59,8 +59,8 @@ runtime-start: ## Start the GraphFlow runtime server
 
 runtime-stop: ## Stop the GraphFlow runtime server
 	@echo "$(BLUE)Stopping GraphFlow runtime...$(NC)"
-	@if lsof -ti:8000 > /dev/null 2>&1; then \
-		lsof -ti:8000 | xargs kill -9 2>/dev/null; \
+	@if lsof -ti:8000 -sTCP:LISTEN > /dev/null 2>&1; then \
+		lsof -ti:8000 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
 		echo "$(GREEN)✓ Runtime stopped$(NC)"; \
 	else \
 		echo "$(YELLOW)Runtime is not running$(NC)"; \
@@ -73,8 +73,8 @@ builder-start: ## Start the builder UI dev server
 	@echo "$(BLUE)Starting builder UI...$(NC)"
 	@cd packages/graph-builder && npm run dev > /tmp/vite-dev.log 2>&1 &
 	@sleep 3
-	@if lsof -ti:3000 > /dev/null 2>&1 || lsof -ti:3001 > /dev/null 2>&1; then \
-		PORT=$$(lsof -ti:3000 > /dev/null 2>&1 && echo "3000" || echo "3001"); \
+	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1 || lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
+		PORT=$$(lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1 && echo "3000" || echo "3001"); \
 		echo "$(GREEN)✓ Builder started on http://localhost:$$PORT$(NC)"; \
 	else \
 		echo "$(RED)✗ Builder failed to start. Check /tmp/vite-dev.log$(NC)"; \
@@ -83,11 +83,11 @@ builder-start: ## Start the builder UI dev server
 
 builder-stop: ## Stop the builder UI dev server
 	@echo "$(BLUE)Stopping builder UI...$(NC)"
-	@if lsof -ti:3000 > /dev/null 2>&1; then \
-		lsof -ti:3000 | xargs kill -9 2>/dev/null; \
+	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
+		lsof -ti:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
 		echo "$(GREEN)✓ Builder stopped (port 3000)$(NC)"; \
-	elif lsof -ti:3001 > /dev/null 2>&1; then \
-		lsof -ti:3001 | xargs kill -9 2>/dev/null; \
+	elif lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
+		lsof -ti:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
 		echo "$(GREEN)✓ Builder stopped (port 3001)$(NC)"; \
 	else \
 		echo "$(YELLOW)Builder is not running$(NC)"; \
@@ -109,16 +109,16 @@ status: ## Show status of runtime and builder
 	@echo "$(BLUE)GraphFlow Status:$(NC)"
 	@echo ""
 	@echo "Runtime (port 8000):"
-	@if lsof -ti:8000 > /dev/null 2>&1; then \
+	@if lsof -ti:8000 -sTCP:LISTEN > /dev/null 2>&1; then \
 		echo "  $(GREEN)✓ Running$(NC) (http://localhost:8000)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \
 	fi
 	@echo ""
 	@echo "Builder (port 3000/3001):"
-	@if lsof -ti:3000 > /dev/null 2>&1; then \
+	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
 		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3000)"; \
-	elif lsof -ti:3001 > /dev/null 2>&1; then \
+	elif lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
 		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3001)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \

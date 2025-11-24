@@ -82,12 +82,13 @@ class LLMStep(StepBase):
                         "azure",            # Azure OpenAI (OpenAI-compatible, requires base_url)
                         "openai_compatible" # Any OpenAI-compatible endpoint (requires base_url)
                     ],
-                    "default": "openai",
+                    "default": "ollama",
                     "description": "LLM provider"
                 },
                 "model": {
                     "type": "string",
-                    "description": "Model identifier (e.g., 'gpt-4-turbo', 'claude-3-5-sonnet', 'llama3.2')"
+                    "default": "llama3.1",
+                    "description": "Model identifier (e.g., 'llama3.1', 'gpt-4-turbo', 'claude-3-5-sonnet')"
                 },
                 "api_key_secret": {
                     "type": "string",
@@ -95,7 +96,8 @@ class LLMStep(StepBase):
                 },
                 "base_url": {
                     "type": "string",
-                    "description": "Custom base URL for API calls. Required for azure/openai_compatible. Optional for openai (defaults to api.openai.com), ollama (defaults to localhost:11434), lmstudio (defaults to localhost:1234/v1)."
+                    "default": "http://localhost:11434",
+                    "description": "Base URL for API calls. Defaults to localhost:11434 for Ollama. Change for other providers or remote servers."
                 },
 
                 # Prompts
@@ -252,7 +254,7 @@ class LLMStep(StepBase):
             errors.append(f"LLMStep {self.id}: temperature must be between 0 and 2")
 
         # Validate provider
-        provider = self.config.get("provider", "openai")
+        provider = self.config.get("provider", "ollama")
         valid_providers = {
             "openai", "anthropic", "ollama", "lmstudio", "groq",
             "mistral", "google", "openrouter", "azure", "openai_compatible"
