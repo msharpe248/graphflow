@@ -70,6 +70,7 @@ class MemoryResponse(BaseModel):
     config: dict = {}
     environment: dict = {}
     secrets: dict = {}
+    execution_log: list = []
 
 
 class HealthResponse(BaseModel):
@@ -266,13 +267,14 @@ async def start_run(
             db_session.close()
 
     # Define error callback
-    async def on_error(run_id: str, error: str):
+    async def on_error(run_id: str, error: str, execution_log: list = None):
         db_session = next(get_db())
         try:
             run_record = db_session.query(AgentRun).filter(AgentRun.id == run_id).first()
             if run_record:
                 run_record.status = "failed"
                 run_record.error = error
+                run_record.execution_log = execution_log or []
                 run_record.completed_at = datetime.utcnow()
                 db_session.commit()
         finally:
@@ -397,14 +399,21 @@ async def get_memory(
     if not run:
         raise HTTPException(404, f"Run not found: {run_id}")
 
-    # Get memory state
-    memory_state = exec.get_memory_state(run_id)
-    if memory_state is None:
+    # Get memory store and state
+    memory = exec.get_memory(run_id)
+    if memory is None:
         raise HTTPException(404, f"Memory not available (run may have completed or been released)")
+
+    memory_state = memory.to_dict()
+
+    # Get execution log if available (LoggingMemoryStore has get_log method)
+    execution_log = []
+    if hasattr(memory, 'get_log'):
+        execution_log = memory.get_log()
 
     # Flatten the nested structure from to_dict()
     # to_dict() returns: {"memory": {"inputs": ..., "outputs": ..., "intermediate": ...}, "config": ..., "environment": ..., "secrets": ...}
-    # API expects: {"inputs": ..., "outputs": ..., "intermediate": ..., "config": ..., "environment": ..., "secrets": ...}
+    # API expects: {"inputs": ..., "outputs": ..., "intermediate": ..., "config": ..., "environment": ..., "secrets": ..., "execution_log": ...}
     flattened = {
         "inputs": memory_state.get("memory", {}).get("inputs", {}),
         "outputs": memory_state.get("memory", {}).get("outputs", {}),
@@ -412,6 +421,7 @@ async def get_memory(
         "config": memory_state.get("config", {}),
         "environment": memory_state.get("environment", {}),
         "secrets": memory_state.get("secrets", {}),
+        "execution_log": execution_log,
     }
 
     return flattened

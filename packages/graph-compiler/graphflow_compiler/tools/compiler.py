@@ -172,20 +172,17 @@ class ToolCompiler:
         lines.append(f'    )')
         lines.append(f'')
 
-        # Use the main memory store directly for tool execution
-        # This allows tools to access intermediate memory and write results
-        lines.append(f'    await step.execute(memory)')
-        lines.append(f'')
-
-        # Extract result
-        lines.append(f'    # Extract and return result')
-        lines.append(f'    result = memory.read("tool_result")')
-
-        # Apply output transform if specified
+        # Execute step with error handling - return errors to LLM instead of raising
+        lines.append(f'    try:')
+        lines.append(f'        await step.execute(memory)')
+        lines.append(f'        result = memory.read("tool_result")')
         if tool.output_transform:
-            lines.append(f'    # Apply output transform')
-            lines.append(f'    result = {tool.output_transform}')
-
+            lines.append(f'        # Apply output transform')
+            lines.append(f'        result = {tool.output_transform}')
+        lines.append(f'    except Exception as e:')
+        lines.append(f'        # Return error to LLM so it can adapt')
+        lines.append(f'        result = f"Error: {{type(e).__name__}}: {{str(e)}}"')
+        lines.append(f'')
         lines.append(f'    return result')
 
         return "\n".join(lines)
@@ -265,19 +262,17 @@ class ToolCompiler:
         lines.append(f'{ind}    )')
         lines.append(f'{ind}')
 
-        # Execute with shared memory (captured from closure)
-        lines.append(f'{ind}    await step.execute(memory)')
-        lines.append(f'{ind}')
-
-        # Extract result
-        lines.append(f'{ind}    # Extract and return result')
-        lines.append(f'{ind}    result = memory.read("tool_result")')
-
-        # Apply output transform if specified
+        # Execute step with error handling - return errors to LLM instead of raising
+        lines.append(f'{ind}    try:')
+        lines.append(f'{ind}        await step.execute(memory)')
+        lines.append(f'{ind}        result = memory.read("tool_result")')
         if tool.output_transform:
-            lines.append(f'{ind}    # Apply output transform')
-            lines.append(f'{ind}    result = {tool.output_transform}')
-
+            lines.append(f'{ind}        # Apply output transform')
+            lines.append(f'{ind}        result = {tool.output_transform}')
+        lines.append(f'{ind}    except Exception as e:')
+        lines.append(f'{ind}        # Return error to LLM so it can adapt')
+        lines.append(f'{ind}        result = f"Error: {{type(e).__name__}}: {{str(e)}}"')
+        lines.append(f'{ind}')
         lines.append(f'{ind}    return result')
 
         return "\n".join(lines)

@@ -1,0 +1,120 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Ollama HTTP Tool Agent",
+    "description": "Agent using Ollama (llama3.1) with HTTP fetch tool for web requests",
+    "created": "2025-11-27T00:00:00Z",
+    "framework_hints": [
+      "pydantic_ai",
+      "langgraph"
+    ],
+    "tags": [
+      "example",
+      "ollama",
+      "tools",
+      "http"
+    ]
+  },
+  "memory": {
+    "inputs": {
+      "user_request": {
+        "type": "string",
+        "description": "User's question that may require fetching web content",
+        "required": true
+      }
+    },
+    "outputs": {
+      "answer": {
+        "type": "string",
+        "description": "The response from the LLM"
+      }
+    },
+    "intermediate": {
+      "llm_response": {
+        "type": "string",
+        "description": "Raw response from LLM"
+      },
+      "tool_calls": {
+        "type": "array",
+        "description": "Tool calls made by the LLM"
+      }
+    },
+    "secrets": {}
+  },
+  "steps": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "config": {},
+      "outputs": {},
+      "description": "Entry point"
+    },
+    {
+      "id": "llm_1",
+      "type": "llm",
+      "config": {
+        "provider": "ollama",
+        "model": "llama3.1",
+        "base_url": "http://localhost:11434",
+        "system_prompt": "You are a helpful assistant that can fetch content from URLs. When the user asks about a webpage or needs information from a URL, use the fetch_url tool to retrieve it. After fetching, summarize or extract the relevant information for the user.",
+        "user_prompt": "{memory.user_request}",
+        "tools": [
+          {
+            "type": "mapped_step",
+            "definition": {
+              "id": "fetch_tool",
+              "name": "fetch_url",
+              "description": "Fetch content from a URL. Use this when you need to retrieve information from a webpage.",
+              "source_step_type": "http.HTTPGetStep",
+              "property_mappings": [
+                {
+                  "source_property": "url",
+                  "visibility": "llm",
+                  "llm_parameter_name": "url",
+                  "llm_description": "The URL to fetch content from",
+                  "llm_schema": {
+                    "type": "string"
+                  },
+                  "required": true
+                }
+              ],
+              "output_key": "response"
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "temperature": 0.7
+      },
+      "outputs": {
+        "response": "{memory.llm_response}",
+        "tool_calls": "{memory.tool_calls}"
+      },
+      "description": "Call Ollama LLM with HTTP fetch tool"
+    },
+    {
+      "id": "output_1",
+      "type": "output",
+      "config": {
+        "mapping": {
+          "answer": "llm_response"
+        }
+      },
+      "outputs": {
+        "answer": "{memory.llm_response}"
+      },
+      "description": "Map LLM response to output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "from": "start_1",
+      "to": "llm_1"
+    },
+    {
+      "id": "edge_2",
+      "from": "llm_1",
+      "to": "output_1"
+    }
+  ]
+}

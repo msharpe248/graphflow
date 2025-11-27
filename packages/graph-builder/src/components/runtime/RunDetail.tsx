@@ -460,12 +460,22 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
         ) : (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Execution Log</h3>
-            {run.execution_log && run.execution_log.length > 0 ? (
+            {(() => {
+              // Use live execution log from memory if available (during active run), otherwise use persisted run log
+              const executionLog = (memory?.execution_log && memory.execution_log.length > 0)
+                ? memory.execution_log
+                : run.execution_log;
+
+              if (!executionLog || executionLog.length === 0) {
+                return <p className="text-sm text-gray-500">No execution log available</p>;
+              }
+
+              return (
               <div className="space-y-3 min-w-0">
                 {(() => {
                   // Group entries by step
-                  const stepGroups = new Map<string, typeof run.execution_log>();
-                  run.execution_log.forEach((entry) => {
+                  const stepGroups = new Map<string, typeof executionLog>();
+                  executionLog.forEach((entry) => {
                     const stepId = entry.step_id || 'unknown';
                     if (!stepGroups.has(stepId)) {
                       stepGroups.set(stepId, []);
@@ -652,13 +662,8 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                   });
                 })()}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">
-                {run.status === 'completed'
-                  ? 'No execution log available for this run'
-                  : 'Execution log will appear when the run completes'}
-              </p>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>

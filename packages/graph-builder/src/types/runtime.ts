@@ -42,6 +42,12 @@ export interface MemoryState {
   inputs: Record<string, any>;
   outputs: Record<string, any>;
   intermediate: Record<string, any>;
+  config?: Record<string, any>;
+  environment?: Record<string, any>;
+  secrets?: Record<string, any>;
+  execution_log?: ExecutionLogEntry[];
+  // Index signature for dynamic namespace access
+  [key: string]: Record<string, any> | ExecutionLogEntry[] | undefined;
 }
 
 export interface CreateAgentRequest {

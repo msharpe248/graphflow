@@ -141,9 +141,15 @@ class AsyncExecutor:
             raise
 
         except Exception as e:
-            # Error during execution
+            # Error during execution - still try to get execution log
+            execution_log = []
+            if agent and hasattr(agent, 'get_execution_log'):
+                try:
+                    execution_log = agent.get_execution_log()
+                except Exception:
+                    pass  # Ignore errors getting log
             if on_error:
-                await on_error(run_id, str(e))
+                await on_error(run_id, str(e), execution_log)
             raise
 
         finally:
