@@ -11,6 +11,7 @@ import MarkdownEditor from './MarkdownEditor';
 import DatePicker from './DatePicker';
 import TimeEditor from './TimeEditor';
 import DateTimePicker from './DateTimePicker';
+import ToolEditor from './ToolEditor';
 
 // Registry of all available editors
 const EDITOR_REGISTRY: Record<string, EditorConfig> = {
@@ -60,6 +61,10 @@ const EDITOR_REGISTRY: Record<string, EditorConfig> = {
   },
   'datetime': {
     component: DateTimePicker,
+    displayMode: 'inline',
+  },
+  'tools': {
+    component: ToolEditor,
     displayMode: 'inline',
   },
 };

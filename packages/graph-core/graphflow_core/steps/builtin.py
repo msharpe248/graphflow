@@ -15,6 +15,9 @@ class StartStep(StepBase):
     This step performs no operations and is used as the starting node.
     """
 
+    can_be_tool = False
+    tool_ineligible_reason = "Entry point steps cannot be used as tools"
+
     @classmethod
     def get_type(cls) -> str:
         return "start"
@@ -50,6 +53,9 @@ class OutputStep(StepBase):
     Outputs dict maps output names to memory locations using {memory.variable} syntax.
     Example: {"answer": "{memory.llm_response}", "score": "{memory.confidence}"}
     """
+
+    can_be_tool = False
+    tool_ineligible_reason = "Output mapping steps cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:
@@ -133,6 +139,9 @@ class ConditionalStep(StepBase):
     The condition expression can reference memory keys using {memory.variable}.
     Example: "{memory.score} > 0.8 and {memory.status} == 'ready'"
     """
+
+    can_be_tool = False
+    tool_ineligible_reason = "Control flow steps cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:
@@ -244,6 +253,8 @@ class TransformStep(StepBase):
     The code should return a value that will be written to the output location.
     Memory references in code using {memory.variable} will be available as variables.
     """
+
+    can_be_tool = True  # Transform steps can be wrapped as LLM tools
 
     @classmethod
     def get_type(cls) -> str:
@@ -362,6 +373,9 @@ class JoinStep(StepBase):
         wait_for: List[str] - Step IDs that must complete before this step executes
     """
 
+    can_be_tool = False
+    tool_ineligible_reason = "Synchronization steps cannot be used as tools"
+
     @classmethod
     def get_type(cls) -> str:
         return "join"
@@ -422,6 +436,8 @@ class ReadMemoryStep(StepBase):
 
     name = "Read Memory"
     label = "Read Memory"
+    can_be_tool = False
+    tool_ineligible_reason = "Memory operations cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:
@@ -520,6 +536,8 @@ class WriteMemoryStep(StepBase):
 
     name = "Write Memory"
     label = "Write Memory"
+    can_be_tool = False
+    tool_ineligible_reason = "Memory operations cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:
@@ -627,6 +645,8 @@ class SleepStep(StepBase):
 
     name = "Sleep"
     label = "Sleep"
+    can_be_tool = False
+    tool_ineligible_reason = "Timing/delay steps cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:

@@ -170,12 +170,12 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
       <div className="p-4 border-b border-gray-200 space-y-3 shrink-0">
         <h2 className="text-lg font-bold text-gray-900">Palette</h2>
 
-        {/* Main Tabs: Steps vs Shapes */}
+        {/* Main Tabs: Steps, Shapes */}
         <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
           <button
             onClick={() => setMainTab('steps')}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
+              flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-sm font-medium transition-colors
               ${
                 mainTab === 'steps'
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -183,13 +183,13 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
               }
             `}
           >
-            <Package className="w-4 h-4" />
+            <Package size={16} />
             Steps
           </button>
           <button
             onClick={() => setMainTab('shapes')}
             className={`
-              flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
+              flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-sm font-medium transition-colors
               ${
                 mainTab === 'shapes'
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -197,7 +197,7 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
               }
             `}
           >
-            <Shapes className="w-4 h-4" />
+            <Shapes size={16} />
             Shapes
           </button>
         </div>
@@ -252,23 +252,25 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {mainTab === 'steps' ? (
           // Steps List
-          Object.keys(filteredSteps).length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-500">
-                {searchQuery ? 'No steps found matching your search.' : 'No steps available.'}
-              </p>
-            </div>
-          ) : (
-            Object.entries(filteredSteps).map(([groupName, steps]) =>
-              steps.length > 0 ? renderGroup(groupName, steps) : null
-            )
-          )
+          <div className="p-4">
+            {Object.keys(filteredSteps).length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">
+                  {searchQuery ? 'No steps found matching your search.' : 'No steps available.'}
+                </p>
+              </div>
+            ) : (
+              Object.entries(filteredSteps).map(([groupName, steps]) =>
+                steps.length > 0 ? renderGroup(groupName, steps) : null
+              )
+            )}
+          </div>
         ) : (
           // Shapes List
-          <div className="space-y-2">
+          <div className="p-4 space-y-2">
             {/* Rectangle */}
             <div
               draggable

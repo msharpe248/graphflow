@@ -54,6 +54,7 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
           inputsSchema: step.inputs_schema,
           outputsSchema: step.outputs_schema,
           uiComponent: step.ui_component,
+          can_be_tool: step.can_be_tool,
         };
       }
 

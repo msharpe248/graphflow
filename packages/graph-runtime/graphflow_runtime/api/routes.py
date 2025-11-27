@@ -7,10 +7,11 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from graphflow_core.models import GraphDefinition
+from graphflow_core.models import GraphDefinition, ToolDefinition
 from graphflow_runtime.storage.models import Agent, AgentRun
 from graphflow_runtime.executor.async_executor import AsyncExecutor
 from graphflow_core.plugins.manager import PluginManager
+from graphflow_core.steps.registry import StepRegistry
 
 # Router
 router = APIRouter()
@@ -90,6 +91,8 @@ class StepTypeResponse(BaseModel):
     inputs_schema: dict
     outputs_schema: dict
     ui_component: Optional[str]
+    can_be_tool: bool = False
+    tool_ineligible_reason: Optional[str] = None
 
 
 class PluginResponse(BaseModel):
@@ -679,3 +682,133 @@ async def get_debug_state(
         raise HTTPException(404, "Debug state not available (run may have completed)")
 
     return state
+
+
+# Tool endpoints
+
+class ToolValidationResponse(BaseModel):
+    """Response from tool validation."""
+    valid: bool
+    errors: List[str] = []
+    warnings: List[str] = []
+
+
+@router.post("/tools/validate", response_model=ToolValidationResponse)
+async def validate_tool(
+    tool: ToolDefinition,
+    pm: PluginManager = Depends(get_plugin_manager)
+):
+    """
+    Validate a tool definition.
+
+    Checks:
+    - Source step exists and is tool-eligible
+    - All required properties are mapped
+    - Memory bindings are valid syntax
+    - LLM parameters have valid schemas
+    """
+    errors = []
+    warnings = []
+
+    # Check source step exists
+    all_steps = pm.get_all_steps()
+    if tool.source_step_type not in all_steps:
+        errors.append(f"Source step type '{tool.source_step_type}' not found")
+        return ToolValidationResponse(valid=False, errors=errors)
+
+    step_metadata = all_steps[tool.source_step_type]
+
+    # Check step is tool-eligible
+    if not step_metadata.get("can_be_tool", False):
+        reason = step_metadata.get("tool_ineligible_reason", "This step cannot be used as a tool")
+        errors.append(f"Step '{tool.source_step_type}' is not tool-eligible: {reason}")
+        return ToolValidationResponse(valid=False, errors=errors)
+
+    # Get step's config schema
+    config_schema = step_metadata.get("config_schema", {})
+    schema_properties = config_schema.get("properties", {})
+    required_properties = set(config_schema.get("required", []))
+
+    # Check property mappings
+    mapped_properties = set()
+    for mapping in tool.property_mappings:
+        mapped_properties.add(mapping.source_property)
+
+        # Validate property exists in step schema
+        if mapping.source_property not in schema_properties:
+            warnings.append(
+                f"Property '{mapping.source_property}' not found in step schema "
+                f"(may be a dynamic property)"
+            )
+
+        # Validate runtime value syntax
+        if mapping.visibility == "runtime":
+            if mapping.runtime_value:
+                # Check for valid memory binding syntax
+                if mapping.runtime_value.startswith("{") and not mapping.runtime_value.startswith("{memory."):
+                    if not any(mapping.runtime_value.startswith(f"{{{ns}.") for ns in ["config", "env", "secrets"]):
+                        warnings.append(
+                            f"Property '{mapping.source_property}' has unusual binding syntax: "
+                            f"{mapping.runtime_value}"
+                        )
+            else:
+                errors.append(
+                    f"Runtime property '{mapping.source_property}' has no value specified"
+                )
+
+        # Validate LLM parameter
+        if mapping.visibility == "llm":
+            if not mapping.llm_description:
+                warnings.append(
+                    f"LLM parameter '{mapping.source_property}' has no description "
+                    f"(recommended for better LLM understanding)"
+                )
+
+    # Check for unmapped required properties
+    unmapped_required = required_properties - mapped_properties
+    if unmapped_required:
+        errors.append(
+            f"Required properties not mapped: {', '.join(sorted(unmapped_required))}"
+        )
+
+    # Validate tool has at least one LLM parameter
+    llm_params = [m for m in tool.property_mappings if m.visibility == "llm"]
+    if not llm_params:
+        warnings.append(
+            "Tool has no LLM-controlled parameters. "
+            "Consider if this tool needs any input from the LLM."
+        )
+
+    return ToolValidationResponse(
+        valid=len(errors) == 0,
+        errors=errors,
+        warnings=warnings
+    )
+
+
+@router.get("/steps/{step_type}/schema")
+async def get_step_schema(
+    step_type: str,
+    pm: PluginManager = Depends(get_plugin_manager)
+):
+    """
+    Get detailed schema for a specific step type.
+
+    Useful for building tool property mappings - returns the full
+    config schema so the UI can show available properties.
+    """
+    all_steps = pm.get_all_steps()
+
+    if step_type not in all_steps:
+        raise HTTPException(404, f"Step type '{step_type}' not found")
+
+    step_metadata = all_steps[step_type]
+
+    return {
+        "type": step_type,
+        "config_schema": step_metadata.get("config_schema", {}),
+        "inputs_schema": step_metadata.get("inputs_schema", {}),
+        "outputs_schema": step_metadata.get("outputs_schema", {}),
+        "can_be_tool": step_metadata.get("can_be_tool", False),
+        "tool_ineligible_reason": step_metadata.get("tool_ineligible_reason"),
+    }

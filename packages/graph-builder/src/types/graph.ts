@@ -113,6 +113,8 @@ export interface StepTypeInfo {
   inputsSchema?: Record<string, any>;
   outputsSchema?: Record<string, any>;
   uiComponent?: string;
+  /** Whether this step type can be used as a tool by LLM steps */
+  can_be_tool?: boolean;
 }
 
 // ReactFlow node types

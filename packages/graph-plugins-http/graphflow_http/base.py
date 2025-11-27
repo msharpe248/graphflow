@@ -14,6 +14,7 @@ class BaseHTTPStep(StepBase, ABC):
     """Base class for HTTP steps with shared functionality."""
 
     category = "http"
+    can_be_tool = True  # All HTTP steps can be wrapped as LLM tools
 
     def _render_template(self, template: str, memory: MemoryStore) -> str:
         """

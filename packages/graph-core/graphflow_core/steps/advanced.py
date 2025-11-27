@@ -24,6 +24,9 @@ class LoopStep(StepBase):
     which processes the subgraph defined within the loop.
     """
 
+    can_be_tool = False
+    tool_ineligible_reason = "Control flow steps cannot be used as tools"
+
     @classmethod
     def get_type(cls) -> str:
         return "loop"
@@ -131,6 +134,8 @@ class DBQueryStep(StepBase):
             "results_key": "users"
         }
     """
+
+    can_be_tool = True  # Database queries can be wrapped as LLM tools
 
     @classmethod
     def get_type(cls) -> str:

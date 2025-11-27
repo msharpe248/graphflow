@@ -57,6 +57,8 @@ class LLMStep(StepBase):
 
     label = "LLM"
     description = "LLM call with tool support, prompts, and structured outputs"
+    can_be_tool = False
+    tool_ineligible_reason = "Nested agent tools not yet supported (planned for future release)"
 
     @classmethod
     def get_type(cls) -> str:
@@ -119,7 +121,8 @@ class LLMStep(StepBase):
                             {"type": "object"}   # Inline tool definition
                         ]
                     },
-                    "description": "List of tools available to the LLM"
+                    "description": "List of tools available to the LLM",
+                    "x-editor": "tools"
                 },
                 "tool_choice": {
                     "type": "string",
@@ -392,6 +395,8 @@ class HumanInputStep(StepBase):
 
     label = "Human Input"
     description = "Wait for human input during execution"
+    can_be_tool = False
+    tool_ineligible_reason = "Human input steps require runtime pause and cannot be used as tools"
 
     @classmethod
     def get_type(cls) -> str:

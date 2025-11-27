@@ -3,6 +3,7 @@
 from graphflow_compiler.compiler import compile_graph, CompilerRegistry
 from graphflow_compiler.generators.pydantic_ai import PydanticAIGenerator
 from graphflow_compiler.generators.langgraph import LangGraphGenerator
+from graphflow_compiler.tools.compiler import ToolCompiler
 
 # Register built-in generators
 CompilerRegistry.register("pydantic_ai", PydanticAIGenerator)
@@ -15,4 +16,5 @@ __all__ = [
     "CompilerRegistry",
     "PydanticAIGenerator",
     "LangGraphGenerator",
+    "ToolCompiler",
 ]

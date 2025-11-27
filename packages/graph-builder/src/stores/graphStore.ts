@@ -610,7 +610,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       to: edge.target,
     }));
 
-    const currentGraph = {
+    const currentGraph: GraphDefinition = {
       version: '1.0',
       metadata: state.metadata,
       memory: state.memory,
@@ -640,7 +640,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     return currentGraph;
   },
 
-  clearGraph: () =>
+  clearGraph: () => {
     set({
       metadata: {
         name: 'Untitled Graph',
@@ -661,7 +661,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedNodeId: null,
       selectedShapeId: null,
       lastSavedState: null,
-    }),
+    });
+  },
 
   // Validation
   validateGraph: () => {

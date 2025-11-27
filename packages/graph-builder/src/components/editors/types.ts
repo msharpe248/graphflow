@@ -6,6 +6,7 @@ export interface EditorProps {
   schema: Record<string, any>;
   isMemoryBound?: boolean;
   onToggleBinding?: () => void;
+  stepId?: string;  // Parent step ID for generating memory bindings
 }
 
 export type EditorType = 'string' | 'number' | 'boolean' | 'json' | 'keyvalue' | 'color' | 'markdown';

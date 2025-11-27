@@ -42,7 +42,7 @@ export default function BuilderView() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar - Step palette */}
-        <div className="w-64 shrink-0">
+        <div className="w-72 shrink-0">
           <StepPalette onDragStart={onDragStart} onShapeDragStart={onShapeDragStart} />
         </div>
 

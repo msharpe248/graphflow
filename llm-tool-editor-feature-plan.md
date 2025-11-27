@@ -126,7 +126,7 @@ class SetVariableStep(StepBase):
 
 class LLMStep(StepBase):
     can_be_tool = False
-    tool_ineligible_reason = "LLM steps cannot call other LLM steps as tools"
+    tool_ineligible_reason = "Nested agent tools not yet supported (planned for future release)"
 ```
 
 **1.3 API Exposure** (`packages/graph-runtime/graphflow_runtime/api/routes.py`)
@@ -760,20 +760,37 @@ const importTool = (file: File) => {
 
 ## Implementation Phases
 
-### Phase 1: Step Eligibility & Schema API
-1. Add `can_be_tool` flag to `StepBase`
-2. Mark all existing steps appropriately
-3. Update `/api/v1/steps` endpoint to include flag
-4. Add `/api/v1/steps/{type}/schema` endpoint
-5. Add `/api/v1/tools/validate` endpoint
-6. Test with Postman/curl
+### Phase 1: Step Eligibility & Schema API ✅ COMPLETED
+1. ✅ Add `can_be_tool` flag to `StepBase`
+2. ✅ Mark all existing steps appropriately
+3. ✅ Update `/api/v1/steps` endpoint to include flag
+4. ✅ Add `/api/v1/steps/{type}/schema` endpoint
+5. ✅ Add `/api/v1/tools/validate` endpoint
+6. ✅ Test with curl/Python
 
-### Phase 2: Tool Compiler
-1. Create `ToolCompiler` class
-2. Implement Pydantic AI tool generation
-3. Implement LangChain tool generation (if needed)
-4. Add unit tests for generated code
-5. Test with sample tool definitions
+**Tool-Eligible Steps (7 total):**
+- `transform` - Python code transformations
+- `db_query` - Database queries
+- `http.HTTPGetStep` - HTTP GET requests
+- `http.HTTPPostStep` - HTTP POST requests
+- `http.HTTPPutStep` - HTTP PUT requests
+- `http.HTTPPatchStep` - HTTP PATCH requests
+- `http.HTTPDeleteStep` - HTTP DELETE requests
+
+**Not Tool-Eligible:**
+- `start`, `output` - Entry/exit points
+- `conditional`, `join`, `loop` - Control flow
+- `read-memory`, `write-memory` - Memory operations
+- `sleep` - Timing/delay
+- `llm` - Nested agents (planned for future)
+- `human_input` - Requires runtime pause
+
+### Phase 2: Tool Compiler ✅ COMPLETED
+1. ✅ Create `ToolCompiler` class
+2. ✅ Implement Pydantic AI tool generation
+3. ✅ Implement LangGraph tool generation
+4. ✅ Create `ToolDefinition` and `ToolPropertyMapping` models
+5. ✅ Test with sample tool definitions
 
 ### Phase 3: Compiler Integration
 1. Update `PydanticAIGenerator` to extract tools
@@ -860,10 +877,10 @@ Steps that should be tools:
 - Custom code execution
 - Retrieval operations (search, query)
 
-Steps that should NOT be tools:
+Steps that should NOT be tools (currently):
 - Control flow (if/else, loops, switches)
 - Memory operations (set variable, clear memory)
-- Other LLM steps (no nested LLM calls)
+- LLM steps (nested agents deferred - see "Nested Agents" section below)
 - Graph control (wait, timeout, error handling)
 
 ### Advanced Features (Future)
@@ -873,6 +890,75 @@ Steps that should NOT be tools:
 - **Tool categories**: Organize tools by function
 - **Tool templates**: Pre-built tools for common use cases
 - **Tool versioning**: Track changes to tool definitions
+
+### Nested Agents (LLM as Tool) - Future Consideration
+
+Currently, LLM steps are marked as not tool-eligible. However, nested agents (one LLM calling another as a tool) is a valid and powerful pattern for multi-agent systems.
+
+**Use Cases:**
+- Specialist agents (one agent for code, another for research)
+- Hierarchical agent systems (manager agent delegates to workers)
+- Chain-of-thought decomposition (break complex tasks into sub-agents)
+
+**Implementation Considerations:**
+
+1. **Prompt as Parameter**
+   - Should outer agent control `user_prompt`? Likely yes - this is the "task" given to inner agent
+   - `system_prompt` probably runtime-provided (defines the inner agent's persona)
+
+2. **Model Selection**
+   - Can outer agent pick which model inner agent uses?
+   - Probably not - this should be runtime-configured for cost/capability control
+   - Could expose as read-only context
+
+3. **Recursion Guard**
+   - Prevent infinite loops: agent A calls agent B which calls agent A
+   - Options: max depth counter, call graph analysis, agent ID tracking
+   - Should be enforced at runtime, not just compile time
+
+4. **Context Passing**
+   - How much memory/context flows between agents?
+   - Options: full memory copy, explicit subset, or fresh memory
+   - Consider memory size limits for nested calls
+
+5. **Cost Awareness**
+   - Nested LLM calls can be expensive (tokens compound)
+   - Consider: max token budget per tool call, cost tracking
+   - UI should show estimated cost impact
+
+6. **Tool Definition for LLM Step**
+   ```json
+   {
+     "name": "research_assistant",
+     "description": "Delegate research tasks to a specialized agent",
+     "source_step_type": "llm",
+     "property_mappings": [
+       {
+         "source_property": "user_prompt",
+         "visibility": "llm",
+         "llm_parameter_name": "task",
+         "llm_description": "Research task to delegate"
+       },
+       {
+         "source_property": "system_prompt",
+         "visibility": "runtime",
+         "runtime_value": "You are a research assistant..."
+       },
+       {
+         "source_property": "model",
+         "visibility": "runtime",
+         "runtime_value": "gpt-4"
+       },
+       {
+         "source_property": "max_tokens",
+         "visibility": "runtime",
+         "runtime_value": "2000"
+       }
+     ]
+   }
+   ```
+
+**Status:** Deferred - infrastructure ready (can flip `can_be_tool = True` when needed)
 
 ## Files to Create
 

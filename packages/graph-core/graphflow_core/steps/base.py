@@ -14,6 +14,13 @@ class StepBase(ABC):
     the memory store. The execution logic is defined in the execute() method.
     """
 
+    # Tool eligibility: whether this step can be wrapped as an LLM tool
+    # Override in subclasses to allow/disallow tool usage
+    can_be_tool: bool = False
+
+    # Human-readable reason if step cannot be used as a tool
+    tool_ineligible_reason: Optional[str] = None
+
     def __init__(
         self,
         id: str,

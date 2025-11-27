@@ -565,6 +565,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                                 value={memoryValue !== undefined ? memoryValue : (schema.default ?? '')}
                                 onChange={(newValue) => updateMemoryValue(currentValue, newValue)}
                                 schema={schema}
+                                stepId={step.id}
                               />
                             );
                           })()}
@@ -579,6 +580,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                             value={step.config[key] ?? schema.default}
                             onChange={(newValue) => handleConfigChange(key, newValue)}
                             schema={schema}
+                            stepId={step.id}
                           />
                         );
                       })()}
@@ -661,6 +663,7 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
                                 value={outputMemoryValue !== undefined ? outputMemoryValue : (outputSchema.default ?? '')}
                                 onChange={(newValue) => updateMemoryValue(outputValue, newValue)}
                                 schema={outputSchema}
+                                stepId={step.id}
                               />
                             );
                           })()}

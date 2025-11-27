@@ -305,6 +305,8 @@ class PluginManager:
                     "inputs_schema": step_class.get_inputs_schema() if hasattr(step_class, "get_inputs_schema") else {},
                     "outputs_schema": step_class.get_outputs_schema() if hasattr(step_class, "get_outputs_schema") else {},
                     "ui_component": None,
+                    "can_be_tool": getattr(step_class, "can_be_tool", False),
+                    "tool_ineligible_reason": getattr(step_class, "tool_ineligible_reason", None),
                 }
             except Exception as e:
                 logger.warning(f"Could not get metadata for step '{step_type}': {e}")
@@ -344,6 +346,8 @@ class PluginManager:
                     "inputs_schema": step_class.get_inputs_schema() if hasattr(step_class, "get_inputs_schema") else {},
                     "outputs_schema": step_class.get_outputs_schema() if hasattr(step_class, "get_outputs_schema") else {},
                     "ui_component": plugin_info.ui_components.get(step_class_name),
+                    "can_be_tool": getattr(step_class, "can_be_tool", False),
+                    "tool_ineligible_reason": getattr(step_class, "tool_ineligible_reason", None),
                 }
 
         return all_steps
