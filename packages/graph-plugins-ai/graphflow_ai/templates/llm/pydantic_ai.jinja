@@ -1,5 +1,12 @@
 # LLM step using Pydantic AI
 
+{% if tool_imports %}
+# Tool imports
+{% for imp in tool_imports %}
+{{ imp }}
+{% endfor %}
+{% endif %}
+
 {% if output_schema %}
 # Define output schema
 class LLMOutput_{{ step.id }}(BaseModel):
@@ -10,6 +17,11 @@ class LLMOutput_{{ step.id }}(BaseModel):
 {% else %}
     pass
 {% endif %}
+
+{% endif %}
+{% if tool_code %}
+# Tool functions
+{{ tool_code }}
 
 {% endif %}
 # Render prompts
@@ -88,10 +100,18 @@ agent = Agent(
 {% else %}
     output_type=str,
 {% endif %}
+{% if tool_names %}
+    tools=[{{ tool_names | join(', ') }}],
+{% endif %}
 )
 
 # Run agent
+{% if tool_names %}
+# Pass memory in deps for tool access
+result = await agent.run(user_prompt_template, deps={"memory": self.memory})
+{% else %}
 result = await agent.run(user_prompt_template)
+{% endif %}
 
 # Extract result
 {% if output_schema %}
@@ -107,8 +127,18 @@ response_data = result.output
 {% if output_name == 'response' %}
 self.memory.write("{{ output_key }}", response_data)
 {% elif output_name == 'tool_calls' %}
-# Tool calls not yet implemented in generated code
-self.memory.write("{{ output_key }}", [])
+# Extract tool call history from result
+tool_calls_data = []
+if hasattr(result, 'all_messages'):
+    for msg in result.all_messages():
+        if hasattr(msg, 'parts'):
+            for part in msg.parts:
+                if hasattr(part, 'tool_name'):
+                    tool_calls_data.append({
+                        "name": part.tool_name,
+                        "args": getattr(part, 'args', {}),
+                    })
+self.memory.write("{{ output_key }}", tool_calls_data)
 {% endif %}
 {% endif %}
 {% endfor %}

@@ -5,8 +5,9 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Set
 from pathlib import Path
 import jinja2
-from graphflow_core.models import GraphDefinition, Step
+from graphflow_core.models import GraphDefinition, Step, ToolDefinition, MappedStepTool
 from graphflow_core.steps.registry import StepRegistry
+from graphflow_compiler.tools.compiler import ToolCompiler
 
 
 class CodeGenerator(ABC):
@@ -282,6 +283,19 @@ Generated: {graph.metadata.created}
             match = re.search(pattern, text)
             return match
 
+        # Parse and compile tools if present
+        tools_config = step.config.get("tools", [])
+        tool_definitions = self._parse_tools(tools_config)
+        tool_code = ""
+        tool_names = []
+        tool_imports = []
+
+        if tool_definitions:
+            compiler = ToolCompiler(self.get_framework_name())
+            tool_code = compiler.compile_tools(tool_definitions)
+            tool_names = compiler.get_tool_names(tool_definitions)
+            tool_imports = compiler.get_tool_imports(tool_definitions)
+
         return {
             "step": step,
             "graph": graph,
@@ -304,7 +318,43 @@ Generated: {graph.metadata.created}
             "max_tokens": step.config.get("max_tokens"),
             "api_key_secret": step.config.get("api_key_secret"),
             "base_url": step.config.get("base_url"),
+            # Tool-related context
+            "tools": tool_definitions,
+            "tool_code": tool_code,
+            "tool_names": tool_names,
+            "tool_imports": tool_imports,
         }
+
+    def _parse_tools(self, tools_config: List[Any]) -> List[ToolDefinition]:
+        """
+        Parse tools from config into ToolDefinition objects.
+
+        Handles both MappedStepTool format (from frontend) and raw dicts.
+
+        Args:
+            tools_config: List of tool configs from step config
+
+        Returns:
+            List of ToolDefinition objects
+        """
+        tool_definitions = []
+
+        for tool_entry in tools_config:
+            if isinstance(tool_entry, dict):
+                # Check if it's a MappedStepTool (from frontend)
+                if tool_entry.get("type") == "mapped_step":
+                    definition_dict = tool_entry.get("definition", {})
+                    try:
+                        tool_def = ToolDefinition(**definition_dict)
+                        tool_definitions.append(tool_def)
+                    except Exception as e:
+                        # Log error but continue with other tools
+                        print(f"Warning: Failed to parse tool definition: {e}")
+                # Could also handle FunctionTool type here in future
+            elif isinstance(tool_entry, ToolDefinition):
+                tool_definitions.append(tool_entry)
+
+        return tool_definitions
 
     def _extract_memory_refs(self, config: Dict[str, Any]) -> Set[str]:
         """

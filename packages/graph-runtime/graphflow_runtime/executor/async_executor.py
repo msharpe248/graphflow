@@ -15,6 +15,9 @@ from graphflow_compiler import compile_graph
 from graphflow_runtime.config import runtime_config
 from graphflow_runtime.executor.execution_controller import ExecutionController
 
+# Import AI plugin to register LLM step with template support
+import graphflow_ai  # noqa: F401
+
 
 class AsyncExecutor:
     """

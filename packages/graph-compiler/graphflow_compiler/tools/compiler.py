@@ -74,18 +74,20 @@ class ToolCompiler:
         Returns:
             List of import statements
         """
+        if not tools:
+            return []
+
         imports = set()
 
-        # Common imports
-        imports.add("from typing import Any, Dict, Optional")
+        # Common imports for tool execution
+        imports.add("from typing import Any, Dict")
         imports.add("from graphflow_core.steps.registry import StepRegistry")
-        imports.add("from graphflow_core.memory import MemoryStore")
 
         # Framework-specific imports
         if self.framework == "pydantic_ai":
             imports.add("from pydantic_ai import RunContext")
 
-        # Check for specific step types
+        # Check for specific step types and add plugin imports
         step_types = {tool.source_step_type for tool in tools}
         if any(s.startswith("http.") for s in step_types):
             imports.add("import graphflow_http")
@@ -96,13 +98,13 @@ class ToolCompiler:
         """
         Generate Pydantic AI tool function.
 
-        Pydantic AI tools are async functions decorated with @agent.tool.
+        Generates a standalone async function that will be passed to Agent(tools=[...]).
+        Uses RunContext for dependency injection (memory access).
         """
         lines = []
 
-        # Generate docstring
-        lines.append(f'@agent.tool')
-        lines.append(f'async def {tool.name}(')
+        # Generate function signature (no decorator - passed to Agent constructor)
+        lines.append(f'async def tool_{tool.name}(')
         lines.append(f'    ctx: RunContext[Dict[str, Any]],')
 
         # Add LLM parameters
@@ -128,26 +130,30 @@ class ToolCompiler:
 
         lines.append(f'    """')
 
-        # Get memory from context
-        lines.append(f'    memory = ctx.deps.get("memory")')
+        # Get memory from context deps
+        lines.append(f'    memory = ctx.deps["memory"]')
         lines.append(f'')
 
         # Build step config
         lines.append(f'    # Build step configuration')
         lines.append(f'    step_config = {{}}')
 
-        # Add runtime parameters
+        # Add runtime parameters (memory bindings resolved at runtime)
         for mapping in tool.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    # Memory binding - extract the path
-                    mem_path = mapping.runtime_value[1:-1]  # Remove { and }
-                    lines.append(f'    step_config["{mapping.source_property}"] = memory.read("{mem_path}")')
+                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
+                    # Memory binding - extract the path (e.g., {memory.llm_1.aa.url} -> llm_1.aa.url)
+                    mem_path = mapping.runtime_value[8:-1]  # Remove {memory. and }
+                    lines.append(f'    step_config["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
+                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
+                    # Other binding types (config, env, secrets)
+                    binding = mapping.runtime_value[1:-1]  # Remove { and }
+                    lines.append(f'    step_config["{mapping.source_property}"] = memory.read("{binding}")')
                 else:
-                    # Constant value
+                    # Constant value - try to parse as JSON, fallback to string
                     lines.append(f'    step_config["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
 
-        # Add LLM parameters
+        # Add LLM parameters (values passed by LLM)
         for mapping in llm_params:
             param_name = mapping.llm_parameter_name or mapping.source_property
             lines.append(f'    step_config["{mapping.source_property}"] = {param_name}')
@@ -160,24 +166,18 @@ class ToolCompiler:
         lines.append(f'    step = step_class(')
         lines.append(f'        id="{tool.id}_tool",')
         lines.append(f'        config=step_config,')
-        lines.append(f'        outputs={{{repr(tool.output_key)}: "{{memory.tool_result}}"}}')
+        lines.append(f'        outputs={{"{tool.output_key}": "{{memory.tool_result}}"}}')
         lines.append(f'    )')
         lines.append(f'')
-        lines.append(f'    # Create temporary memory for tool execution')
-        lines.append(f'    tool_memory = MemoryStore()')
-        lines.append(f'    # Copy relevant memory values')
-        lines.append(f'    for key in memory.list_keys("memory"):')
-        lines.append(f'        try:')
-        lines.append(f'            tool_memory.write(f"memory.{{key}}", memory.read(f"memory.{{key}}"))')
-        lines.append(f'        except KeyError:')
-        lines.append(f'            pass')
-        lines.append(f'')
-        lines.append(f'    await step.execute(tool_memory)')
+
+        # Use the main memory store directly for tool execution
+        # This allows tools to access intermediate memory and write results
+        lines.append(f'    await step.execute(memory)')
         lines.append(f'')
 
         # Extract result
-        lines.append(f'    # Extract result')
-        lines.append(f'    result = tool_memory.read("memory.tool_result")')
+        lines.append(f'    # Extract and return result')
+        lines.append(f'    result = memory.read("tool_result")')
 
         # Apply output transform if specified
         if tool.output_transform:
@@ -289,20 +289,14 @@ class ToolCompiler:
         }
         return type_map.get(json_type, "Any")
 
-    def generate_tool_registration_code(self, tools: List[ToolDefinition]) -> str:
+    def get_tool_names(self, tools: List[ToolDefinition]) -> List[str]:
         """
-        Generate code to register all tools with an agent.
+        Get list of generated tool function names.
 
-        For Pydantic AI, tools are registered via decorators.
-        This generates the tools list for manual registration if needed.
+        Args:
+            tools: List of tool definitions
+
+        Returns:
+            List of function names (e.g., ['tool_search', 'tool_fetch'])
         """
-        lines = []
-        lines.append("# Tool definitions")
-        lines.append(f"TOOLS = [")
-
-        for tool in tools:
-            lines.append(f"    {tool.name},")
-
-        lines.append(f"]")
-
-        return "\n".join(lines)
+        return [f"tool_{tool.name}" for tool in tools]
