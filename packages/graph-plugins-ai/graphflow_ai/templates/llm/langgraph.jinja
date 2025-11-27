@@ -1,73 +1,155 @@
-# LLM step using LangChain
-import os
+# LLM step using LangChain/LangGraph
 
-# Render prompts from state
-{%- for key in memory_refs | sort %}
-{{ key | replace('.', '_') }} = state.get("{{ key }}", "")
-{%- endfor %}
+{% if tool_imports %}
+# Tool imports
+{% for imp in tool_imports %}
+{{ imp }}
+{% endfor %}
+{% endif %}
+
+{% if tool_code %}
+# Tool factory function
+{{ tool_code }}
+
+{% endif %}
+# Render prompts from memory
+{% for key in memory_refs | sort %}
+{{ key | replace('.', '_') }} = self.memory.read("{{ key }}")
+{% endfor %}
 
 # Build prompt
-{%- if user_prompt %}
+{% if user_prompt %}
 user_prompt_template = {{ user_prompt | repr }}
-{%- for key in memory_refs | sort %}
+{% for key in memory_refs | sort %}
 user_prompt_template = user_prompt_template.replace("{memory.{{ key }}}", str({{ key | replace('.', '_') }}))
-{%- endfor %}
-{%- else %}
+{% endfor %}
+{% else %}
 user_prompt_template = ""
-{%- endif %}
+{% endif %}
 
 # Get API key
-{%- if api_key_secret %}
-api_key = os.getenv("{{ api_key_secret | upper }}", "")
-{%- else %}
-api_key = None
-{%- endif %}
+{% if api_key_secret %}
+api_key = self.memory.get_secret("{{ api_key_secret }}")
+{% else %}
+api_key = None  # Will use environment variable
+{% endif %}
 
 # Configure LLM based on provider
-{%- if provider == "openai" %}
-{%- if base_url %}
+{% if provider == "openai" %}
+{% if base_url %}
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url }}", api_key=api_key)
-{%- else %}
+{% else %}
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }})
-{%- endif %}
-{%- elif provider == "anthropic" %}
+{% endif %}
+{% elif provider == "anthropic" %}
 llm = ChatAnthropic(model="{{ model }}", temperature={{ temperature }})
-{%- elif provider == "ollama" %}
+{% elif provider == "ollama" %}
 llm = ChatOllama(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url or 'http://localhost:11434' }}")
-{%- elif provider == "groq" %}
+{% elif provider == "groq" %}
 llm = ChatGroq(model="{{ model }}", temperature={{ temperature }})
-{%- elif provider == "mistral" %}
+{% elif provider == "mistral" %}
 llm = ChatMistralAI(model="{{ model }}", temperature={{ temperature }})
-{%- elif provider == "google" %}
+{% elif provider == "google" %}
 llm = ChatGoogleGenerativeAI(model="{{ model }}", temperature={{ temperature }})
-{%- elif provider == "lmstudio" %}
+{% elif provider == "lmstudio" %}
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url or 'http://localhost:1234/v1' }}", api_key="lm-studio")
-{%- elif provider == "openrouter" %}
+{% elif provider == "openrouter" %}
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="https://openrouter.ai/api/v1", api_key=api_key)
-{%- elif provider in ["azure", "openai_compatible"] %}
+{% elif provider in ["azure", "openai_compatible"] %}
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url }}", api_key=api_key)
-{%- else %}
+{% else %}
 # Default: treat as OpenAI
 llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }})
-{%- endif %}
+{% endif %}
 
-# Build and send messages
+# Build messages
 messages = []
-{%- if system_prompt %}
+{% if system_prompt %}
 messages.append(SystemMessage(content={{ system_prompt | repr }}))
-{%- endif %}
+{% endif %}
 messages.append(HumanMessage(content=user_prompt_template))
 
-# Invoke LLM
+{% if tool_names %}
+# Create tools with memory access and bind to LLM
+tools = create_tools(self.memory)
+llm_with_tools = llm.bind_tools(tools)
+
+# Invoke LLM with tools
+response = await llm_with_tools.ainvoke(messages)
+
+# Handle tool calls if present
+if hasattr(response, 'tool_calls') and response.tool_calls:
+    tool_results = []
+    tool_map = {t.name: t for t in tools}
+
+    for tool_call in response.tool_calls:
+        tool_name = tool_call.get('name') or tool_call.get('function', {}).get('name')
+        tool_args = tool_call.get('args') or tool_call.get('function', {}).get('arguments', {})
+
+        if tool_name in tool_map:
+            tool_func = tool_map[tool_name]
+            result = await tool_func.ainvoke(tool_args)
+            tool_results.append({
+                "tool": tool_name,
+                "result": result
+            })
+
+    # Add tool results to conversation and get final response
+    messages.append(response)
+    for i, tool_call in enumerate(response.tool_calls):
+        tool_name = tool_call.get('name') or tool_call.get('function', {}).get('name')
+        from langchain_core.messages import ToolMessage
+        messages.append(ToolMessage(
+            content=str(tool_results[i]["result"]) if i < len(tool_results) else "",
+            tool_call_id=tool_call.get('id', str(i))
+        ))
+
+    # Get final response after tool execution
+    final_response = await llm_with_tools.ainvoke(messages)
+    response_content = final_response.content
+else:
+    response_content = response.content
+{% else %}
+# Invoke LLM (no tools)
 response = await llm.ainvoke(messages)
+response_content = response.content
+{% endif %}
 
-{%- if output_schema %}
-# Parse structured output (placeholder)
-# In production, use with_structured_output()
-response_data = {"answer": response.content, "confidence": 0.85}
-state["{{ output_key }}"] = response_data
-{%- else %}
-state["{{ output_key }}"] = response.content
-{%- endif %}
-
-return state
+# Write to memory using outputs dict
+{% if output_schema %}
+# Parse structured output
+import json
+try:
+    response_data = json.loads(response_content)
+except (json.JSONDecodeError, TypeError):
+    response_data = {"answer": response_content, "confidence": 0.85}
+{% for output_name, output_template in outputs.items() %}
+{% if '{memory.' in output_template %}
+{% set output_key = output_template.split('{memory.')[1].split('}')[0] %}
+{% if output_name == 'response' %}
+self.memory.write("{{ output_key }}", response_data)
+{% endif %}
+{% endif %}
+{% endfor %}
+{% else %}
+{% for output_name, output_template in outputs.items() %}
+{% if '{memory.' in output_template %}
+{% set output_key = output_template.split('{memory.')[1].split('}')[0] %}
+{% if output_name == 'response' %}
+self.memory.write("{{ output_key }}", response_content)
+{% elif output_name == 'tool_calls' %}
+# Extract tool call history
+tool_calls_data = []
+{% if tool_names %}
+if hasattr(response, 'tool_calls') and response.tool_calls:
+    for tc in response.tool_calls:
+        tool_calls_data.append({
+            "name": tc.get('name') or tc.get('function', {}).get('name'),
+            "args": tc.get('args') or tc.get('function', {}).get('arguments', {}),
+        })
+{% endif %}
+self.memory.write("{{ output_key }}", tool_calls_data)
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}

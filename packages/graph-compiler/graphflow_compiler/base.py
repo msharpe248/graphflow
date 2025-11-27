@@ -292,7 +292,13 @@ Generated: {graph.metadata.created}
 
         if tool_definitions:
             compiler = ToolCompiler(self.get_framework_name())
-            tool_code = compiler.compile_tools(tool_definitions)
+            # Use framework-specific tool compilation
+            if self.get_framework_name() == "langgraph":
+                # LangGraph uses factory pattern for closure-based memory access
+                tool_code = compiler.compile_langgraph_tool_factory(tool_definitions)
+            else:
+                # Pydantic AI uses standalone functions
+                tool_code = compiler.compile_tools(tool_definitions)
             tool_names = compiler.get_tool_names(tool_definitions)
             tool_imports = compiler.get_tool_imports(tool_definitions)
 

@@ -86,6 +86,8 @@ class ToolCompiler:
         # Framework-specific imports
         if self.framework == "pydantic_ai":
             imports.add("from pydantic_ai import RunContext")
+        elif self.framework == "langgraph":
+            imports.add("from langchain_core.tools import tool")
 
         # Check for specific step types and add plugin imports
         step_types = {tool.source_step_type for tool in tools}
@@ -190,15 +192,19 @@ class ToolCompiler:
 
     def _compile_langgraph_tool(self, tool: ToolDefinition) -> str:
         """
-        Generate LangGraph tool function.
+        Generate LangGraph tool function for use inside closure factory.
 
         LangGraph uses the @tool decorator from langchain_core.tools.
+        Tools are generated with extra indentation to sit inside create_tools(memory).
+        Memory access is via closure scope.
         """
         lines = []
+        # Extra indentation since this goes inside create_tools(memory) factory
+        ind = "    "
 
-        # Generate function signature
-        lines.append(f'@tool')
-        lines.append(f'async def {tool.name}(')
+        # Generate function signature with @tool decorator
+        lines.append(f'{ind}@tool')
+        lines.append(f'{ind}async def tool_{tool.name}(')
 
         # Add LLM parameters
         llm_params = tool.get_llm_parameters()
@@ -207,68 +213,104 @@ class ToolCompiler:
             param_type = self._get_python_type(mapping.llm_schema)
             default = "" if mapping.required else " = None"
             comma = "," if i < len(llm_params) - 1 else ""
-            lines.append(f'    {param_name}: {param_type}{default}{comma}')
+            lines.append(f'{ind}    {param_name}: {param_type}{default}{comma}')
 
-        lines.append(f') -> Any:')
-        lines.append(f'    """')
-        lines.append(f'    {tool.description}')
+        lines.append(f'{ind}) -> Any:')
+        lines.append(f'{ind}    """')
+        lines.append(f'{ind}    {tool.description}')
 
         if llm_params:
-            lines.append(f'')
-            lines.append(f'    Args:')
+            lines.append(f'{ind}')
+            lines.append(f'{ind}    Args:')
             for mapping in llm_params:
                 param_name = mapping.llm_parameter_name or mapping.source_property
                 desc = mapping.llm_description or f"Value for {mapping.source_property}"
-                lines.append(f'        {param_name}: {desc}')
+                lines.append(f'{ind}        {param_name}: {desc}')
 
-        lines.append(f'    """')
+        lines.append(f'{ind}    """')
 
-        # Note: LangGraph tools need access to state/memory through different means
-        lines.append(f'    # Note: Access to state must be configured at graph level')
-        lines.append(f'')
+        # Build step config - memory accessed from closure scope
+        lines.append(f'{ind}    # Build step configuration')
+        lines.append(f'{ind}    step_config = {{}}')
 
-        # Build step config
-        lines.append(f'    # Build step configuration')
-        lines.append(f'    step_config = {{}}')
-
-        # Add runtime parameters (these would need to come from state)
+        # Add runtime parameters (memory bindings resolved at runtime)
         for mapping in tool.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    lines.append(f'    # TODO: Get {mapping.source_property} from state')
-                    lines.append(f'    step_config["{mapping.source_property}"] = None  # {mapping.runtime_value}')
+                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
+                    # Memory binding - extract the path (e.g., {memory.llm_1.aa.url} -> llm_1.aa.url)
+                    mem_path = mapping.runtime_value[8:-1]  # Remove {memory. and }
+                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
+                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
+                    # Other binding types (config, env, secrets)
+                    binding = mapping.runtime_value[1:-1]  # Remove { and }
+                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = memory.read("{binding}")')
                 else:
-                    lines.append(f'    step_config["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+                    # Constant value
+                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
 
-        # Add LLM parameters
+        # Add LLM parameters (values passed by LLM)
         for mapping in llm_params:
             param_name = mapping.llm_parameter_name or mapping.source_property
-            lines.append(f'    step_config["{mapping.source_property}"] = {param_name}')
+            lines.append(f'{ind}    step_config["{mapping.source_property}"] = {param_name}')
 
-        lines.append(f'')
+        lines.append(f'{ind}')
 
         # Create and execute step
-        lines.append(f'    # Create and execute step')
-        lines.append(f'    step_class = StepRegistry.get("{tool.source_step_type}")')
-        lines.append(f'    step = step_class(')
-        lines.append(f'        id="{tool.id}_tool",')
-        lines.append(f'        config=step_config,')
-        lines.append(f'        outputs={{{repr(tool.output_key)}: "{{memory.tool_result}}"}}')
-        lines.append(f'    )')
-        lines.append(f'')
-        lines.append(f'    # Create memory for step execution')
-        lines.append(f'    tool_memory = MemoryStore()')
-        lines.append(f'    await step.execute(tool_memory)')
-        lines.append(f'')
+        lines.append(f'{ind}    # Create and execute step')
+        lines.append(f'{ind}    step_class = StepRegistry.get("{tool.source_step_type}")')
+        lines.append(f'{ind}    step = step_class(')
+        lines.append(f'{ind}        id="{tool.id}_tool",')
+        lines.append(f'{ind}        config=step_config,')
+        lines.append(f'{ind}        outputs={{"{tool.output_key}": "{{memory.tool_result}}"}}')
+        lines.append(f'{ind}    )')
+        lines.append(f'{ind}')
+
+        # Execute with shared memory (captured from closure)
+        lines.append(f'{ind}    await step.execute(memory)')
+        lines.append(f'{ind}')
 
         # Extract result
-        lines.append(f'    # Extract result')
-        lines.append(f'    result = tool_memory.read("memory.tool_result")')
+        lines.append(f'{ind}    # Extract and return result')
+        lines.append(f'{ind}    result = memory.read("tool_result")')
 
+        # Apply output transform if specified
         if tool.output_transform:
-            lines.append(f'    result = {tool.output_transform}')
+            lines.append(f'{ind}    # Apply output transform')
+            lines.append(f'{ind}    result = {tool.output_transform}')
 
-        lines.append(f'    return result')
+        lines.append(f'{ind}    return result')
+
+        return "\n".join(lines)
+
+    def compile_langgraph_tool_factory(self, tools: List[ToolDefinition]) -> str:
+        """
+        Generate factory function that creates tools with memory access via closure.
+
+        This is the key pattern for LangGraph: tools are created inside a factory
+        function that captures memory in the closure scope.
+
+        Args:
+            tools: List of tool definitions
+
+        Returns:
+            Generated Python code for create_tools(memory) factory function
+        """
+        if not tools:
+            return ""
+
+        lines = []
+        lines.append('def create_tools(memory):')
+        lines.append('    """Create tools with memory access via closure."""')
+        lines.append('')
+
+        # Generate each tool function (already indented)
+        for tool in tools:
+            lines.append(self._compile_langgraph_tool(tool))
+            lines.append('')
+
+        # Return list of tool functions
+        tool_names = [f'tool_{t.name}' for t in tools]
+        lines.append(f'    return [{", ".join(tool_names)}]')
 
         return "\n".join(lines)
 
