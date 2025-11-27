@@ -107,6 +107,20 @@ class LoggingMemoryStore(MemoryStore):
 
     def write(self, key: str, value: Any) -> None:
         """Write value and log the operation."""
+        # Special handling for tool call events
+        if key == "__tool_call__":
+            log_entry = LogEntry(
+                timestamp=datetime.utcnow().isoformat(),
+                operation="tool_call",
+                key=value.get("tool_name", "unknown") if isinstance(value, dict) else "unknown",
+                value=value,
+                namespace="tool",
+                step_id=self._current_step_id,
+                step_label=self._current_step_label
+            )
+            self._log.append(log_entry)
+            return  # Don't actually write to memory store
+
         namespace = self._determine_namespace(key)
 
         log_entry = LogEntry(

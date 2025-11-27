@@ -30,7 +30,7 @@ export interface AgentRun {
 
 export interface ExecutionLogEntry {
   timestamp: string;
-  operation: 'read' | 'write';
+  operation: 'read' | 'write' | 'tool_call';
   key: string;
   namespace: string;
   value?: any;

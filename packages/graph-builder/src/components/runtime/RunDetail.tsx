@@ -477,6 +477,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                     const stepLabel = entries[0]?.step_label || stepId;
                     const reads = entries.filter(e => e.operation === 'read');
                     const writes = entries.filter(e => e.operation === 'write');
+                    const toolCalls = entries.filter(e => e.operation === 'tool_call');
 
                     return (
                       <div
@@ -488,6 +489,7 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                           <h4 className="font-semibold text-gray-900">{stepLabel}</h4>
                           <p className="text-xs text-gray-500 mt-0.5">
                             {reads.length} input(s) read, {writes.length} output(s) written
+                            {toolCalls.length > 0 && `, ${toolCalls.length} tool call(s)`}
                           </p>
                         </div>
 
@@ -571,6 +573,73 @@ export default function RunDetail({ agentId, runId }: RunDetailProps) {
                                           ))
                                         }
                                       </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tool Calls */}
+                          {toolCalls.length > 0 && (
+                            <div className="min-w-0">
+                              <h5 className="text-xs font-semibold text-purple-700 uppercase mb-2">
+                                Tool Calls
+                              </h5>
+                              <div className="space-y-2 min-w-0">
+                                {toolCalls.map((entry, toolIdx) => (
+                                  <div
+                                    key={toolIdx}
+                                    className="bg-purple-50 border border-purple-200 rounded p-2 min-w-0"
+                                  >
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-mono text-xs font-semibold text-purple-900">
+                                        {entry.value?.tool_name || entry.key}
+                                      </span>
+                                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                        entry.value?.event === 'call'
+                                          ? 'bg-purple-200 text-purple-800'
+                                          : 'bg-green-200 text-green-800'
+                                      }`}>
+                                        {entry.value?.event === 'call' ? 'CALL' : 'RESULT'}
+                                      </span>
+                                    </div>
+                                    {entry.value?.event === 'call' && entry.value?.arguments && (
+                                      <details className="text-xs mt-1">
+                                        <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                                          Arguments
+                                        </summary>
+                                        <div className="mt-1 bg-white border border-purple-100 rounded p-2 font-mono"
+                                             style={{
+                                               maxHeight: '128px',
+                                               overflow: 'auto',
+                                               whiteSpace: 'nowrap'
+                                             }}>
+                                          {JSON.stringify(entry.value.arguments, null, 2).split('\n').map((line, idx) => (
+                                            <div key={idx} style={{ whiteSpace: 'nowrap' }}>{line}</div>
+                                          ))}
+                                        </div>
+                                      </details>
+                                    )}
+                                    {entry.value?.event === 'result' && entry.value?.result !== undefined && (
+                                      <details className="text-xs mt-1">
+                                        <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                                          Result
+                                        </summary>
+                                        <div className="mt-1 bg-white border border-purple-100 rounded p-2 font-mono"
+                                             style={{
+                                               maxHeight: '128px',
+                                               overflow: 'auto',
+                                               whiteSpace: 'nowrap'
+                                             }}>
+                                          {typeof entry.value.result === 'string'
+                                            ? entry.value.result
+                                            : JSON.stringify(entry.value.result, null, 2).split('\n').map((line, idx) => (
+                                              <div key={idx} style={{ whiteSpace: 'nowrap' }}>{line}</div>
+                                            ))
+                                          }
+                                        </div>
+                                      </details>
                                     )}
                                   </div>
                                 ))}

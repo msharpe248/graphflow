@@ -109,6 +109,26 @@ agent = Agent(
 {% if tool_names %}
 # Pass memory in deps for tool access
 result = await agent.run(user_prompt_template, deps={"memory": self.memory})
+
+# Log tool calls to execution log
+if hasattr(result, 'all_messages'):
+    for msg in result.all_messages():
+        if hasattr(msg, 'parts'):
+            for part in msg.parts:
+                # Log tool call request (has tool_name and args)
+                if hasattr(part, 'tool_name') and hasattr(part, 'args'):
+                    self.memory.write("__tool_call__", {
+                        "event": "call",
+                        "tool_name": part.tool_name,
+                        "arguments": part.args,
+                    })
+                # Log tool return (has tool_name and content - this is the result)
+                if hasattr(part, 'tool_name') and hasattr(part, 'content') and not hasattr(part, 'args'):
+                    self.memory.write("__tool_call__", {
+                        "event": "result",
+                        "tool_name": part.tool_name,
+                        "result": part.content,
+                    })
 {% else %}
 result = await agent.run(user_prompt_template)
 {% endif %}

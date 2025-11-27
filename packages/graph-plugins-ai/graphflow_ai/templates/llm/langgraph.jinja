@@ -86,12 +86,26 @@ if hasattr(response, 'tool_calls') and response.tool_calls:
         tool_name = tool_call.get('name') or tool_call.get('function', {}).get('name')
         tool_args = tool_call.get('args') or tool_call.get('function', {}).get('arguments', {})
 
+        # Log tool call to execution log
+        self.memory.write("__tool_call__", {
+            "event": "call",
+            "tool_name": tool_name,
+            "arguments": tool_args,
+        })
+
         if tool_name in tool_map:
             tool_func = tool_map[tool_name]
             result = await tool_func.ainvoke(tool_args)
             tool_results.append({
                 "tool": tool_name,
                 "result": result
+            })
+
+            # Log tool result to execution log
+            self.memory.write("__tool_call__", {
+                "event": "result",
+                "tool_name": tool_name,
+                "result": result,
             })
 
     # Add tool results to conversation and get final response
