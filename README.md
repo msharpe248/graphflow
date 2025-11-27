@@ -18,6 +18,8 @@ GraphFlow is a comprehensive agent development platform that lets you:
 - **Visual Graph Builder**: Drag-and-drop UI with ReactFlow for building agent workflows
 - **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding, usage tracking, and editable outputs
 - **Interactive Debugger**: Set breakpoints before/after steps, step through execution, pause/resume, inspect and edit memory values in real-time
+- **LLM Tool Support**: Visual tool builder with MappedStepTools - wrap any step type as an LLM-callable tool
+- **Multi-Provider LLM**: Support for Ollama, LM Studio, OpenRouter, Anthropic, and OpenAI out of the box
 - **Plugin System**: Extensible architecture with dynamically loaded step types, categorization, and search
 - **Decoupled Control & Data Flow**: Edges define control flow, memory store handles data independently
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
@@ -181,7 +183,8 @@ See the `examples/` directory for complete graph definitions:
 1. **simple_agent.json** - Basic linear workflow
 2. **conditional_agent.json** - Branching with join
 3. **llm_agent.json** - LLM with tools and structured output
-4. **advanced_research_agent.json** - Complex multi-step with loops, HTTP, LLM, and human review
+4. **ollama_tool_agent.json** - LLM with MappedStepTool for URL fetching (Ollama)
+5. **advanced_research_agent.json** - Complex multi-step with loops, HTTP, LLM, and human review
 
 ## 🛠️ Step Types
 
@@ -203,6 +206,22 @@ GraphFlow provides a rich ecosystem of step types organized by category:
 | **Integration** | `http` | Basic HTTP request step |
 | | `db_query` | Database query execution |
 | **Human** | `human_input` | Wait for human review/input |
+
+### AI Plugin Steps (graph-plugins-ai)
+
+| Step | Description |
+|------|-------------|
+| `ai.LLMStep` | LLM call with multi-provider support, tools, and structured output |
+| `ai.HumanInputStep` | Wait for human review/input |
+
+**Supported LLM Providers:**
+| Provider | Models | API Key Environment Variable |
+|----------|--------|------------------------------|
+| **Ollama** | llama3.1, llama3.2, mistral, etc. | (none - local) |
+| **LM Studio** | Any loaded model | (none - local) |
+| **OpenRouter** | Claude, GPT-4, Llama, etc. | `OPENROUTER_API_KEY` |
+| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Opus | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-4, GPT-3.5-turbo | `OPENAI_API_KEY` |
 
 ### HTTP Plugin Steps (graph-plugins-http)
 
@@ -285,10 +304,53 @@ GraphFlow includes a full-featured debugger for troubleshooting and understandin
   - Smart namespace detection for memory bindings
 - **Step Properties Panel**: Inspect configuration, current values, and outputs for each step
 
+**Execution Log**
+- **Live Tool Call Visibility**: See LLM tool calls and results in real-time while paused at breakpoints
+- **Grouped by Step**: Execution log entries organized by step with inputs/outputs/tool calls
+- **Error Preservation**: Execution logs are captured even when runs fail for debugging
+
 **Framework Support**
 - Works with both Pydantic AI and LangGraph compiled agents
 - Transparent to plugin developers - no special code required
 - Full debugging API for programmatic control
+
+## 🔧 LLM Tools
+
+GraphFlow supports giving LLMs access to tools that can be called during execution:
+
+**MappedStepTools**
+- Wrap any existing step type as an LLM-callable tool
+- Visual tool builder in the UI for configuring parameter mappings
+- Parameters can be:
+  - **LLM-provided**: The LLM decides the value (e.g., URL to fetch)
+  - **Runtime-bound**: Value comes from memory (e.g., API key from secrets)
+- Tool errors are returned to the LLM instead of aborting, allowing adaptive behavior
+
+**Example: HTTP Fetch Tool**
+```json
+{
+  "tools": [{
+    "type": "mapped_step",
+    "definition": {
+      "name": "fetch_url",
+      "description": "Fetch content from a URL",
+      "source_step_type": "http.HTTPGetStep",
+      "property_mappings": [{
+        "source_property": "url",
+        "visibility": "llm",
+        "llm_parameter_name": "url",
+        "llm_description": "The URL to fetch",
+        "required": true
+      }],
+      "output_key": "response"
+    }
+  }]
+}
+```
+
+**Supported in Both Frameworks**
+- **Pydantic AI**: Tools passed to Agent constructor with RunContext for memory access
+- **LangGraph**: Tools created via closure factory for memory access
 
 ## 🔌 Plugin System
 
@@ -499,6 +561,8 @@ graphflow-runtime --reload
 | Runtime Memory Editing | ✅ | ❌ | ❌ |
 | Memory Schema Management | ✅ | ⚠️ | ⚠️ |
 | Memory Inspection | ✅ | ⚠️ | ⚠️ |
+| LLM Tool Builder | ✅ | ⚠️ | ✅ |
+| Multi-Provider LLM | ✅ | ⚠️ | ✅ |
 | Runtime API | ✅ | ✅ | ✅ |
 
 ## 🚧 Roadmap
@@ -521,6 +585,10 @@ graphflow-runtime --reload
 - ✅ Step-through execution (step/pause/resume)
 - ✅ Real-time memory inspection and editing
 - ✅ Rich property editors in debug mode
+- ✅ Multi-provider LLM support (Ollama, LM Studio, OpenRouter, Anthropic, OpenAI)
+- ✅ LLM tool support with visual tool builder (MappedStepTools)
+- ✅ Live execution log with tool call visibility during debugging
+- ✅ Tool error handling (errors returned to LLM for adaptive behavior)
 - 🚧 Graph templates
 - 🚧 Compile from UI
 

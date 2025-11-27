@@ -311,9 +311,8 @@ The `config` object is step-type specific. Each step type defines its own config
   "id": "llm_1",
   "type": "llm",
   "config": {
-    "provider": "openrouter",
-    "model": "anthropic/claude-3.5-sonnet",
-    "api_key_secret": "openrouter_api_key",
+    "provider": "ollama",
+    "model": "llama3.1",
     "system_prompt": "You are a helpful assistant.",
     "user_prompt": "{memory.user_question}",
     "output_schema": {
@@ -329,6 +328,55 @@ The `config` object is step-type specific. Each step type defines its own config
     "max_tokens": 2000
   },
   "description": "Generate answer with LLM"
+}
+```
+
+**Supported Providers:**
+| Provider | Config | API Key |
+|----------|--------|---------|
+| `ollama` | `base_url` (default: http://localhost:11434) | None (local) |
+| `lmstudio` | `base_url` (default: http://localhost:1234/v1) | None (local) |
+| `openrouter` | - | `api_key_secret` → env var |
+| `anthropic` | - | `api_key_secret` → env var |
+| `openai` | - | `api_key_secret` → env var |
+
+#### LLM Step with Tools
+
+LLM steps can have tools that the model can call during execution:
+
+```json
+{
+  "id": "llm_1",
+  "type": "llm",
+  "config": {
+    "provider": "ollama",
+    "model": "llama3.1",
+    "user_prompt": "{memory.user_request}",
+    "output_key": "response",
+    "tools": [
+      {
+        "type": "mapped_step",
+        "definition": {
+          "id": "fetch_tool",
+          "name": "fetch_url",
+          "description": "Fetch content from a URL",
+          "source_step_type": "http.HTTPGetStep",
+          "property_mappings": [
+            {
+              "source_property": "url",
+              "visibility": "llm",
+              "llm_parameter_name": "url",
+              "llm_description": "The URL to fetch",
+              "llm_schema": {"type": "string"},
+              "required": true
+            }
+          ],
+          "output_key": "response"
+        }
+      }
+    ]
+  },
+  "description": "LLM with URL fetch tool"
 }
 ```
 
@@ -890,4 +938,4 @@ graphflow-compile validate my_graph.json
 ---
 
 **Version:** 1.0
-**Last Updated:** 2025-11-09
+**Last Updated:** 2025-11-27
