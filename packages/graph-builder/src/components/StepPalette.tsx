@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as Icons from 'lucide-react';
-import { Search, ChevronDown, ChevronRight, Layers, Package, Square, Circle, Shapes, FileText, StickyNote } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Layers, Package, Square, Circle, Shapes, FileText, StickyNote, ChevronsUpDown, ChevronsDownUp } from 'lucide-react';
 import { StepTypeInfo } from '@/types/graph';
 import { usePluginStore } from '@/stores/pluginStore';
 
@@ -19,6 +19,7 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [hasInitializedCollapse, setHasInitializedCollapse] = useState(false);
 
   // Fetch step types on mount
   useEffect(() => {
@@ -28,6 +29,58 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
   // Get grouped steps based on view mode
   const stepsByCategory = getStepTypesByCategory();
   const stepsByPlugin = getStepTypesByPlugin();
+
+  // Initialize collapse state once data is loaded
+  useEffect(() => {
+    if (hasInitializedCollapse) return;
+
+    const categoryKeys = Object.keys(stepsByCategory);
+    const pluginKeys = Object.keys(stepsByPlugin);
+
+    if (categoryKeys.length > 0 || pluginKeys.length > 0) {
+      // Collapse all except "Control" for categories and "Built-in" for plugins
+      const initialCollapsed: Record<string, boolean> = {};
+
+      categoryKeys.forEach(key => {
+        initialCollapsed[key] = key.toLowerCase() !== 'control';
+      });
+
+      pluginKeys.forEach(key => {
+        initialCollapsed[key] = key.toLowerCase() !== 'built-in';
+      });
+
+      setCollapsed(initialCollapsed);
+      setHasInitializedCollapse(true);
+    }
+  }, [stepsByCategory, stepsByPlugin, hasInitializedCollapse]);
+
+  // Get current group keys based on view mode
+  const currentGroupKeys = useMemo(() => {
+    return Object.keys(viewMode === 'category' ? stepsByCategory : stepsByPlugin);
+  }, [viewMode, stepsByCategory, stepsByPlugin]);
+
+  // Check if all groups are collapsed
+  const allCollapsed = useMemo(() => {
+    return currentGroupKeys.length > 0 && currentGroupKeys.every(key => collapsed[key]);
+  }, [currentGroupKeys, collapsed]);
+
+  // Expand all groups
+  const expandAll = useCallback(() => {
+    const newCollapsed: Record<string, boolean> = { ...collapsed };
+    currentGroupKeys.forEach(key => {
+      newCollapsed[key] = false;
+    });
+    setCollapsed(newCollapsed);
+  }, [currentGroupKeys, collapsed]);
+
+  // Collapse all groups
+  const collapseAll = useCallback(() => {
+    const newCollapsed: Record<string, boolean> = { ...collapsed };
+    currentGroupKeys.forEach(key => {
+      newCollapsed[key] = true;
+    });
+    setCollapsed(newCollapsed);
+  }, [currentGroupKeys, collapsed]);
 
   // Filter steps based on search query
   const filteredSteps = useMemo(() => {
@@ -218,34 +271,48 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
 
         {/* View Mode Tabs - only for steps */}
         {mainTab === 'steps' && (
-          <div className="flex gap-1 bg-gray-200 rounded-lg p-1">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-gray-200 rounded-lg p-1 flex-1">
+              <button
+                onClick={() => setViewMode('category')}
+                className={`
+                  flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                  ${
+                    viewMode === 'category'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }
+                `}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Category
+              </button>
+              <button
+                onClick={() => setViewMode('plugin')}
+                className={`
+                  flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                  ${
+                    viewMode === 'plugin'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }
+                `}
+              >
+                <Package className="w-3.5 h-3.5" />
+                Plugin
+              </button>
+            </div>
+            {/* Collapse/Expand All Toggle */}
             <button
-              onClick={() => setViewMode('category')}
-              className={`
-                flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                ${
-                  viewMode === 'category'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }
-              `}
+              onClick={allCollapsed ? expandAll : collapseAll}
+              className="p-1.5 rounded-md bg-gray-200 hover:bg-gray-300 transition-colors"
+              title={allCollapsed ? 'Expand all' : 'Collapse all'}
             >
-              <Layers className="w-3.5 h-3.5" />
-              Category
-            </button>
-            <button
-              onClick={() => setViewMode('plugin')}
-              className={`
-                flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                ${
-                  viewMode === 'plugin'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }
-              `}
-            >
-              <Package className="w-3.5 h-3.5" />
-              Plugin
+              {allCollapsed ? (
+                <ChevronsUpDown className="w-4 h-4 text-gray-600" />
+              ) : (
+                <ChevronsDownUp className="w-4 h-4 text-gray-600" />
+              )}
             </button>
           </div>
         )}
