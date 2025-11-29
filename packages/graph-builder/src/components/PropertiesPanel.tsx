@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGraphStore } from '@/stores/graphStore';
 import { X, Link, ChevronDown, ChevronRight, Edit2, Search } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import ColorPickerModal from './editors/ColorPickerModal';
 import MarkdownEditor from './editors/MarkdownEditor';
 import { getEditorForSchema } from './editors';
@@ -486,15 +487,45 @@ export default function PropertiesPanel({ isCollapsed, setIsCollapsed }: Propert
 
       {!isCollapsed && (
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Step info */}
-        <div>
+        {/* Step info header */}
+        <div className="rounded-lg border border-gray-200 overflow-hidden">
+          {/* Colored header bar */}
           <div
-            className="inline-block px-3 py-1 rounded-full text-sm font-medium text-white"
-            style={{ backgroundColor: stepTypeInfo.color }}
+            className="px-4 py-3 flex items-center gap-3"
+            style={{ backgroundColor: stepTypeInfo.color + '15' }}
           >
-            {stepTypeInfo.label}
+            {/* Icon container */}
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm"
+              style={{ backgroundColor: stepTypeInfo.color }}
+            >
+              {(() => {
+                const IconComponent = stepTypeInfo.icon
+                  ? (Icons as any)[stepTypeInfo.icon]
+                  : null;
+                return IconComponent ? (
+                  <IconComponent className="w-5 h-5 text-white" />
+                ) : null;
+              })()}
+            </div>
+            {/* Label and type */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-semibold text-gray-900 truncate">
+                {stepTypeInfo.label}
+              </h3>
+              <p className="text-xs text-gray-500 font-mono">
+                {step.type}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-gray-600 mt-2">{stepTypeInfo.description}</p>
+          {/* Description */}
+          {stepTypeInfo.description && (
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {stepTypeInfo.description}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Step ID */}
