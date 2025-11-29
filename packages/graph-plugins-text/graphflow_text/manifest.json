@@ -1,0 +1,24 @@
+{
+  "name": "text",
+  "version": "1.0.0",
+  "description": "Text and string manipulation utilities",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["text", "string", "regex", "formatting"],
+  "steps": [
+    "StringJoinStep",
+    "StringSplitStep",
+    "StringReplaceStep",
+    "StringReverseStep",
+    "StringRepeatStep",
+    "StringFormatStep",
+    "TextCaseStep",
+    "StringTrimStep",
+    "StringPadStep",
+    "SubstringStep",
+    "TextTruncateStep",
+    "RegexMatchStep",
+    "RegexReplaceStep"
+  ],
+  "ui_components": {}
+}

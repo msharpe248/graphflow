@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphflow-plugins-text"
+version = "1.0.0"
+description = "Text and string manipulation plugin for GraphFlow"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []  # No external dependencies - pure Python
+
+[project.entry-points."graphflow.plugins"]
+text = "graphflow_text"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["graphflow_text*"]
