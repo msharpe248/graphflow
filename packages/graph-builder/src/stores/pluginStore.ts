@@ -48,8 +48,8 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
           description: step.description,
           plugin: step.plugin,
           plugin_version: step.plugin_version,
-          color: getColorForCategory(step.category),
-          icon: getIconForCategory(step.category),
+          color: getColorForStep(step.category, step.plugin),
+          icon: getIconForStep(step.category, step.plugin),
           configSchema: step.config_schema,
           inputsSchema: step.inputs_schema,
           outputsSchema: step.outputs_schema,
@@ -125,26 +125,58 @@ export const usePluginStore = create<PluginStore>((set, get) => ({
   },
 }));
 
-// Helper function to get color for category
-function getColorForCategory(category: string): string {
-  const colorMap: Record<string, string> = {
-    control: '#10b981',
-    ai: '#8b5cf6',
-    data: '#3b82f6',
-    transform: '#f59e0b',
-    general: '#6b7280',
-  };
-  return colorMap[category] || colorMap.general;
+// Plugin-specific color overrides
+const pluginColorMap: Record<string, string> = {
+  json: '#f97316',   // orange - JSON braces
+  yaml: '#a855f7',   // purple - config files
+  csv: '#22c55e',    // green - spreadsheet/table
+  text: '#14b8a6',   // teal - text manipulation
+  http: '#3b82f6',   // blue - network/web
+};
+
+// Plugin-specific icon overrides
+const pluginIconMap: Record<string, string> = {
+  json: 'Braces',      // { } curly braces
+  yaml: 'FileCode',    // config file
+  csv: 'Table',        // spreadsheet/table
+  text: 'Type',        // text/typography
+  http: 'Globe',       // network/web
+};
+
+// Category color defaults
+const categoryColorMap: Record<string, string> = {
+  control: '#10b981',
+  ai: '#8b5cf6',
+  data: '#3b82f6',
+  transform: '#f59e0b',
+  general: '#6b7280',
+};
+
+// Category icon defaults
+const categoryIconMap: Record<string, string> = {
+  control: 'Play',
+  ai: 'Sparkles',
+  data: 'Database',
+  transform: 'Code',
+  general: 'Box',
+};
+
+// Helper function to get color for step (plugin-specific or category default)
+function getColorForStep(category: string, plugin?: string): string {
+  // Check plugin-specific color first
+  if (plugin && pluginColorMap[plugin]) {
+    return pluginColorMap[plugin];
+  }
+  // Fall back to category color
+  return categoryColorMap[category] || categoryColorMap.general;
 }
 
-// Helper function to get icon for category
-function getIconForCategory(category: string): string {
-  const iconMap: Record<string, string> = {
-    control: 'Play',
-    ai: 'Sparkles',
-    data: 'Database',
-    transform: 'Code',
-    general: 'Box',
-  };
-  return iconMap[category] || iconMap.general;
+// Helper function to get icon for step (plugin-specific or category default)
+function getIconForStep(category: string, plugin?: string): string {
+  // Check plugin-specific icon first
+  if (plugin && pluginIconMap[plugin]) {
+    return pluginIconMap[plugin];
+  }
+  // Fall back to category icon
+  return categoryIconMap[category] || categoryIconMap.general;
 }
