@@ -3,6 +3,7 @@ import { Download, Upload, Trash2, Settings, FileJson, Play } from 'lucide-react
 import { useGraphStore } from '@/stores/graphStore';
 import { useAppStore } from '@/stores/appStore';
 import { useCreateAgent, useCreateRun } from '@/hooks/useRuntime';
+import { getAgent } from '@/services/runtime';
 import RunInputModal from './RunInputModal';
 
 interface ToolbarProps {
@@ -75,8 +76,20 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
 
       let targetAgentId: string;
 
+      // Check if linked agent exists in runtime
+      let agentExists = false;
       if (agentId) {
-        // Update existing agent (not implementing update for now, just use existing)
+        try {
+          await getAgent(agentId);
+          agentExists = true;
+        } catch {
+          // Agent doesn't exist (likely runtime was restarted)
+          agentExists = false;
+        }
+      }
+
+      if (agentId && agentExists) {
+        // Use existing agent
         targetAgentId = agentId;
       } else {
         // Create new temporary agent

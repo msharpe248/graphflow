@@ -42,6 +42,41 @@ class CodeGenerator(ABC):
         # Replace dots and other invalid characters with underscores
         return value.replace('.', '_').replace('-', '_').replace(' ', '_')
 
+    def _resolve_memory_reference(self, value: Any, graph: GraphDefinition) -> Any:
+        """
+        Resolve a memory reference to its default value from the memory schema.
+
+        If value is a string like "{memory.llm_2.tools}", looks up the default value
+        from the memory schema. Otherwise returns the value as-is.
+
+        Args:
+            value: Config value that might be a memory reference
+            graph: Graph definition containing memory schema
+
+        Returns:
+            Resolved value (default from memory schema) or original value
+        """
+        if not isinstance(value, str):
+            return value
+
+        # Check if this is a memory reference: {memory.key}
+        match = re.match(r'^\{memory\.([^}]+)\}$', value)
+        if not match:
+            return value
+
+        memory_key = match.group(1)
+
+        # Look up in memory schema (intermediate, inputs, or outputs)
+        for namespace in [graph.memory.intermediate, graph.memory.inputs, graph.memory.outputs]:
+            if memory_key in namespace:
+                field_def = namespace[memory_key]
+                if hasattr(field_def, 'default') and field_def.default is not None:
+                    return field_def.default
+                break
+
+        # If no default found, return empty list for tools (common case)
+        return value
+
     @abstractmethod
     def get_framework_name(self) -> str:
         """Return framework identifier (e.g., 'pydantic_ai', 'langgraph')."""
@@ -284,7 +319,11 @@ Generated: {graph.metadata.created}
             return match
 
         # Parse and compile tools if present
-        tools_config = step.config.get("tools", [])
+        # Resolve memory reference if tools config is a memory binding like "{memory.step_id.tools}"
+        tools_config_raw = step.config.get("tools", [])
+        tools_config = self._resolve_memory_reference(tools_config_raw, graph)
+        if not isinstance(tools_config, list):
+            tools_config = []  # Fallback if resolution fails
         tool_definitions = self._parse_tools(tools_config)
         mcp_tools = self._parse_mcp_tools(tools_config)
 
@@ -340,6 +379,9 @@ Generated: {graph.metadata.created}
 
             mcp_tool_names = compiler.get_mcp_tool_names(mcp_tools)
             tool_names.extend(mcp_tool_names)
+            # Add MCP tool imports (includes RunContext for pydantic_ai)
+            mcp_imports = compiler.get_mcp_tool_imports(mcp_tools)
+            tool_imports.extend(mcp_imports)
 
         return {
             "step": step,
@@ -502,7 +544,7 @@ await step.execute(self.memory)
             match = pattern.search(source_template)
             if match:
                 source_key = match.group(1)
-                lines.append(f'self.memory.write("{output_name}", self.memory.read("{source_key}"))')
+                lines.append(f'self.memory.write("memory.{output_name}", self.memory.read("memory.{source_key}"))')
 
         return "\n".join(lines)
 
@@ -516,7 +558,7 @@ await step.execute(self.memory)
         context_lines = ["# Transform step"]
         for key in input_keys:
             var_name = key.replace('.', '_')
-            context_lines.append(f'{var_name} = self.memory.read("{key}")')
+            context_lines.append(f'{var_name} = self.memory.read("memory.{key}")')
 
         # Execute transform
         context_lines.append("def _transform():")
@@ -524,7 +566,7 @@ await step.execute(self.memory)
             context_lines.append(f"    {line}")
 
         context_lines.append(f'_result = _transform()')
-        context_lines.append(f'self.memory.write("{output_key}", _result)')
+        context_lines.append(f'self.memory.write("memory.{output_key}", _result)')
 
         return "\n".join(context_lines)
 
@@ -536,7 +578,7 @@ await step.execute(self.memory)
         lines = ["# Conditional step"]
         for key in step.memory_reads:
             var_name = key.replace('.', '_')
-            lines.append(f'{var_name} = self.memory.read("{key}")')
+            lines.append(f'{var_name} = self.memory.read("memory.{key}")')
 
         # Adjust condition for dotted keys
         adjusted_condition = condition
@@ -545,7 +587,7 @@ await step.execute(self.memory)
                 adjusted_condition = adjusted_condition.replace(key, key.replace('.', '_'))
 
         lines.append(f'_condition_result = {adjusted_condition}')
-        lines.append(f'self.memory.write("{result_key}", bool(_condition_result))')
+        lines.append(f'self.memory.write("memory.{result_key}", bool(_condition_result))')
 
         return "\n".join(lines)
 
@@ -568,7 +610,7 @@ await step.execute(self.memory)
                 if match:
                     mem_key = match.group(1)
                     var_name = key
-                    lines.append(f'{var_name} = self.memory.read("{mem_key}")')
+                    lines.append(f'{var_name} = self.memory.read("memory.{mem_key}")')
 
         lines.append("")
         lines.append("# Make HTTP request")
@@ -588,10 +630,10 @@ await step.execute(self.memory)
             if match:
                 output_key = match.group(1)
                 if output_name == "response":
-                    lines.append(f'self.memory.write("{output_key}", response.text)')
+                    lines.append(f'self.memory.write("memory.{output_key}", response.text)')
                 elif output_name == "status_code":
-                    lines.append(f'self.memory.write("{output_key}", response.status_code)')
+                    lines.append(f'self.memory.write("memory.{output_key}", response.status_code)')
                 elif output_name == "headers":
-                    lines.append(f'self.memory.write("{output_key}", dict(response.headers))')
+                    lines.append(f'self.memory.write("memory.{output_key}", dict(response.headers))')
 
         return "\n".join(lines)

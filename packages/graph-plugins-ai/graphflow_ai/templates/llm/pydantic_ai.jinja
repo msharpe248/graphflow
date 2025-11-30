@@ -12,16 +12,12 @@
 from graphflow_ai.mcp_client import MCPServerPool, MCPServerConfig
 {% endif %}
 
-{% if output_schema %}
+{% if output_schema and output_schema.properties %}
 # Define output schema
 class LLMOutput_{{ step.id }}(BaseModel):
-{% if output_schema.properties %}
 {% for prop_name, prop_def in output_schema.properties.items() %}
     {{ prop_name }}: {{ json_type_to_python(prop_def.type) }}  # {{ prop_def.description | default("") }}
 {% endfor %}
-{% else %}
-    pass
-{% endif %}
 
 {% endif %}
 {% if tool_code %}
@@ -52,78 +48,87 @@ mcp_servers["{{ server_key }}"] = await _mcp_pool.get_or_create(_mcp_cfg_{{ loop
 {% endfor %}
 
 {% endif %}
-# Render prompts
+# Read LLM configuration from memory
+_provider = self.memory.read("memory.{{ step.id }}.provider")
+_model = self.memory.read("memory.{{ step.id }}.model")
+_base_url = self.memory.read("memory.{{ step.id }}.base_url")
+_system_prompt = self.memory.read("memory.{{ step.id }}.system_prompt")
+_user_prompt = self.memory.read("memory.{{ step.id }}.user_prompt")
+
+# Render prompts - replace any remaining memory references
 {% for key in memory_refs | sort %}
-{{ key | replace('.', '_') }} = self.memory.read("{{ key }}")
+{{ key | replace('.', '_') }} = self.memory.read("memory.{{ key }}")
 {% endfor %}
 
-# Build prompt
-{% if user_prompt %}
-user_prompt_template = {{ user_prompt | repr }}
+# Build user prompt with variable substitution
+user_prompt_template = str(_user_prompt) if _user_prompt else ""
 {% for key in memory_refs | sort %}
 user_prompt_template = user_prompt_template.replace("{memory.{{ key }}}", str({{ key | replace('.', '_') }}))
 {% endfor %}
-{% else %}
-user_prompt_template = ""
-{% endif %}
 
 # Get API key
 {% if api_key_secret %}
+{% if api_key_secret.startswith('{memory.') %}
+{% set api_key_mem_key = api_key_secret[8:-1] %}
+api_key = self.memory.read("memory.{{ api_key_mem_key }}")
+{% elif api_key_secret.startswith('{secrets.') %}
+{% set api_key_secret_name = api_key_secret[9:-1] %}
+api_key = self.memory.get_secret("{{ api_key_secret_name }}")
+{% else %}
 api_key = self.memory.get_secret("{{ api_key_secret }}")
+{% endif %}
 {% else %}
 api_key = None  # Will use environment variable
 {% endif %}
 
-# Configure model based on provider
-{% if provider == "openai" %}
-{% if base_url %}
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-_provider = OpenAIProvider(base_url="{{ base_url }}", api_key=api_key)
-model_ref = OpenAIChatModel("{{ model }}", provider=_provider)
-{% else %}
-model_ref = "openai:{{ model }}"
-{% endif %}
-{% elif provider == "anthropic" %}
-model_ref = "anthropic:{{ model }}"
-{% elif provider == "ollama" %}
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.ollama import OllamaProvider
-_provider = OllamaProvider(base_url="{{ base_url or 'http://localhost:11434' }}/v1")
-model_ref = OpenAIChatModel("{{ model }}", provider=_provider)
-{% elif provider == "groq" %}
-model_ref = "groq:{{ model }}"
-{% elif provider == "mistral" %}
-model_ref = "mistral:{{ model }}"
-{% elif provider == "google" %}
-model_ref = "google-gla:{{ model }}"
-{% elif provider == "lmstudio" %}
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-_provider = OpenAIProvider(base_url="{{ base_url or 'http://localhost:1234/v1' }}", api_key="lm-studio")
-model_ref = OpenAIChatModel("{{ model }}", provider=_provider)
-{% elif provider == "openrouter" %}
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-_provider = OpenAIProvider(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-model_ref = OpenAIChatModel("{{ model }}", provider=_provider)
-{% elif provider in ["azure", "openai_compatible"] %}
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-_provider = OpenAIProvider(base_url="{{ base_url }}", api_key=api_key)
-model_ref = OpenAIChatModel("{{ model }}", provider=_provider)
-{% else %}
-# Default: treat as OpenAI
-model_ref = "openai:{{ model }}"
-{% endif %}
+# Configure model based on provider (resolved at runtime)
+if _provider == "openai":
+    if _base_url:
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+        _llm_provider = OpenAIProvider(base_url=_base_url, api_key=api_key)
+        model_ref = OpenAIChatModel(_model, provider=_llm_provider)
+    else:
+        model_ref = f"openai:{_model}"
+elif _provider == "anthropic":
+    model_ref = f"anthropic:{_model}"
+elif _provider == "ollama":
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.ollama import OllamaProvider
+    _ollama_url = _base_url or "http://localhost:11434"
+    _llm_provider = OllamaProvider(base_url=f"{_ollama_url}/v1")
+    model_ref = OpenAIChatModel(_model, provider=_llm_provider)
+elif _provider == "groq":
+    model_ref = f"groq:{_model}"
+elif _provider == "mistral":
+    model_ref = f"mistral:{_model}"
+elif _provider == "google":
+    model_ref = f"google-gla:{_model}"
+elif _provider == "lmstudio":
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    _lm_url = _base_url or "http://localhost:1234/v1"
+    _llm_provider = OpenAIProvider(base_url=_lm_url, api_key="lm-studio")
+    model_ref = OpenAIChatModel(_model, provider=_llm_provider)
+elif _provider == "openrouter":
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    _llm_provider = OpenAIProvider(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+    model_ref = OpenAIChatModel(_model, provider=_llm_provider)
+elif _provider in ["azure", "openai_compatible"]:
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    _llm_provider = OpenAIProvider(base_url=_base_url, api_key=api_key)
+    model_ref = OpenAIChatModel(_model, provider=_llm_provider)
+else:
+    # Default: treat as OpenAI
+    model_ref = f"openai:{_model}"
 
 # Create Pydantic AI agent
 agent = Agent(
     model_ref,
-{% if system_prompt %}
-    system_prompt={{ system_prompt | repr }},
-{% endif %}
-{% if output_schema %}
+    system_prompt=_system_prompt if _system_prompt else None,
+{% if output_schema and output_schema.properties %}
     output_type=LLMOutput_{{ step.id }},
 {% else %}
     output_type=str,
@@ -162,7 +167,7 @@ result = await agent.run(user_prompt_template)
 {% endif %}
 
 # Extract result
-{% if output_schema %}
+{% if output_schema and output_schema.properties %}
 response_data = result.output.model_dump()
 {% else %}
 response_data = result.output
@@ -173,7 +178,7 @@ response_data = result.output
 {% if '{memory.' in output_template %}
 {% set output_key = output_template.split('{memory.')[1].split('}')[0] %}
 {% if output_name == 'response' %}
-self.memory.write("{{ output_key }}", response_data)
+self.memory.write("memory.{{ output_key }}", response_data)
 {% elif output_name == 'tool_calls' %}
 # Extract tool call history from result
 tool_calls_data = []
@@ -186,7 +191,7 @@ if hasattr(result, 'all_messages'):
                         "name": part.tool_name,
                         "args": getattr(part, 'args', {}),
                     })
-self.memory.write("{{ output_key }}", tool_calls_data)
+self.memory.write("memory.{{ output_key }}", tool_calls_data)
 {% endif %}
 {% endif %}
 {% endfor %}

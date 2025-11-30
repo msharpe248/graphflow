@@ -41,7 +41,7 @@ class MCPClientStep(StepBase):
     label = "MCP Client"
     description = "Connect to MCP server and execute a tool"
     can_be_tool = False
-    tool_ineligible_reason = "MCP client manages external connections, not suitable as a tool"
+    tool_ineligible_reason = "Use 'Add MCP' button in LLM step to add MCP tools"
 
     @classmethod
     def get_type(cls) -> str:
@@ -52,7 +52,7 @@ class MCPClientStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                # All MCP configuration in one wizard
+                # All MCP configuration in one wizard (for standalone use)
                 "mcp_config": {
                     "type": "object",
                     "description": "MCP server connection, tool selection, and arguments",
@@ -73,6 +73,15 @@ class MCPClientStep(StepBase):
                         "tool_name": {"type": "string"},
                         "tool_args": {"type": "object"}
                     }
+                },
+                # Top-level properties for LLM tool usage (override mcp_config values)
+                "tool_name": {
+                    "type": "string",
+                    "description": "Name of the MCP tool to execute (overrides mcp_config.tool_name)"
+                },
+                "tool_args": {
+                    "type": "object",
+                    "description": "Arguments for the MCP tool (overrides mcp_config.tool_args)"
                 },
             },
             "required": []
@@ -204,11 +213,22 @@ class MCPClientStep(StepBase):
         )
 
     def _get_tool_config(self, memory: Optional[MemoryStore] = None) -> Dict[str, Any]:
-        """Get tool configuration from mcp_config property."""
+        """
+        Get tool configuration, checking top-level properties first.
+
+        Priority:
+        1. Top-level tool_name/tool_args (for LLM tool usage)
+        2. mcp_config.tool_name/tool_args (for standalone/wizard usage)
+        """
         mcp_config = self._get_mcp_config(memory)
+
+        # Check for top-level overrides first
+        tool_name = self.config.get("tool_name") or mcp_config.get("tool_name", "")
+        tool_args = self.config.get("tool_args") or mcp_config.get("tool_args", {})
+
         return {
-            "tool_name": mcp_config.get("tool_name", ""),
-            "tool_args": mcp_config.get("tool_args", {}),
+            "tool_name": tool_name,
+            "tool_args": tool_args,
         }
 
     def _resolve_tool_args(self, memory: MemoryStore) -> Dict[str, Any]:
@@ -232,12 +252,12 @@ class MCPClientStep(StepBase):
                     # Full replacement if entire string is a memory ref
                     if pattern.fullmatch(value):
                         mem_path = match.group(1)
-                        resolved[key] = memory.read(f"intermediate.{mem_path}")
+                        resolved[key] = memory.read(f"memory.{mem_path}")
                     else:
                         # Partial replacement for string interpolation
                         def replace_match(m):
                             mem_path = m.group(1)
-                            val = memory.read(f"intermediate.{mem_path}")
+                            val = memory.read(f"memory.{mem_path}")
                             return str(val) if val is not None else ""
                         resolved[key] = pattern.sub(replace_match, value)
                 else:

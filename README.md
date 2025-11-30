@@ -640,12 +640,12 @@ graphflow-runtime --reload
 - ✅ LLM tool support with visual tool builder (MappedStepTools)
 - ✅ Live execution log with tool call visibility during debugging
 - ✅ Tool error handling (errors returned to LLM for adaptive behavior)
+- ✅ MCP tool integration for LLM steps (connect to any MCP server)
 
 **Phase 5: Future Enhancements**
 - 🚧 Graph templates
 - 🚧 Compile from UI
 - Plugin marketplace/registry
-- MCP server integration
 - Graph versioning
 - Distributed execution
 - Streaming support

@@ -37,6 +37,26 @@ class ToolCompiler:
         """
         self.framework = framework
 
+    def _sanitize_name(self, name: str) -> str:
+        """
+        Sanitize a name to be a valid Python identifier.
+
+        Replaces hyphens and other invalid characters with underscores.
+        MCP tool names like 'resolve-library-id' become 'resolve_library_id'.
+
+        Args:
+            name: Original name (may contain hyphens, dots, etc.)
+
+        Returns:
+            Valid Python identifier
+        """
+        # Replace hyphens, dots, and other non-alphanumeric chars with underscores
+        sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        # Ensure it doesn't start with a number
+        if sanitized and sanitized[0].isdigit():
+            sanitized = '_' + sanitized
+        return sanitized
+
     def compile_tool(self, tool: ToolDefinition) -> str:
         """
         Compile a single tool definition to Python code.
@@ -99,6 +119,8 @@ class ToolCompiler:
         step_types = {tool.source_step_type for tool in tools}
         if any(s.startswith("http.") for s in step_types):
             imports.add("import graphflow_http")
+        if any(s.startswith("ai.") or s == "mcp_client" for s in step_types):
+            imports.add("import graphflow_ai")
 
         return sorted(imports)
 
@@ -112,7 +134,8 @@ class ToolCompiler:
         lines = []
 
         # Generate function signature (no decorator - passed to Agent constructor)
-        lines.append(f'async def tool_{tool.name}(')
+        safe_name = self._sanitize_name(tool.name)
+        lines.append(f'async def tool_{safe_name}(')
         lines.append(f'    ctx: RunContext[Dict[str, Any]],')
 
         # Add LLM parameters
@@ -206,8 +229,9 @@ class ToolCompiler:
         ind = "    "
 
         # Generate function signature with @tool decorator
+        safe_name = self._sanitize_name(tool.name)
         lines.append(f'{ind}@tool')
-        lines.append(f'{ind}async def tool_{tool.name}(')
+        lines.append(f'{ind}async def tool_{safe_name}(')
 
         # Add LLM parameters
         llm_params = tool.get_llm_parameters()
@@ -310,7 +334,7 @@ class ToolCompiler:
             lines.append('')
 
         # Return list of tool functions
-        tool_names = [f'tool_{t.name}' for t in tools]
+        tool_names = [f'tool_{self._sanitize_name(t.name)}' for t in tools]
         lines.append(f'    return [{", ".join(tool_names)}]')
 
         return "\n".join(lines)
@@ -342,7 +366,7 @@ class ToolCompiler:
         Returns:
             List of function names (e.g., ['tool_search', 'tool_fetch'])
         """
-        return [f"tool_{tool.name}" for tool in tools]
+        return [f"tool_{self._sanitize_name(tool.name)}" for tool in tools]
 
     # =========================================================================
     # MCP Tool Compilation
@@ -420,7 +444,7 @@ class ToolCompiler:
         Returns:
             List of function names
         """
-        return [f"tool_{mcp_tool.definition.name}" for mcp_tool in mcp_tools]
+        return [f"tool_{self._sanitize_name(mcp_tool.definition.name)}" for mcp_tool in mcp_tools]
 
     def _compile_pydantic_ai_mcp_tool(self, mcp_tool: MCPTool) -> str:
         """
@@ -434,7 +458,8 @@ class ToolCompiler:
         lines = []
 
         # Generate function signature
-        lines.append(f'async def tool_{definition.name}(')
+        safe_name = self._sanitize_name(definition.name)
+        lines.append(f'async def tool_{safe_name}(')
         lines.append(f'    ctx: RunContext[Dict[str, Any]],')
 
         # Add LLM parameters
@@ -521,8 +546,9 @@ class ToolCompiler:
         ind = "    "  # Extra indentation for factory function
 
         # Generate function signature with @tool decorator
+        safe_name = self._sanitize_name(definition.name)
         lines.append(f'{ind}@tool')
-        lines.append(f'{ind}async def tool_{definition.name}(')
+        lines.append(f'{ind}async def tool_{safe_name}(')
 
         # Add LLM parameters
         llm_params = definition.get_llm_parameters()
@@ -698,8 +724,8 @@ class ToolCompiler:
 
         # Return list of all tool functions
         all_tool_names = []
-        all_tool_names.extend([f'tool_{t.name}' for t in step_tools])
-        all_tool_names.extend([f'tool_{mt.definition.name}' for mt in mcp_tools])
+        all_tool_names.extend([f'tool_{self._sanitize_name(t.name)}' for t in step_tools])
+        all_tool_names.extend([f'tool_{self._sanitize_name(mt.definition.name)}' for mt in mcp_tools])
 
         lines.append(f'    return [{", ".join(all_tool_names)}]')
 

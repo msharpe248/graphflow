@@ -90,9 +90,67 @@ export interface FunctionTool {
 }
 
 /**
+ * MCP Server configuration for connecting to an MCP server.
+ */
+export interface MCPServerConfig {
+  /** Transport type: 'stdio', 'sse', or 'streamable_http' */
+  transport: 'stdio' | 'sse' | 'streamable_http';
+
+  /** Command to run for stdio transport */
+  command?: string;
+
+  /** Arguments for stdio command */
+  args?: string[];
+
+  /** Environment variables for stdio process */
+  env?: Record<string, string>;
+
+  /** Server URL for SSE or Streamable HTTP transport */
+  url?: string;
+
+  /** HTTP headers for SSE/Streamable HTTP */
+  headers?: Record<string, string>;
+
+  /** Connection/call timeout in seconds */
+  timeout?: number;
+}
+
+/**
+ * Definition of an MCP tool to expose to an LLM.
+ */
+export interface MCPToolDefinition {
+  /** Unique identifier for this tool */
+  id: string;
+
+  /** Tool name visible to LLM (can differ from MCP tool name) */
+  name: string;
+
+  /** Tool description for LLM */
+  description: string;
+
+  /** Original tool name on the MCP server */
+  mcp_tool_name: string;
+
+  /** How each MCP tool parameter is handled (LLM vs runtime) */
+  property_mappings: ToolPropertyMapping[];
+
+  /** Key for the output in the result */
+  output_key?: string;
+}
+
+/**
+ * A tool entry that wraps an MCP server tool.
+ */
+export interface MCPTool {
+  type: 'mcp';
+  server: MCPServerConfig;
+  definition: MCPToolDefinition;
+}
+
+/**
  * Union type for all tool entry types in an LLM step's tools array.
  */
-export type ToolEntry = MappedStepTool | FunctionTool;
+export type ToolEntry = MappedStepTool | FunctionTool | MCPTool;
 
 /**
  * Helper to check if a tool entry is a mapped step tool.
@@ -106,6 +164,13 @@ export function isMappedStepTool(entry: ToolEntry): entry is MappedStepTool {
  */
 export function isFunctionTool(entry: ToolEntry): entry is FunctionTool {
   return entry.type === 'function';
+}
+
+/**
+ * Helper to check if a tool entry is an MCP tool.
+ */
+export function isMCPTool(entry: ToolEntry): entry is MCPTool {
+  return entry.type === 'mcp';
 }
 
 /**
@@ -180,5 +245,40 @@ export function createMappedStepTool(definition: ToolDefinition): MappedStepTool
   return {
     type: 'mapped_step',
     definition,
+  };
+}
+
+/**
+ * Create an MCP tool from server config and definition.
+ */
+export function createMCPTool(server: MCPServerConfig, definition: MCPToolDefinition): MCPTool {
+  return {
+    type: 'mcp',
+    server,
+    definition,
+  };
+}
+
+/**
+ * Create an empty MCP server config with defaults.
+ */
+export function createEmptyMCPServerConfig(): MCPServerConfig {
+  return {
+    transport: 'stdio',
+    timeout: 30,
+  };
+}
+
+/**
+ * Create an empty MCP tool definition with defaults.
+ */
+export function createEmptyMCPToolDefinition(id?: string, mcpToolName?: string): MCPToolDefinition {
+  return {
+    id: id || `mcp_tool_${Date.now()}`,
+    name: mcpToolName || '',
+    description: '',
+    mcp_tool_name: mcpToolName || '',
+    property_mappings: [],
+    output_key: 'result',
   };
 }

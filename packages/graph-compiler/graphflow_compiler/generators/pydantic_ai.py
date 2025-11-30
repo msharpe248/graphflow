@@ -100,7 +100,7 @@ class PydanticAIGenerator(CodeGenerator):
         lines.append("# Render prompts")
         for key in sorted(memory_refs):
             var_name = key.replace('.', '_')
-            lines.append(f'{var_name} = self.memory.read("{key}")')
+            lines.append(f'{var_name} = self.memory.read("memory.{key}")')
 
         # Build full prompt
         lines.append("")
@@ -120,7 +120,17 @@ class PydanticAIGenerator(CodeGenerator):
         # Get API key
         api_key_secret = config.get("api_key_secret")
         if api_key_secret:
-            lines.append(f'api_key = self.memory.get_secret("{api_key_secret}")')
+            if api_key_secret.startswith('{memory.'):
+                # Memory binding - read from memory
+                api_key_mem_key = api_key_secret[8:-1]
+                lines.append(f'api_key = self.memory.read("memory.{api_key_mem_key}")')
+            elif api_key_secret.startswith('{secrets.'):
+                # Secrets binding - use get_secret
+                api_key_secret_name = api_key_secret[9:-1]
+                lines.append(f'api_key = self.memory.get_secret("{api_key_secret_name}")')
+            else:
+                # Literal secret name
+                lines.append(f'api_key = self.memory.get_secret("{api_key_secret}")')
         else:
             lines.append(f'api_key = None  # Will use environment variable')
 
@@ -168,7 +178,7 @@ class PydanticAIGenerator(CodeGenerator):
             match = pattern.search(response_template)
             if match:
                 output_key = match.group(1)
-                lines.append(f'self.memory.write("{output_key}", response_data)')
+                lines.append(f'self.memory.write("memory.{output_key}", response_data)')
 
         # Handle tool calls if configured
         if 'tool_calls' in step.outputs:
@@ -177,7 +187,7 @@ class PydanticAIGenerator(CodeGenerator):
             if match:
                 tool_calls_key = match.group(1)
                 lines.append(f'# Tool calls not yet implemented in generated code')
-                lines.append(f'self.memory.write("{tool_calls_key}", [])')
+                lines.append(f'self.memory.write("memory.{tool_calls_key}", [])')
 
         return "\n".join(lines)
 

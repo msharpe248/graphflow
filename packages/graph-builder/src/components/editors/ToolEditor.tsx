@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Package, Wrench } from 'lucide-react';
+import { Plus, Trash2, Edit2, Package, Wrench, Server } from 'lucide-react';
 import { EditorProps } from './types';
 import {
   ToolEntry,
   ToolDefinition,
+  MCPTool,
   isMappedStepTool,
+  isMCPTool,
   createMappedStepTool,
 } from '@/types/tool';
 import ToolBuilderModal from './ToolBuilderModal';
+import MCPBuilderModal from './MCPBuilderModal';
 
 export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMCPModalOpen, setIsMCPModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // Ensure value is always an array
@@ -22,6 +26,11 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
     setIsModalOpen(true);
   };
 
+  // Open MCP modal
+  const handleCreateMCP = () => {
+    setIsMCPModalOpen(true);
+  };
+
   // Edit an existing tool
   const handleEdit = (index: number) => {
     const tool = tools[index];
@@ -29,6 +38,7 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
       setEditingIndex(index);
       setIsModalOpen(true);
     }
+    // TODO: Support editing MCP tools
   };
 
   // Remove a tool
@@ -51,15 +61,28 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
     }
   };
 
+  // Save MCP tools from modal
+  const handleSaveMCPTools = (mcpTools: MCPTool[]) => {
+    onChange([...tools, ...mcpTools]);
+  };
+
   // Get display info for a tool entry
-  const getToolInfo = (entry: ToolEntry): { name: string; description: string } => {
+  const getToolInfo = (entry: ToolEntry): { name: string; description: string; type: 'step' | 'mcp' | 'function' } => {
     if (isMappedStepTool(entry)) {
       return {
         name: entry.definition.name,
         description: entry.definition.description,
+        type: 'step',
       };
     }
-    return { name: 'Unknown', description: '' };
+    if (isMCPTool(entry)) {
+      return {
+        name: entry.definition.name,
+        description: entry.definition.description || `MCP: ${entry.definition.mcp_tool_name}`,
+        type: 'mcp',
+      };
+    }
+    return { name: 'Unknown', description: '', type: 'function' };
   };
 
   // Get the tool definition for editing
@@ -79,14 +102,21 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
         <div className="space-y-2">
           {tools.map((entry, index) => {
             const info = getToolInfo(entry);
+            const isMCP = info.type === 'mcp';
             return (
               <div
                 key={index}
-                className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                className={`p-3 border rounded-lg hover:border-gray-300 transition-colors ${
+                  isMCP ? 'bg-purple-50/50 border-purple-200' : 'bg-gray-50 border-gray-200'
+                }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-2 flex-1 min-w-0">
-                    <Package className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    {isMCP ? (
+                      <Server className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <Package className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-gray-900 text-sm truncate block">
                         {info.name || 'Unnamed tool'}
@@ -98,13 +128,15 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
                   </div>
 
                   <div className="flex items-center gap-1 ml-2">
-                    <button
-                      onClick={() => handleEdit(index)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="Edit tool"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    {!isMCP && (
+                      <button
+                        onClick={() => handleEdit(index)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Edit tool"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleRemove(index)}
                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -131,14 +163,23 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
         </div>
       )}
 
-      {/* Add Tool Button */}
-      <button
-        onClick={handleCreate}
-        className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-      >
-        <Plus className="w-4 h-4" />
-        Add Tool
-      </button>
+      {/* Add Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleCreate}
+          className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Tool
+        </button>
+        <button
+          onClick={handleCreateMCP}
+          className="flex-1 px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded-md hover:bg-purple-100 transition-colors flex items-center justify-center gap-2"
+        >
+          <Server className="w-4 h-4" />
+          Add MCP
+        </button>
+      </div>
 
       {/* Tool Builder Modal */}
       <ToolBuilderModal
@@ -147,6 +188,14 @@ export default function ToolEditor({ value, onChange, stepId }: EditorProps) {
         onSave={handleSaveTool}
         initialTool={getEditingTool()}
         title={editingIndex !== null ? 'Edit Tool' : 'Create Tool'}
+        stepId={stepId}
+      />
+
+      {/* MCP Builder Modal */}
+      <MCPBuilderModal
+        isOpen={isMCPModalOpen}
+        onClose={() => setIsMCPModalOpen(false)}
+        onSave={handleSaveMCPTools}
         stepId={stepId}
       />
     </div>

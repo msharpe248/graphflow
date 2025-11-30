@@ -40,61 +40,72 @@ mcp_servers["{{ server_key }}"] = await _mcp_pool.get_or_create(_mcp_cfg_{{ loop
 {% endfor %}
 
 {% endif %}
-# Render prompts from memory
+# Read LLM configuration from memory
+_provider = self.memory.read("memory.{{ step.id }}.provider")
+_model = self.memory.read("memory.{{ step.id }}.model")
+_base_url = self.memory.read("memory.{{ step.id }}.base_url")
+_system_prompt = self.memory.read("memory.{{ step.id }}.system_prompt")
+_user_prompt = self.memory.read("memory.{{ step.id }}.user_prompt")
+_temperature = self.memory.read("memory.{{ step.id }}.temperature") or {{ temperature }}
+
+# Render prompts - replace any remaining memory references
 {% for key in memory_refs | sort %}
-{{ key | replace('.', '_') }} = self.memory.read("{{ key }}")
+{{ key | replace('.', '_') }} = self.memory.read("memory.{{ key }}")
 {% endfor %}
 
-# Build prompt
-{% if user_prompt %}
-user_prompt_template = {{ user_prompt | repr }}
+# Build user prompt with variable substitution
+user_prompt_template = str(_user_prompt) if _user_prompt else ""
 {% for key in memory_refs | sort %}
 user_prompt_template = user_prompt_template.replace("{memory.{{ key }}}", str({{ key | replace('.', '_') }}))
 {% endfor %}
-{% else %}
-user_prompt_template = ""
-{% endif %}
 
 # Get API key
 {% if api_key_secret %}
+{% if api_key_secret.startswith('{memory.') %}
+{% set api_key_mem_key = api_key_secret[8:-1] %}
+api_key = self.memory.read("memory.{{ api_key_mem_key }}")
+{% elif api_key_secret.startswith('{secrets.') %}
+{% set api_key_secret_name = api_key_secret[9:-1] %}
+api_key = self.memory.get_secret("{{ api_key_secret_name }}")
+{% else %}
 api_key = self.memory.get_secret("{{ api_key_secret }}")
+{% endif %}
 {% else %}
 api_key = None  # Will use environment variable
 {% endif %}
 
-# Configure LLM based on provider
-{% if provider == "openai" %}
-{% if base_url %}
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url }}", api_key=api_key)
-{% else %}
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }})
-{% endif %}
-{% elif provider == "anthropic" %}
-llm = ChatAnthropic(model="{{ model }}", temperature={{ temperature }})
-{% elif provider == "ollama" %}
-llm = ChatOllama(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url or 'http://localhost:11434' }}")
-{% elif provider == "groq" %}
-llm = ChatGroq(model="{{ model }}", temperature={{ temperature }})
-{% elif provider == "mistral" %}
-llm = ChatMistralAI(model="{{ model }}", temperature={{ temperature }})
-{% elif provider == "google" %}
-llm = ChatGoogleGenerativeAI(model="{{ model }}", temperature={{ temperature }})
-{% elif provider == "lmstudio" %}
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url or 'http://localhost:1234/v1' }}", api_key="lm-studio")
-{% elif provider == "openrouter" %}
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="https://openrouter.ai/api/v1", api_key=api_key)
-{% elif provider in ["azure", "openai_compatible"] %}
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }}, base_url="{{ base_url }}", api_key=api_key)
-{% else %}
-# Default: treat as OpenAI
-llm = ChatOpenAI(model="{{ model }}", temperature={{ temperature }})
-{% endif %}
+# Configure LLM based on provider (resolved at runtime)
+if _provider == "openai":
+    if _base_url:
+        llm = ChatOpenAI(model=_model, temperature=_temperature, base_url=_base_url, api_key=api_key)
+    else:
+        llm = ChatOpenAI(model=_model, temperature=_temperature)
+elif _provider == "anthropic":
+    llm = ChatAnthropic(model=_model, temperature=_temperature)
+elif _provider == "ollama":
+    _ollama_url = _base_url or "http://localhost:11434"
+    llm = ChatOllama(model=_model, temperature=_temperature, base_url=_ollama_url)
+elif _provider == "groq":
+    llm = ChatGroq(model=_model, temperature=_temperature)
+elif _provider == "mistral":
+    llm = ChatMistralAI(model=_model, temperature=_temperature)
+elif _provider == "google":
+    llm = ChatGoogleGenerativeAI(model=_model, temperature=_temperature)
+elif _provider == "lmstudio":
+    _lm_url = _base_url or "http://localhost:1234/v1"
+    llm = ChatOpenAI(model=_model, temperature=_temperature, base_url=_lm_url, api_key="lm-studio")
+elif _provider == "openrouter":
+    llm = ChatOpenAI(model=_model, temperature=_temperature, base_url="https://openrouter.ai/api/v1", api_key=api_key)
+elif _provider in ["azure", "openai_compatible"]:
+    llm = ChatOpenAI(model=_model, temperature=_temperature, base_url=_base_url, api_key=api_key)
+else:
+    # Default: treat as OpenAI
+    llm = ChatOpenAI(model=_model, temperature=_temperature)
 
 # Build messages
 messages = []
-{% if system_prompt %}
-messages.append(SystemMessage(content={{ system_prompt | repr }}))
-{% endif %}
+if _system_prompt:
+    messages.append(SystemMessage(content=_system_prompt))
 messages.append(HumanMessage(content=user_prompt_template))
 
 {% if tool_names or mcp_tools %}
@@ -158,7 +169,7 @@ response_content = response.content
 {% endif %}
 
 # Write to memory using outputs dict
-{% if output_schema %}
+{% if output_schema and output_schema.properties %}
 # Parse structured output
 import json
 try:
@@ -169,7 +180,7 @@ except (json.JSONDecodeError, TypeError):
 {% if '{memory.' in output_template %}
 {% set output_key = output_template.split('{memory.')[1].split('}')[0] %}
 {% if output_name == 'response' %}
-self.memory.write("{{ output_key }}", response_data)
+self.memory.write("memory.{{ output_key }}", response_data)
 {% endif %}
 {% endif %}
 {% endfor %}
@@ -178,7 +189,7 @@ self.memory.write("{{ output_key }}", response_data)
 {% if '{memory.' in output_template %}
 {% set output_key = output_template.split('{memory.')[1].split('}')[0] %}
 {% if output_name == 'response' %}
-self.memory.write("{{ output_key }}", response_content)
+self.memory.write("memory.{{ output_key }}", response_content)
 {% elif output_name == 'tool_calls' %}
 # Extract tool call history
 tool_calls_data = []
@@ -190,7 +201,7 @@ if hasattr(response, 'tool_calls') and response.tool_calls:
             "args": tc.get('args') or tc.get('function', {}).get('arguments', {}),
         })
 {% endif %}
-self.memory.write("{{ output_key }}", tool_calls_data)
+self.memory.write("memory.{{ output_key }}", tool_calls_data)
 {% endif %}
 {% endif %}
 {% endfor %}
