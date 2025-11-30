@@ -1,0 +1,21 @@
+{
+  "name": "yaml",
+  "version": "1.0.0",
+  "description": "YAML manipulation utilities",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["yaml", "config", "serialization", "conversion"],
+  "steps": [
+    "YAMLParseStep",
+    "YAMLStringifyStep",
+    "YAMLParseAllStep",
+    "YAMLStringifyAllStep",
+    "YAMLValidateStep",
+    "YAMLToJSONStep",
+    "JSONToYAMLStep",
+    "YAMLMergeStep",
+    "YAMLGetStep",
+    "YAMLSetStep"
+  ],
+  "ui_components": {}
+}
