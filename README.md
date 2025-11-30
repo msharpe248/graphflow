@@ -1,6 +1,6 @@
 # GraphFlow
 
-🚀 **Status**: 🚧 **In Development - Proof of Concept**
+🚀 **Status**: ✅ **Active Development**
 
 A low-code agent builder for creating, compiling, and running AI agents with graph-based workflows.
 
@@ -25,7 +25,7 @@ GraphFlow is a comprehensive agent development platform that lets you:
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
 - **Comprehensive Step Library**:
   - 10+ built-in steps (control flow, AI, data transformation)
-  - 17 HTTP plugin steps (requests, URL utils, data transforms, HTML processing)
+  - 60+ plugin steps across 6 plugins (HTTP, Text, JSON, YAML, CSV, Example)
   - Memory manipulation steps (read-memory, write-memory)
 - **Runtime Environment**: Long-running agents with queryable memory and full lifecycle management
 - **CLI Tools**: `graphflow-compile` and `graphflow-runtime`
@@ -42,14 +42,18 @@ GraphFlow consists of four main components plus an extensible plugin system:
 | **graph-core** | Shared library with step types, memory management, and graph models | ✅ Complete |
 | **graph-compiler** | Transpiler from graph JSON to Python (Pydantic AI / LangGraph) | ✅ Complete |
 | **graph-runtime** | FastAPI service for executing and managing agents | ✅ Complete |
-| **graph-builder** | React UI for visual graph construction and runtime monitoring | 🚧 POC |
+| **graph-builder** | React UI for visual graph construction and runtime monitoring | ✅ Complete |
 
 ### Plugin Packages
 
 | Plugin | Description | Steps | Status |
 |--------|-------------|-------|--------|
-| **[graph-plugins-http](packages/graph-plugins-http/README.md)** | Comprehensive HTTP client with request handling, URL utilities, data transforms, and HTML processing | 17 steps | ✅ Complete |
-| **[graphflow-plugin-example](packages/graphflow-plugin-example/README.md)** | Example plugin demonstrating notification steps (Email, Slack) | 2 steps | ✅ Reference |
+| **[graph-plugins-http](packages/graph-plugins-http/README.md)** | HTTP client with request handling, URL utilities, and HTML processing | 15 steps | ✅ Complete |
+| **[graph-plugins-text](packages/graph-plugins-text/README.md)** | Text and string manipulation (join, split, replace, regex, case conversion) | 13 steps | ✅ Complete |
+| **[graph-plugins-json](packages/graph-plugins-json/README.md)** | JSON parsing, manipulation, JSONPath queries, and schema validation | 9 steps | ✅ Complete |
+| **[graph-plugins-yaml](packages/graph-plugins-yaml/README.md)** | YAML parsing, multi-document support, and JSON conversion | 10 steps | ✅ Complete |
+| **[graph-plugins-csv](packages/graph-plugins-csv/README.md)** | CSV parsing, filtering, sorting, column operations, and merging | 14 steps | ✅ Complete |
+| **[graphflow-plugin-example](packages/graphflow-plugin-example/README.md)** | Example plugin demonstrating notification steps (Email, Slack) | 3 steps | ✅ Reference |
 
 ## 🚀 Quick Start
 
@@ -229,10 +233,53 @@ See **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** for c
 
 | Category | Steps | Description |
 |----------|-------|-------------|
-| **HTTP Requests** | `http-get`, `http-post`, `http-put`, `http-patch`, `http-delete` | Full HTTP method support with auth, retries, SSL config |
-| **URL Utilities** | `url-parse`, `url-build`, `url-escape`, `url-unescape` | URL manipulation and construction |
-| **Data Transform** | `json-parse`, `json-stringify`, `base64-encode`, `base64-decode` | Data format conversions |
-| **HTML Processing** | `html-strip`, `html-parse`, `html-find-links`, `html-table-extract` | Extract data from HTML content |
+| **HTTP Requests** | `http.get`, `http.post`, `http.put`, `http.patch`, `http.delete` | Full HTTP method support with auth, retries, SSL config |
+| **URL Utilities** | `http.url-parse`, `http.url-build`, `http.url-escape`, `http.url-unescape` | URL manipulation and construction |
+| **HTML Processing** | `http.html-strip`, `http.html-parse`, `http.html-find-links`, `http.html-table-extract` | Extract data from HTML content |
+| **Encoding** | `http.base64-encode`, `http.base64-decode` | Base64 encoding/decoding |
+
+### Text Plugin Steps (graph-plugins-text)
+
+See **[Text Plugin Documentation](packages/graph-plugins-text/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **String Operations** | `text.join`, `text.split`, `text.replace`, `text.reverse`, `text.repeat` | Basic string manipulation |
+| **Formatting** | `text.format`, `text.case`, `text.trim`, `text.pad`, `text.substring`, `text.truncate` | Text formatting and extraction |
+| **Regex** | `text.regex-match`, `text.regex-replace` | Pattern matching and replacement |
+
+### JSON Plugin Steps (graph-plugins-json)
+
+See **[JSON Plugin Documentation](packages/graph-plugins-json/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **Core** | `json.parse`, `json.stringify` | Parse and serialize JSON |
+| **Manipulation** | `json.get`, `json.set`, `json.merge`, `json.keys`, `json.values` | Access and modify JSON data |
+| **Advanced** | `json.path`, `json.schema-validate` | JSONPath queries and schema validation |
+
+### YAML Plugin Steps (graph-plugins-yaml)
+
+See **[YAML Plugin Documentation](packages/graph-plugins-yaml/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **Core** | `yaml.parse`, `yaml.stringify` | Parse and serialize YAML |
+| **Multi-Document** | `yaml.parse-all`, `yaml.stringify-all` | Handle multi-document YAML files |
+| **Conversion** | `yaml.to-json`, `yaml.from-json` | Convert between YAML and JSON |
+| **Advanced** | `yaml.validate`, `yaml.merge`, `yaml.get`, `yaml.set` | Validation and manipulation |
+
+### CSV Plugin Steps (graph-plugins-csv)
+
+See **[CSV Plugin Documentation](packages/graph-plugins-csv/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **Core** | `csv.parse`, `csv.stringify`, `csv.get-headers` | Parse and serialize CSV |
+| **Conversion** | `csv.to-json`, `csv.from-json` | Convert between CSV and JSON |
+| **Filter & Sort** | `csv.filter`, `csv.sort` | Filter rows by conditions, sort by columns |
+| **Column Ops** | `csv.select-columns`, `csv.get-column`, `csv.add-column`, `csv.rename-columns` | Column manipulation |
+| **Row Ops** | `csv.get-row`, `csv.merge`, `csv.group-by` | Row operations and dataset merging |
 
 ### Creating Custom Steps
 
@@ -390,7 +437,11 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 - **[graph-builder](packages/graph-builder/README.md)** - React UI for visual graph construction (if available)
 
 ### Plugin Documentation
-- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - 17 steps for HTTP requests, URL utilities, data transforms, and HTML processing
+- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - HTTP requests, URL utilities, and HTML processing
+- **[Text Plugin](packages/graph-plugins-text/README.md)** - String manipulation and regex operations
+- **[JSON Plugin](packages/graph-plugins-json/README.md)** - JSON parsing, JSONPath, and schema validation
+- **[YAML Plugin](packages/graph-plugins-yaml/README.md)** - YAML parsing and multi-document support
+- **[CSV Plugin](packages/graph-plugins-csv/README.md)** - CSV manipulation, filtering, and analysis
 - **[Example Plugin](packages/graphflow-plugin-example/README.md)** - Reference implementation for creating custom plugins
 
 ## 🧪 Testing
@@ -554,7 +605,7 @@ graphflow-runtime --reload
 | Control/Data Separation | ✅ | ❌ | ❌ |
 | Multi-Framework Compile | ✅ | ❌ | ⚠️ |
 | Standalone Generation | ✅ | ❌ | ❌ |
-| Visual Graph Builder | 🚧 POC | ✅ | ✅ |
+| Visual Graph Builder | ✅ | ✅ | ✅ |
 | Interactive Debugger | ✅ | ❌ | ❌ |
 | Breakpoint Support | ✅ | ❌ | ❌ |
 | Step-Through Execution | ✅ | ❌ | ❌ |
@@ -567,14 +618,14 @@ graphflow-runtime --reload
 
 ## 🚧 Roadmap
 
-**Phase 4: UI Builder** (In Progress - POC)
+**Phase 4: UI Builder** ✅ Complete
 - ✅ React app with ReactFlow
 - ✅ Drag-and-drop graph builder
-- ✅ Plugin system with step palette
+- ✅ Plugin system with step palette (unique icons/colors per plugin)
 - ✅ Memory schema management
 - ✅ Visual memory binding with "Bound to" buttons
 - ✅ Editable outputs section with clean memory locations
-- ✅ HTTP plugin with 17 production-ready steps
+- ✅ 6 production plugins (HTTP, Text, JSON, YAML, CSV, Example)
 - ✅ Memory manipulation steps (read-memory, write-memory)
 - ✅ Position persistence (node layouts saved/restored)
 - ✅ Runtime monitoring view with agents/runs/details
@@ -589,10 +640,10 @@ graphflow-runtime --reload
 - ✅ LLM tool support with visual tool builder (MappedStepTools)
 - ✅ Live execution log with tool call visibility during debugging
 - ✅ Tool error handling (errors returned to LLM for adaptive behavior)
+
+**Phase 5: Future Enhancements**
 - 🚧 Graph templates
 - 🚧 Compile from UI
-
-**Future**:
 - Plugin marketplace/registry
 - MCP server integration
 - Graph versioning
@@ -619,7 +670,12 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 ## 🔗 Quick Links
 
 - **[Graph Format Specification](GRAPH_FORMAT.md)** - Complete JSON format documentation
-- **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** - 17 steps for web APIs and data processing
+- **Plugin Documentation**:
+  - [HTTP Plugin](packages/graph-plugins-http/README.md) - Web requests and HTML processing
+  - [Text Plugin](packages/graph-plugins-text/README.md) - String manipulation and regex
+  - [JSON Plugin](packages/graph-plugins-json/README.md) - JSON parsing and JSONPath
+  - [YAML Plugin](packages/graph-plugins-yaml/README.md) - YAML parsing and conversion
+  - [CSV Plugin](packages/graph-plugins-csv/README.md) - CSV manipulation and analysis
 - **[Plugin Development Guide](packages/graphflow-plugin-example/README.md)** - Create your own custom steps
 - **[Core Documentation](packages/graph-core/README.md)** - Step types and memory management
 - **[Runtime API](http://localhost:8000/docs)** - FastAPI documentation (when server is running)
