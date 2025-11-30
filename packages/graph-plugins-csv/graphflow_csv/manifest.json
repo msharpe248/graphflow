@@ -1,0 +1,25 @@
+{
+  "name": "csv",
+  "version": "1.0.0",
+  "description": "CSV manipulation utilities",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["csv", "data", "tabular", "spreadsheet"],
+  "steps": [
+    "CSVParseStep",
+    "CSVStringifyStep",
+    "CSVGetHeadersStep",
+    "CSVToJSONStep",
+    "JSONToCSVStep",
+    "CSVFilterStep",
+    "CSVSelectColumnsStep",
+    "CSVSortStep",
+    "CSVGetColumnStep",
+    "CSVGetRowStep",
+    "CSVAddColumnStep",
+    "CSVRenameColumnsStep",
+    "CSVMergeStep",
+    "CSVGroupByStep"
+  ],
+  "ui_components": {}
+}
