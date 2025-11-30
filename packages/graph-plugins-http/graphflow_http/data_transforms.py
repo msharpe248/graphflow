@@ -1,5 +1,4 @@
-"""Data transformation step implementations."""
-import json
+"""Data transformation step implementations - Base64 encoding/decoding."""
 import base64
 import re
 from typing import Any, Dict
@@ -7,154 +6,8 @@ from typing import Any, Dict
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
 
-
-class JSONParseStep(StepBase):
-    """Parse JSON string into object step."""
-
-    name = "JSON Parse"
-    label = "JSON Parse"
-    description = "Parse a JSON string into a Python object/dict"
-    category = "http"
-
-    @classmethod
-    def get_type(cls) -> str:
-        return "json-parse"
-
-    @classmethod
-    def get_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "Input value using {memory.variable} syntax"
-                }
-            },
-            "required": ["input"]
-        }
-
-    @classmethod
-    def get_inputs_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "json_string": {
-                    "type": "string",
-                    "description": "JSON string to parse "
-                }
-            },
-            "required": ["json_string"]
-        }
-
-    @classmethod
-    def get_outputs_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "parsed": {
-                    "description": "Parsed JSON object "
-                }
-            }
-        }
-
-    async def execute(self, memory: MemoryStore) -> None:
-        """Execute JSON parse."""
-        json_string = memory.read(self.config["input_key"])
-
-        # Parse JSON
-        try:
-            parsed = json.loads(str(json_string))
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON string: {e}")
-
-        # Write to memory
-        # Write output
-        if "output" in self.outputs:
-            output_template = self.outputs["output"]
-            match = pattern.search(output_template)
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, parsed)
-
-
-class JSONStringifyStep(StepBase):
-    """Convert object to JSON string step."""
-
-    name = "JSON Stringify"
-    label = "JSON Stringify"
-    description = "Convert a Python object/dict to a JSON string"
-    category = "http"
-
-    @classmethod
-    def get_type(cls) -> str:
-        return "json-stringify"
-
-    @classmethod
-    def get_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "Input value using {memory.variable} syntax"
-                },
-                "indent": {
-                    "type": "integer",
-                    "description": "Number of spaces for indentation (optional, for pretty printing)"
-                },
-                "sort_keys": {
-                    "type": "boolean",
-                    "default": False,
-                    "description": "Sort dictionary keys in output"
-                }
-            },
-            "required": ["input"]
-        }
-
-    @classmethod
-    def get_inputs_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "object": {
-                    "description": "Object to convert to JSON "
-                }
-            },
-            "required": ["object"]
-        }
-
-    @classmethod
-    def get_outputs_schema(cls) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "json_string": {
-                    "type": "string",
-                    "description": "JSON string representation "
-                }
-            }
-        }
-
-    async def execute(self, memory: MemoryStore) -> None:
-        """Execute JSON stringify."""
-        obj = memory.read(self.config["input_key"])
-        indent = self.config.get("indent")
-        sort_keys = self.config.get("sort_keys", False)
-
-        # Convert to JSON
-        try:
-            json_string = json.dumps(obj, indent=indent, sort_keys=sort_keys)
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"Cannot convert object to JSON: {e}")
-
-        # Write to memory
-        # Write output
-        if "output" in self.outputs:
-            output_template = self.outputs["output"]
-            match = pattern.search(output_template)
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, json_string)
+# Pattern for extracting memory references
+pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
 
 class Base64EncodeStep(StepBase):
@@ -193,7 +46,7 @@ class Base64EncodeStep(StepBase):
             "type": "object",
             "properties": {
                 "data": {
-                    "description": "String or bytes to encode "
+                    "description": "String or bytes to encode"
                 }
             },
             "required": ["data"]
@@ -206,7 +59,7 @@ class Base64EncodeStep(StepBase):
             "properties": {
                 "base64": {
                     "type": "string",
-                    "description": "Base64 encoded string "
+                    "description": "Base64 encoded string"
                 }
             }
         }
@@ -228,14 +81,14 @@ class Base64EncodeStep(StepBase):
         # Encode to Base64
         encoded = base64.b64encode(data_bytes).decode('ascii')
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, encoded)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", encoded)
 
 
 class Base64DecodeStep(StepBase):
@@ -280,7 +133,7 @@ class Base64DecodeStep(StepBase):
             "properties": {
                 "base64": {
                     "type": "string",
-                    "description": "Base64 encoded string to decode "
+                    "description": "Base64 encoded string to decode"
                 }
             },
             "required": ["base64"]
@@ -292,7 +145,7 @@ class Base64DecodeStep(StepBase):
             "type": "object",
             "properties": {
                 "decoded": {
-                    "description": "Decoded data as string or bytes "
+                    "description": "Decoded data as string or bytes"
                 }
             }
         }
@@ -318,11 +171,11 @@ class Base64DecodeStep(StepBase):
             except UnicodeDecodeError as e:
                 raise ValueError(f"Cannot decode bytes to string with encoding '{encoding}': {e}")
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, result)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", result)

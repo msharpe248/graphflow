@@ -1,0 +1,80 @@
+{
+  "name": "graphflow-plugins-json",
+  "version": "1.0.0",
+  "description": "JSON manipulation plugin for GraphFlow",
+  "author": "GraphFlow Team",
+  "steps": [
+    {
+      "type": "json.parse",
+      "label": "JSON Parse",
+      "description": "Parse a JSON string into a Python object/dict",
+      "category": "json",
+      "icon": "FileJson",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.stringify",
+      "label": "JSON Stringify",
+      "description": "Convert a Python object/dict to a JSON string",
+      "category": "json",
+      "icon": "FileJson2",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.path",
+      "label": "JSON Path",
+      "description": "Extract values from JSON using JSONPath expressions",
+      "category": "json",
+      "icon": "Route",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.merge",
+      "label": "JSON Merge",
+      "description": "Deep merge multiple JSON objects into one",
+      "category": "json",
+      "icon": "Merge",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.schema-validate",
+      "label": "JSON Schema Validate",
+      "description": "Validate a JSON object against a JSON Schema",
+      "category": "json",
+      "icon": "ShieldCheck",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.get",
+      "label": "JSON Get",
+      "description": "Get a value from a JSON object using a dot-notation path",
+      "category": "json",
+      "icon": "ArrowDownToLine",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.set",
+      "label": "JSON Set",
+      "description": "Set a value in a JSON object using a dot-notation path",
+      "category": "json",
+      "icon": "ArrowUpFromLine",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.keys",
+      "label": "JSON Keys",
+      "description": "Get all keys from a JSON object",
+      "category": "json",
+      "icon": "Key",
+      "color": "#f59e0b"
+    },
+    {
+      "type": "json.values",
+      "label": "JSON Values",
+      "description": "Get all values from a JSON object",
+      "category": "json",
+      "icon": "List",
+      "color": "#f59e0b"
+    }
+  ]
+}

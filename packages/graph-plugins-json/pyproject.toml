@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphflow-plugins-json"
+version = "1.0.0"
+description = "JSON manipulation plugin for GraphFlow"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jsonpath-ng>=1.5.0",
+    "jsonschema>=4.0.0",
+]
+
+[project.entry-points."graphflow.plugins"]
+json = "graphflow_json"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["graphflow_json*"]
