@@ -4,7 +4,7 @@
   "description": "HTTP client and web utilities for API integration",
   "author": "GraphFlow Contributors",
   "license": "MIT",
-  "tags": ["http", "api", "web", "rest", "url", "json", "base64", "html", "scraping"],
+  "tags": ["http", "api", "web", "rest", "url", "base64", "html", "scraping"],
   "steps": [
     "HTTPGetStep",
     "HTTPPostStep",
@@ -15,8 +15,6 @@
     "URLUnescapeStep",
     "URLBuildStep",
     "URLParseStep",
-    "JSONParseStep",
-    "JSONStringifyStep",
     "Base64EncodeStep",
     "Base64DecodeStep",
     "HTMLStripStep",

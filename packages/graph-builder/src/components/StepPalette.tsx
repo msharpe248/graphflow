@@ -154,7 +154,8 @@ export default function StepPalette({ onDragStart, onShapeDragStart }: StepPalet
 
   // Render a collapsible group
   const renderGroup = (groupName: string, steps: StepTypeInfo[]) => {
-    const isCollapsed = collapsed[groupName] || false;
+    // Default to collapsed (true) for categories not yet in state
+    const isCollapsed = collapsed[groupName] ?? true;
     const stepCount = steps.length;
 
     return (
