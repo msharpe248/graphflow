@@ -12,6 +12,9 @@ import DatePicker from './DatePicker';
 import TimeEditor from './TimeEditor';
 import DateTimePicker from './DateTimePicker';
 import ToolEditor from './ToolEditor';
+import MCPToolSelector from './MCPToolSelector';
+import MCPToolEditor from './MCPToolEditor';
+import MCPConfigWizard from './MCPConfigWizard';
 
 // Registry of all available editors
 const EDITOR_REGISTRY: Record<string, EditorConfig> = {
@@ -65,6 +68,18 @@ const EDITOR_REGISTRY: Record<string, EditorConfig> = {
   },
   'tools': {
     component: ToolEditor,
+    displayMode: 'inline',
+  },
+  'mcp-tools': {
+    component: MCPToolSelector,
+    displayMode: 'inline',
+  },
+  'mcp-tool-config': {
+    component: MCPToolEditor,
+    displayMode: 'inline',
+  },
+  'mcp-config-wizard': {
+    component: MCPConfigWizard,
     displayMode: 'inline',
   },
 };

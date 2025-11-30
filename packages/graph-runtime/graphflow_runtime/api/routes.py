@@ -822,3 +822,113 @@ async def get_step_schema(
         "can_be_tool": step_metadata.get("can_be_tool", False),
         "tool_ineligible_reason": step_metadata.get("tool_ineligible_reason"),
     }
+
+
+# =============================================================================
+# MCP (Model Context Protocol) Endpoints
+# =============================================================================
+
+
+class MCPDiscoverRequest(BaseModel):
+    """Request to discover tools from an MCP server."""
+    transport: str = Field(..., description="Transport type: 'stdio', 'sse', or 'streamable_http'")
+    command: Optional[str] = Field(None, description="Command for stdio transport")
+    args: Optional[List[str]] = Field(None, description="Arguments for stdio command")
+    env: Optional[dict] = Field(None, description="Environment variables for stdio")
+    url: Optional[str] = Field(None, description="URL for SSE/streamable_http transport")
+    headers: Optional[dict] = Field(None, description="HTTP headers for SSE/streamable_http")
+    timeout: float = Field(10.0, description="Discovery timeout in seconds")
+
+
+class MCPToolInfo(BaseModel):
+    """Information about an MCP tool."""
+    name: str
+    description: str
+    input_schema: dict
+
+
+class MCPDiscoverResponse(BaseModel):
+    """Response from MCP tool discovery."""
+    success: bool
+    server_info: dict = {}
+    tools: List[MCPToolInfo] = []
+    error: Optional[str] = None
+
+
+@router.post("/mcp/discover", response_model=MCPDiscoverResponse)
+async def discover_mcp_tools(request: MCPDiscoverRequest):
+    """
+    Connect to an MCP server and discover available tools.
+
+    This endpoint connects to the specified MCP server, lists its tools,
+    and returns the tool definitions with their input schemas.
+
+    Supports three transport types:
+    - stdio: Local process communication
+    - sse: Server-Sent Events over HTTP
+    - streamable_http: Streamable HTTP transport
+
+    Example request for stdio:
+    ```json
+    {
+        "transport": "stdio",
+        "command": "uvx",
+        "args": ["mcp-server-fetch"],
+        "timeout": 10
+    }
+    ```
+
+    Example request for SSE:
+    ```json
+    {
+        "transport": "sse",
+        "url": "http://localhost:8080/mcp",
+        "timeout": 10
+    }
+    ```
+    """
+    try:
+        from graphflow_core.models.tool import MCPServerConfig
+        from graphflow_ai.mcp_client import discover_mcp_tools as do_discover
+
+        # Build server config
+        config = MCPServerConfig(
+            transport=request.transport,
+            command=request.command,
+            args=request.args,
+            env=request.env,
+            url=request.url,
+            headers=request.headers,
+            timeout=request.timeout,
+        )
+
+        # Discover tools
+        result = await do_discover(config)
+
+        # Convert to response format
+        tools = [
+            MCPToolInfo(
+                name=t["name"],
+                description=t.get("description", ""),
+                input_schema=t.get("input_schema", {}),
+            )
+            for t in result.get("tools", [])
+        ]
+
+        return MCPDiscoverResponse(
+            success=result.get("success", False),
+            server_info=result.get("server_info", {}),
+            tools=tools,
+            error=result.get("error"),
+        )
+
+    except ImportError as e:
+        return MCPDiscoverResponse(
+            success=False,
+            error=f"MCP support not available: {str(e)}. Install with: pip install pydantic-ai[mcp]",
+        )
+    except Exception as e:
+        return MCPDiscoverResponse(
+            success=False,
+            error=f"Discovery failed: {type(e).__name__}: {str(e)}",
+        )

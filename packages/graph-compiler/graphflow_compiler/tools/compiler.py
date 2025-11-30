@@ -1,14 +1,20 @@
 """
 Tool Compiler
 
-Generates Python code for tools from ToolDefinitions.
+Generates Python code for tools from ToolDefinitions and MCP tools.
 Supports multiple frameworks (Pydantic AI, LangGraph).
 """
 
 import re
 import json
-from typing import Dict, Any, List
-from graphflow_core.models import ToolDefinition, ToolPropertyMapping
+from typing import Dict, Any, List, Union
+from graphflow_core.models import (
+    ToolDefinition,
+    ToolPropertyMapping,
+    MCPTool,
+    MCPServerConfig,
+    MCPToolDefinition,
+)
 
 
 class ToolCompiler:
@@ -337,3 +343,364 @@ class ToolCompiler:
             List of function names (e.g., ['tool_search', 'tool_fetch'])
         """
         return [f"tool_{tool.name}" for tool in tools]
+
+    # =========================================================================
+    # MCP Tool Compilation
+    # =========================================================================
+
+    def compile_mcp_tool(self, mcp_tool: MCPTool) -> str:
+        """
+        Compile an MCP tool to Python code.
+
+        Args:
+            mcp_tool: MCP tool definition (server config + tool definition)
+
+        Returns:
+            Generated Python code for the MCP tool function
+        """
+        if self.framework == "pydantic_ai":
+            return self._compile_pydantic_ai_mcp_tool(mcp_tool)
+        elif self.framework == "langgraph":
+            return self._compile_langgraph_mcp_tool(mcp_tool)
+        else:
+            raise ValueError(f"Unsupported framework: {self.framework}")
+
+    def compile_mcp_tools(self, mcp_tools: List[MCPTool]) -> str:
+        """
+        Compile multiple MCP tool definitions.
+
+        Args:
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            Generated Python code for all MCP tools
+        """
+        tool_codes = []
+        for mcp_tool in mcp_tools:
+            tool_codes.append(self.compile_mcp_tool(mcp_tool))
+
+        return "\n\n".join(tool_codes)
+
+    def get_mcp_tool_imports(self, mcp_tools: List[MCPTool]) -> List[str]:
+        """
+        Get required imports for compiled MCP tools.
+
+        Args:
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            List of import statements
+        """
+        if not mcp_tools:
+            return []
+
+        imports = set()
+
+        # Common imports
+        imports.add("from typing import Any, Dict")
+
+        # MCP client imports
+        imports.add("from pydantic_ai.mcp import MCPServerStdio, MCPServerSSE, MCPServerStreamableHTTP")
+
+        # Framework-specific imports
+        if self.framework == "pydantic_ai":
+            imports.add("from pydantic_ai import RunContext")
+        elif self.framework == "langgraph":
+            imports.add("from langchain_core.tools import tool")
+
+        return sorted(imports)
+
+    def get_mcp_tool_names(self, mcp_tools: List[MCPTool]) -> List[str]:
+        """
+        Get list of generated MCP tool function names.
+
+        Args:
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            List of function names
+        """
+        return [f"tool_{mcp_tool.definition.name}" for mcp_tool in mcp_tools]
+
+    def _compile_pydantic_ai_mcp_tool(self, mcp_tool: MCPTool) -> str:
+        """
+        Generate Pydantic AI tool function for an MCP tool.
+
+        Uses ctx.deps["mcp_servers"][server_key] to access the MCP server connection.
+        The server should be initialized and entered before running the agent.
+        """
+        definition = mcp_tool.definition
+        server = mcp_tool.server
+        lines = []
+
+        # Generate function signature
+        lines.append(f'async def tool_{definition.name}(')
+        lines.append(f'    ctx: RunContext[Dict[str, Any]],')
+
+        # Add LLM parameters
+        llm_params = definition.get_llm_parameters()
+        for i, mapping in enumerate(llm_params):
+            param_name = mapping.llm_parameter_name or mapping.source_property
+            param_type = self._get_python_type(mapping.llm_schema)
+            default = "" if mapping.required else " = None"
+            comma = "," if i < len(llm_params) - 1 else ""
+            lines.append(f'    {param_name}: {param_type}{default}{comma}')
+
+        lines.append(f') -> Any:')
+        lines.append(f'    """')
+        lines.append(f'    {definition.description}')
+
+        if llm_params:
+            lines.append(f'')
+            lines.append(f'    Args:')
+            for mapping in llm_params:
+                param_name = mapping.llm_parameter_name or mapping.source_property
+                desc = mapping.llm_description or f"Value for {mapping.source_property}"
+                lines.append(f'        {param_name}: {desc}')
+
+        lines.append(f'    """')
+        lines.append(f'    memory = ctx.deps["memory"]')
+        lines.append(f'    mcp_servers = ctx.deps.get("mcp_servers", {{}})')
+        lines.append(f'')
+
+        # Build tool arguments
+        lines.append(f'    # Build MCP tool arguments')
+        lines.append(f'    tool_args = {{}}')
+
+        # Add runtime parameters
+        for mapping in definition.get_runtime_parameters():
+            if mapping.runtime_value:
+                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
+                    mem_path = mapping.runtime_value[8:-1]
+                    lines.append(f'    tool_args["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
+                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
+                    binding = mapping.runtime_value[1:-1]
+                    lines.append(f'    tool_args["{mapping.source_property}"] = memory.read("{binding}")')
+                else:
+                    lines.append(f'    tool_args["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+
+        # Add LLM parameters
+        for mapping in llm_params:
+            param_name = mapping.llm_parameter_name or mapping.source_property
+            lines.append(f'    tool_args["{mapping.source_property}"] = {param_name}')
+
+        lines.append(f'')
+
+        # Get MCP server and call tool
+        server_key = server.get_server_key()
+        lines.append(f'    # Call MCP tool')
+        lines.append(f'    server_key = "{server_key}"')
+        lines.append(f'    if server_key not in mcp_servers:')
+        lines.append(f'        return f"Error: MCP server not available: {{server_key}}"')
+        lines.append(f'')
+        lines.append(f'    try:')
+        lines.append(f'        mcp_server = mcp_servers[server_key]')
+        lines.append(f'        result = await mcp_server.call_tool("{definition.mcp_tool_name}", tool_args)')
+        lines.append(f'        # Extract text content from MCP result')
+        lines.append(f'        if hasattr(result, "content") and result.content:')
+        lines.append(f'            for item in result.content:')
+        lines.append(f'                if hasattr(item, "text"):')
+        lines.append(f'                    return item.text')
+        lines.append(f'            return str(result.content[0])')
+        lines.append(f'        return str(result) if result else None')
+        lines.append(f'    except Exception as e:')
+        lines.append(f'        return f"Error: {{type(e).__name__}}: {{str(e)}}"')
+
+        return "\n".join(lines)
+
+    def _compile_langgraph_mcp_tool(self, mcp_tool: MCPTool) -> str:
+        """
+        Generate LangGraph tool function for an MCP tool.
+
+        Uses closure scope to access MCP servers. Generated with indentation
+        to sit inside create_tools(memory, mcp_servers) factory.
+        """
+        definition = mcp_tool.definition
+        server = mcp_tool.server
+        lines = []
+        ind = "    "  # Extra indentation for factory function
+
+        # Generate function signature with @tool decorator
+        lines.append(f'{ind}@tool')
+        lines.append(f'{ind}async def tool_{definition.name}(')
+
+        # Add LLM parameters
+        llm_params = definition.get_llm_parameters()
+        for i, mapping in enumerate(llm_params):
+            param_name = mapping.llm_parameter_name or mapping.source_property
+            param_type = self._get_python_type(mapping.llm_schema)
+            default = "" if mapping.required else " = None"
+            comma = "," if i < len(llm_params) - 1 else ""
+            lines.append(f'{ind}    {param_name}: {param_type}{default}{comma}')
+
+        lines.append(f'{ind}) -> Any:')
+        lines.append(f'{ind}    """')
+        lines.append(f'{ind}    {definition.description}')
+
+        if llm_params:
+            lines.append(f'{ind}')
+            lines.append(f'{ind}    Args:')
+            for mapping in llm_params:
+                param_name = mapping.llm_parameter_name or mapping.source_property
+                desc = mapping.llm_description or f"Value for {mapping.source_property}"
+                lines.append(f'{ind}        {param_name}: {desc}')
+
+        lines.append(f'{ind}    """')
+
+        # Build tool arguments
+        lines.append(f'{ind}    # Build MCP tool arguments')
+        lines.append(f'{ind}    tool_args = {{}}')
+
+        # Add runtime parameters
+        for mapping in definition.get_runtime_parameters():
+            if mapping.runtime_value:
+                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
+                    mem_path = mapping.runtime_value[8:-1]
+                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
+                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
+                    binding = mapping.runtime_value[1:-1]
+                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = memory.read("{binding}")')
+                else:
+                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+
+        # Add LLM parameters
+        for mapping in llm_params:
+            param_name = mapping.llm_parameter_name or mapping.source_property
+            lines.append(f'{ind}    tool_args["{mapping.source_property}"] = {param_name}')
+
+        lines.append(f'{ind}')
+
+        # Get MCP server and call tool
+        server_key = server.get_server_key()
+        lines.append(f'{ind}    # Call MCP tool')
+        lines.append(f'{ind}    server_key = "{server_key}"')
+        lines.append(f'{ind}    if server_key not in mcp_servers:')
+        lines.append(f'{ind}        return f"Error: MCP server not available: {{server_key}}"')
+        lines.append(f'{ind}')
+        lines.append(f'{ind}    try:')
+        lines.append(f'{ind}        mcp_server = mcp_servers[server_key]')
+        lines.append(f'{ind}        result = await mcp_server.call_tool("{definition.mcp_tool_name}", tool_args)')
+        lines.append(f'{ind}        # Extract text content from MCP result')
+        lines.append(f'{ind}        if hasattr(result, "content") and result.content:')
+        lines.append(f'{ind}            for item in result.content:')
+        lines.append(f'{ind}                if hasattr(item, "text"):')
+        lines.append(f'{ind}                    return item.text')
+        lines.append(f'{ind}            return str(result.content[0])')
+        lines.append(f'{ind}        return str(result) if result else None')
+        lines.append(f'{ind}    except Exception as e:')
+        lines.append(f'{ind}        return f"Error: {{type(e).__name__}}: {{str(e)}}"')
+
+        return "\n".join(lines)
+
+    def compile_mcp_server_initialization(self, mcp_tools: List[MCPTool]) -> str:
+        """
+        Generate code to initialize MCP servers for a list of MCP tools.
+
+        Groups tools by server to avoid duplicate connections.
+
+        Args:
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            Python code to create MCP server instances
+        """
+        if not mcp_tools:
+            return ""
+
+        # Group by server key to avoid duplicates
+        servers: Dict[str, MCPServerConfig] = {}
+        for mcp_tool in mcp_tools:
+            key = mcp_tool.server.get_server_key()
+            if key not in servers:
+                servers[key] = mcp_tool.server
+
+        lines = []
+        lines.append("# MCP Server configurations")
+        lines.append("mcp_server_configs = {")
+
+        for key, config in servers.items():
+            lines.append(f'    "{key}": {{')
+            lines.append(f'        "transport": "{config.transport}",')
+            if config.command:
+                lines.append(f'        "command": "{config.command}",')
+            if config.args:
+                lines.append(f'        "args": {json.dumps(config.args)},')
+            if config.env:
+                lines.append(f'        "env": {json.dumps(config.env)},')
+            if config.url:
+                lines.append(f'        "url": "{config.url}",')
+            if config.headers:
+                lines.append(f'        "headers": {json.dumps(config.headers)},')
+            lines.append(f'        "timeout": {config.timeout},')
+            lines.append(f'    }},')
+
+        lines.append("}")
+        lines.append("")
+        lines.append("def create_mcp_server(config):")
+        lines.append('    """Create MCP server from config dict."""')
+        lines.append('    transport = config["transport"]')
+        lines.append('    if transport == "stdio":')
+        lines.append('        return MCPServerStdio(')
+        lines.append('            command=config["command"],')
+        lines.append('            args=config.get("args", []),')
+        lines.append('            env=config.get("env"),')
+        lines.append('            timeout=config.get("timeout", 30.0),')
+        lines.append('        )')
+        lines.append('    elif transport == "sse":')
+        lines.append('        return MCPServerSSE(')
+        lines.append('            url=config["url"],')
+        lines.append('            headers=config.get("headers"),')
+        lines.append('            timeout=config.get("timeout", 30.0),')
+        lines.append('        )')
+        lines.append('    else:  # streamable_http')
+        lines.append('        return MCPServerStreamableHTTP(')
+        lines.append('            url=config["url"],')
+        lines.append('            headers=config.get("headers"),')
+        lines.append('            timeout=config.get("timeout", 30.0),')
+        lines.append('        )')
+
+        return "\n".join(lines)
+
+    def compile_langgraph_mcp_tool_factory(
+        self,
+        step_tools: List[ToolDefinition],
+        mcp_tools: List[MCPTool]
+    ) -> str:
+        """
+        Generate factory function for LangGraph that includes both step-based and MCP tools.
+
+        Args:
+            step_tools: List of step-based tool definitions
+            mcp_tools: List of MCP tool definitions
+
+        Returns:
+            Generated Python code for create_tools(memory, mcp_servers) factory
+        """
+        if not step_tools and not mcp_tools:
+            return ""
+
+        lines = []
+        lines.append('def create_tools(memory, mcp_servers=None):')
+        lines.append('    """Create tools with memory and MCP server access via closure."""')
+        lines.append('    if mcp_servers is None:')
+        lines.append('        mcp_servers = {}')
+        lines.append('')
+
+        # Generate step-based tools
+        for tool in step_tools:
+            lines.append(self._compile_langgraph_tool(tool))
+            lines.append('')
+
+        # Generate MCP tools
+        for mcp_tool in mcp_tools:
+            lines.append(self._compile_langgraph_mcp_tool(mcp_tool))
+            lines.append('')
+
+        # Return list of all tool functions
+        all_tool_names = []
+        all_tool_names.extend([f'tool_{t.name}' for t in step_tools])
+        all_tool_names.extend([f'tool_{mt.definition.name}' for mt in mcp_tools])
+
+        lines.append(f'    return [{", ".join(all_tool_names)}]')
+
+        return "\n".join(lines)

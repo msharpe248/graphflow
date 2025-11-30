@@ -17,6 +17,10 @@ from graphflow_core.models.tool import (
     ToolDefinition,
     MappedStepTool,
     FunctionTool,
+    # MCP models
+    MCPServerConfig,
+    MCPToolDefinition,
+    MCPTool,
 )
 
 __all__ = [
@@ -34,4 +38,8 @@ __all__ = [
     "ToolDefinition",
     "MappedStepTool",
     "FunctionTool",
+    # MCP models
+    "MCPServerConfig",
+    "MCPToolDefinition",
+    "MCPTool",
 ]

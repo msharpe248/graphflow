@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Set
 from pathlib import Path
 import jinja2
-from graphflow_core.models import GraphDefinition, Step, ToolDefinition, MappedStepTool
+from graphflow_core.models import GraphDefinition, Step, ToolDefinition, MappedStepTool, MCPTool
 from graphflow_core.steps.registry import StepRegistry
 from graphflow_compiler.tools.compiler import ToolCompiler
 
@@ -286,12 +286,17 @@ Generated: {graph.metadata.created}
         # Parse and compile tools if present
         tools_config = step.config.get("tools", [])
         tool_definitions = self._parse_tools(tools_config)
+        mcp_tools = self._parse_mcp_tools(tools_config)
+
         tool_code = ""
         tool_names = []
         tool_imports = []
+        mcp_server_configs = {}
 
+        compiler = ToolCompiler(self.get_framework_name())
+
+        # Compile regular step-based tools
         if tool_definitions:
-            compiler = ToolCompiler(self.get_framework_name())
             # Use framework-specific tool compilation
             if self.get_framework_name() == "langgraph":
                 # LangGraph uses factory pattern for closure-based memory access
@@ -301,6 +306,40 @@ Generated: {graph.metadata.created}
                 tool_code = compiler.compile_tools(tool_definitions)
             tool_names = compiler.get_tool_names(tool_definitions)
             tool_imports = compiler.get_tool_imports(tool_definitions)
+
+        # Compile MCP tools
+        mcp_tool_names = []
+        if mcp_tools:
+            # Build server configs dict for template
+            for mcp_tool in mcp_tools:
+                server_key = mcp_tool.server.get_server_key()
+                if server_key not in mcp_server_configs:
+                    mcp_server_configs[server_key] = {
+                        "transport": mcp_tool.server.transport,
+                        "command": mcp_tool.server.command,
+                        "args": mcp_tool.server.args,
+                        "env": mcp_tool.server.env,
+                        "url": mcp_tool.server.url,
+                        "headers": mcp_tool.server.headers,
+                        "timeout": mcp_tool.server.timeout,
+                    }
+
+            # Generate MCP tool code
+            if self.get_framework_name() == "langgraph":
+                # LangGraph: generate factory with both step and MCP tools
+                mcp_tool_code = compiler.compile_langgraph_mcp_tool_factory(tool_definitions, mcp_tools)
+                if mcp_tool_code:
+                    tool_code = mcp_tool_code  # Replaces regular factory with combined
+            else:
+                # Pydantic AI: compile MCP tools and combine with regular tools
+                mcp_tool_code = compiler.compile_mcp_tools(mcp_tools)
+                if tool_code and mcp_tool_code:
+                    tool_code = tool_code + "\n\n" + mcp_tool_code
+                elif mcp_tool_code:
+                    tool_code = mcp_tool_code
+
+            mcp_tool_names = compiler.get_mcp_tool_names(mcp_tools)
+            tool_names.extend(mcp_tool_names)
 
         return {
             "step": step,
@@ -329,6 +368,10 @@ Generated: {graph.metadata.created}
             "tool_code": tool_code,
             "tool_names": tool_names,
             "tool_imports": tool_imports,
+            # MCP tool context
+            "mcp_tools": mcp_tools,
+            "mcp_server_configs": mcp_server_configs,
+            "mcp_tool_names": mcp_tool_names,
         }
 
     def _parse_tools(self, tools_config: List[Any]) -> List[ToolDefinition]:
@@ -361,6 +404,42 @@ Generated: {graph.metadata.created}
                 tool_definitions.append(tool_entry)
 
         return tool_definitions
+
+    def _parse_mcp_tools(self, tools_config: List[Any]) -> List[MCPTool]:
+        """
+        Parse MCP tools from config into MCPTool objects.
+
+        Args:
+            tools_config: List of tool configs from step config
+
+        Returns:
+            List of MCPTool objects
+        """
+        from graphflow_core.models import MCPServerConfig, MCPToolDefinition
+
+        mcp_tools = []
+
+        for tool_entry in tools_config:
+            if isinstance(tool_entry, dict):
+                # Check if it's an MCP tool
+                if tool_entry.get("type") == "mcp":
+                    try:
+                        # Parse server config
+                        server_dict = tool_entry.get("server", {})
+                        server = MCPServerConfig(**server_dict)
+
+                        # Parse tool definition
+                        definition_dict = tool_entry.get("definition", {})
+                        definition = MCPToolDefinition(**definition_dict)
+
+                        mcp_tool = MCPTool(server=server, definition=definition)
+                        mcp_tools.append(mcp_tool)
+                    except Exception as e:
+                        print(f"Warning: Failed to parse MCP tool: {e}")
+            elif isinstance(tool_entry, MCPTool):
+                mcp_tools.append(tool_entry)
+
+        return mcp_tools
 
     def _extract_memory_refs(self, config: Dict[str, Any]) -> Set[str]:
         """

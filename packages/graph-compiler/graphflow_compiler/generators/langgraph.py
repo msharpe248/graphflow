@@ -276,6 +276,7 @@ class LangGraphGenerator(CodeGenerator):
         Generate execution code for a specific step (LangGraph state-based).
 
         Overrides base method to use state dict instead of memory store.
+        For LLM steps with tools (especially MCP tools), uses templates.
         """
         if step.type == "start":
             return "# Start step - no operation\nreturn state"
@@ -290,6 +291,20 @@ class LangGraphGenerator(CodeGenerator):
             return self._generate_conditional_step_code_langgraph(step)
 
         elif step.type == "llm":
+            # Check if the LLM step has tools - if so, use template system
+            tools_config = step.config.get("tools", [])
+            has_tools = len(tools_config) > 0
+            if has_tools:
+                # Use template system for steps with tools (supports MCP tools)
+                from graphflow_core.steps.registry import StepRegistry
+                try:
+                    step_class = StepRegistry.get(step.type)
+                    template_str = step_class.get_code_template(self.get_framework_name())
+                    if template_str:
+                        return self._render_step_template(template_str, step, graph)
+                except (KeyError, ValueError):
+                    pass
+            # Fall back to built-in generation for simple LLM steps
             return self._generate_llm_step_code(step, graph)
 
         elif step.type == "http":

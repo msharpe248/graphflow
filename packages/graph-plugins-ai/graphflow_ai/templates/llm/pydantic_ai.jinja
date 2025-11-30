@@ -7,6 +7,11 @@
 {% endfor %}
 {% endif %}
 
+{% if mcp_tools %}
+# MCP imports
+from graphflow_ai.mcp_client import MCPServerPool, MCPServerConfig
+{% endif %}
+
 {% if output_schema %}
 # Define output schema
 class LLMOutput_{{ step.id }}(BaseModel):
@@ -22,6 +27,29 @@ class LLMOutput_{{ step.id }}(BaseModel):
 {% if tool_code %}
 # Tool functions
 {{ tool_code }}
+
+{% endif %}
+{% if mcp_tools %}
+# MCP server initialization
+_mcp_pool = MCPServerPool()
+mcp_servers = {}
+{% for server_key, config in mcp_server_configs.items() %}
+_mcp_cfg_{{ loop.index }} = MCPServerConfig(
+    transport="{{ config.transport }}",
+{% if config.command %}    command="{{ config.command }}",
+{% endif %}
+{% if config.args %}    args={{ config.args | tojson }},
+{% endif %}
+{% if config.env %}    env={{ config.env | tojson }},
+{% endif %}
+{% if config.url %}    url="{{ config.url }}",
+{% endif %}
+{% if config.headers %}    headers={{ config.headers | tojson }},
+{% endif %}
+    timeout={{ config.timeout }},
+)
+mcp_servers["{{ server_key }}"] = await _mcp_pool.get_or_create(_mcp_cfg_{{ loop.index }})
+{% endfor %}
 
 {% endif %}
 # Render prompts
@@ -106,9 +134,9 @@ agent = Agent(
 )
 
 # Run agent
-{% if tool_names %}
-# Pass memory in deps for tool access
-result = await agent.run(user_prompt_template, deps={"memory": self.memory})
+{% if tool_names or mcp_tools %}
+# Pass memory (and mcp_servers if applicable) in deps for tool access
+result = await agent.run(user_prompt_template, deps={"memory": self.memory{% if mcp_tools %}, "mcp_servers": mcp_servers{% endif %}})
 
 # Log tool calls to execution log
 if hasattr(result, 'all_messages'):
@@ -162,3 +190,8 @@ self.memory.write("{{ output_key }}", tool_calls_data)
 {% endif %}
 {% endif %}
 {% endfor %}
+
+{% if mcp_tools %}
+# Cleanup MCP server connections
+await _mcp_pool.close_all()
+{% endif %}

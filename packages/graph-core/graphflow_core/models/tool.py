@@ -176,3 +176,168 @@ class FunctionTool(BaseModel):
         ...,
         description="OpenAI-style function definition"
     )
+
+
+# =============================================================================
+# MCP (Model Context Protocol) Tool Models
+# =============================================================================
+
+
+class MCPServerConfig(BaseModel):
+    """
+    Configuration for connecting to an MCP server.
+
+    Supports three transport types:
+    - stdio: Spawn a local process (command + args)
+    - sse: Server-Sent Events over HTTP
+    - streamable_http: Streamable HTTP transport
+    """
+
+    transport: Literal["stdio", "sse", "streamable_http"] = Field(
+        ...,
+        description="Transport type for MCP connection"
+    )
+
+    # Stdio transport configuration
+    command: Optional[str] = Field(
+        None,
+        description="Command to run for stdio transport (e.g., 'uvx', 'npx', 'python')"
+    )
+    args: Optional[List[str]] = Field(
+        None,
+        description="Arguments for stdio command"
+    )
+    env: Optional[Dict[str, str]] = Field(
+        None,
+        description="Environment variables for stdio process"
+    )
+
+    # HTTP transport configuration (SSE and Streamable HTTP)
+    url: Optional[str] = Field(
+        None,
+        description="Server URL for SSE or Streamable HTTP transport"
+    )
+    headers: Optional[Dict[str, str]] = Field(
+        None,
+        description="HTTP headers for SSE/Streamable HTTP"
+    )
+
+    # Common configuration
+    timeout: float = Field(
+        30.0,
+        description="Connection/call timeout in seconds"
+    )
+
+    def get_server_key(self) -> str:
+        """
+        Generate a unique key for this server configuration.
+        Used to deduplicate connections to the same server.
+        """
+        if self.transport == "stdio":
+            args_str = "_".join(self.args or [])
+            return f"stdio_{self.command}_{args_str}"
+        else:
+            return f"{self.transport}_{self.url}"
+
+
+class MCPToolDefinition(BaseModel):
+    """
+    Definition of an MCP tool to expose to an LLM.
+
+    Similar to ToolDefinition but sources from an MCP server tool
+    rather than a GraphFlow step.
+    """
+
+    id: str = Field(
+        ...,
+        description="Unique identifier for this tool within the step"
+    )
+
+    name: str = Field(
+        ...,
+        description="Tool name visible to LLM (can be different from MCP tool name)"
+    )
+
+    description: str = Field(
+        "",
+        description="Tool description for LLM (overrides MCP description if provided)"
+    )
+
+    mcp_tool_name: str = Field(
+        ...,
+        description="Original tool name on the MCP server"
+    )
+
+    property_mappings: List[ToolPropertyMapping] = Field(
+        default_factory=list,
+        description="How each MCP tool parameter is handled (LLM vs runtime)"
+    )
+
+    output_key: str = Field(
+        "result",
+        description="Key for the output in the result"
+    )
+
+    def get_llm_parameters(self) -> List[ToolPropertyMapping]:
+        """Get all LLM-controlled parameters."""
+        return [m for m in self.property_mappings if m.visibility == "llm"]
+
+    def get_runtime_parameters(self) -> List[ToolPropertyMapping]:
+        """Get all runtime-provided parameters."""
+        return [m for m in self.property_mappings if m.visibility == "runtime"]
+
+    def to_openai_function_schema(self) -> Dict[str, Any]:
+        """
+        Convert to OpenAI function calling format.
+
+        Returns:
+            Dict in OpenAI function schema format
+        """
+        properties = {}
+        required = []
+
+        for mapping in self.get_llm_parameters():
+            param_name = mapping.llm_parameter_name or mapping.source_property
+
+            # Build parameter schema
+            param_schema = mapping.llm_schema or {"type": "string"}
+            if mapping.llm_description:
+                param_schema["description"] = mapping.llm_description
+
+            properties[param_name] = param_schema
+
+            if mapping.required:
+                required.append(param_name)
+
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required
+                }
+            }
+        }
+
+
+class MCPTool(BaseModel):
+    """
+    A tool entry in the LLM step's tools array that wraps an MCP server tool.
+
+    This is the format stored in the graph JSON:
+    {
+        "type": "mcp",
+        "server": { ... MCPServerConfig ... },
+        "definition": { ... MCPToolDefinition ... }
+    }
+
+    Multiple MCPTool entries can reference the same server but different tools.
+    At runtime, connections to the same server are shared.
+    """
+
+    type: Literal["mcp"] = "mcp"
+    server: MCPServerConfig
+    definition: MCPToolDefinition

@@ -7,9 +7,37 @@
 {% endfor %}
 {% endif %}
 
+{% if mcp_tools %}
+# MCP imports
+from graphflow_ai.mcp_client import MCPServerPool, MCPServerConfig
+{% endif %}
+
 {% if tool_code %}
 # Tool factory function
 {{ tool_code }}
+
+{% endif %}
+{% if mcp_tools %}
+# MCP server initialization
+_mcp_pool = MCPServerPool()
+mcp_servers = {}
+{% for server_key, config in mcp_server_configs.items() %}
+_mcp_cfg_{{ loop.index }} = MCPServerConfig(
+    transport="{{ config.transport }}",
+{% if config.command %}    command="{{ config.command }}",
+{% endif %}
+{% if config.args %}    args={{ config.args | tojson }},
+{% endif %}
+{% if config.env %}    env={{ config.env | tojson }},
+{% endif %}
+{% if config.url %}    url="{{ config.url }}",
+{% endif %}
+{% if config.headers %}    headers={{ config.headers | tojson }},
+{% endif %}
+    timeout={{ config.timeout }},
+)
+mcp_servers["{{ server_key }}"] = await _mcp_pool.get_or_create(_mcp_cfg_{{ loop.index }})
+{% endfor %}
 
 {% endif %}
 # Render prompts from memory
@@ -69,9 +97,9 @@ messages.append(SystemMessage(content={{ system_prompt | repr }}))
 {% endif %}
 messages.append(HumanMessage(content=user_prompt_template))
 
-{% if tool_names %}
-# Create tools with memory access and bind to LLM
-tools = create_tools(self.memory)
+{% if tool_names or mcp_tools %}
+# Create tools with memory access (and MCP servers if applicable) and bind to LLM
+tools = create_tools(self.memory{% if mcp_tools %}, mcp_servers{% endif %})
 llm_with_tools = llm.bind_tools(tools)
 
 # Invoke LLM with tools
@@ -154,7 +182,7 @@ self.memory.write("{{ output_key }}", response_content)
 {% elif output_name == 'tool_calls' %}
 # Extract tool call history
 tool_calls_data = []
-{% if tool_names %}
+{% if tool_names or mcp_tools %}
 if hasattr(response, 'tool_calls') and response.tool_calls:
     for tc in response.tool_calls:
         tool_calls_data.append({
@@ -166,4 +194,9 @@ self.memory.write("{{ output_key }}", tool_calls_data)
 {% endif %}
 {% endif %}
 {% endfor %}
+{% endif %}
+
+{% if mcp_tools %}
+# Cleanup MCP server connections
+await _mcp_pool.close_all()
 {% endif %}
