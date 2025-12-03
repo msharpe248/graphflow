@@ -6,6 +6,9 @@ from urllib.parse import quote, unquote, urlparse, urlunparse, parse_qs, urlenco
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
 
+# Pattern for extracting memory references
+pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
+
 
 class URLEscapeStep(StepBase):
     """URL encode/escape string step."""
@@ -81,7 +84,6 @@ class URLEscapeStep(StepBase):
         # URL encode
         encoded = quote(input_str, safe=safe_chars)
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -159,7 +161,6 @@ class URLUnescapeStep(StepBase):
         # URL decode
         decoded = unquote(input_str)
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -259,7 +260,6 @@ class URLBuildStep(StepBase):
         # Construct URL using urlunparse
         url = urlunparse((scheme, netloc, path, "", query, fragment))
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -331,7 +331,7 @@ class URLParseStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute URL parse."""
-        url = memory.read(self.config["input_key"])
+        url = memory.read(self.config["input"])
 
         # Parse URL
         parsed = urlparse(str(url))
@@ -367,7 +367,6 @@ class URLParseStep(StepBase):
             "fragment": parsed.fragment,
         }
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]

@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
 
+# Pattern for extracting memory references
+pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
+
 
 class HTMLStripStep(StepBase):
     """Strip HTML tags from content step."""
@@ -69,7 +72,7 @@ class HTMLStripStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute HTML strip."""
-        html_content = memory.read(self.config["input_key"])
+        html_content = memory.read(self.config["input"])
         separator = self.config.get("separator", " ")
         strip_whitespace = self.config.get("strip_whitespace", True)
 
@@ -82,10 +85,8 @@ class HTMLStripStep(StepBase):
         # Strip excess whitespace if requested
         if strip_whitespace:
             # Replace multiple whitespace with single space
-            import re
             text = re.sub(r'\s+', ' ', text).strip()
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -165,7 +166,7 @@ class HTMLParseStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute HTML parse."""
-        html_content = memory.read(self.config["input_key"])
+        html_content = memory.read(self.config["input"])
         selectors = self.config["selectors"]
         parser = self.config.get("parser", "lxml")
 
@@ -204,7 +205,6 @@ class HTMLParseStep(StepBase):
                 else:
                     extracted[key] = None
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -277,7 +277,7 @@ class HTMLFindLinksStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute HTML find links."""
-        html_content = memory.read(self.config["input_key"])
+        html_content = memory.read(self.config["input"])
         absolute_only = self.config.get("absolute_only", False)
         unique = self.config.get("unique", True)
 
@@ -306,7 +306,6 @@ class HTMLFindLinksStep(StepBase):
                     unique_links.append(link)
             links = unique_links
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
@@ -383,7 +382,7 @@ class HTMLTableExtractStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute HTML table extract."""
-        html_content = memory.read(self.config["input_key"])
+        html_content = memory.read(self.config["input"])
         table_selector = self.config.get("table_selector", "table")
         has_headers = self.config.get("headers", True)
         skip_rows = self.config.get("skip_rows", 0)
@@ -445,7 +444,6 @@ class HTMLTableExtractStep(StepBase):
                     # Just append array of values
                     table_data.append(cell_values)
 
-        # Write to memory
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]

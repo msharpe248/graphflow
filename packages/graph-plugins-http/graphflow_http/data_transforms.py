@@ -66,7 +66,7 @@ class Base64EncodeStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute Base64 encode."""
-        data = memory.read(self.config["input_key"])
+        data = memory.read(self.config["input"])
         encoding = self.config.get("encoding", "utf-8")
 
         # Convert to bytes if string
@@ -152,7 +152,7 @@ class Base64DecodeStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute Base64 decode."""
-        encoded = memory.read(self.config["input_key"])
+        encoded = memory.read(self.config["input"])
         encoding = self.config.get("encoding", "utf-8")
         as_bytes = self.config.get("as_bytes", False)
 
