@@ -13,6 +13,7 @@ export interface Agent {
 export interface AgentRun {
   id: string;
   agent_id: string;
+  session_id?: string;        // Session ID for conversation history
   status: 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
   inputs: Record<string, any>;
   outputs?: Record<string, any>;
@@ -59,6 +60,7 @@ export interface CreateAgentRequest {
 
 export interface CreateRunRequest {
   inputs: Record<string, any>;
+  session_id?: string;        // Optional session ID (auto-generated if not provided)
   debug_mode?: boolean;
   breakpoints?: string[];
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Trash2, Play, Upload, Loader2 } from 'lucide-react';
 import { useAgents, useDeleteAgent, useCreateAgent, useCreateRun } from '@/hooks/useRuntime';
 import { useGraphStore } from '@/stores/graphStore';
 import { Agent } from '@/types/runtime';
+import { getRuns } from '@/services/runtime';
 import RunInputModal from '../RunInputModal';
 import { GraphDefinition } from '@/types/graph';
 
@@ -20,6 +21,8 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
   const [framework, setFramework] = useState<'pydantic_ai' | 'langgraph'>('pydantic_ai');
   const [showRunModal, setShowRunModal] = useState(false);
   const [agentToRun, setAgentToRun] = useState<Agent | null>(null);
+  // Track session IDs per agent for session reuse
+  const agentSessions = useRef<Map<string, string>>(new Map());
 
   const handleDelete = (agentId: string, agentName: string) => {
     if (confirm(`Delete agent "${agentName}"?`)) {
@@ -57,22 +60,53 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
     });
   };
 
-  const handleStartRun = (agent: Agent) => {
+  const handleStartRun = async (agent: Agent) => {
+    // If we don't have a cached session for this agent, fetch existing runs
+    if (!agentSessions.current.has(agent.id)) {
+      try {
+        const runs = await getRuns(agent.id);
+        if (runs.length > 0) {
+          // Sort by started_at descending to get most recent
+          const sortedRuns = runs.sort((a, b) =>
+            new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+          );
+          // Get session_id from most recent run
+          const mostRecentSession = sortedRuns[0].session_id;
+          if (mostRecentSession) {
+            agentSessions.current.set(agent.id, mostRecentSession);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch runs for session lookup:', error);
+        // Continue anyway - will create a new session
+      }
+    }
+
     setAgentToRun(agent);
     setShowRunModal(true);
   };
 
-  const handleRunWithInputs = async (inputs: Record<string, any>, debugMode?: boolean) => {
+  const handleRunWithInputs = async (inputs: Record<string, any>, debugMode?: boolean, newSession?: boolean) => {
     if (!agentToRun) return;
 
     try {
-      await createRun.mutateAsync({
+      // Determine session_id: reuse existing unless newSession is checked
+      const existingSessionId = agentSessions.current.get(agentToRun.id);
+      const sessionId = newSession ? undefined : existingSessionId;
+
+      const result = await createRun.mutateAsync({
         agentId: agentToRun.id,
         data: {
           inputs,
           debug_mode: debugMode,
+          session_id: sessionId,
         },
       });
+
+      // Store the session_id from the run for future reuse
+      if (result.session_id) {
+        agentSessions.current.set(agentToRun.id, result.session_id);
+      }
 
       // Close modal and select agent to view the new run
       setShowRunModal(false);
@@ -227,6 +261,8 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
           graphName={agentToRun.name}
           memory={(agentToRun.graph_definition as GraphDefinition).memory}
           validation={{ isValid: true, errors: [], warnings: [], hasIssues: false }}
+          showSessionControl={true}
+          hasExistingSession={agentSessions.current.has(agentToRun.id)}
         />
       )}
     </div>

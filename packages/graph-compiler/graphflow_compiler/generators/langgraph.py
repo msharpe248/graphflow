@@ -291,11 +291,12 @@ class LangGraphGenerator(CodeGenerator):
             return self._generate_conditional_step_code_langgraph(step)
 
         elif step.type == "llm":
-            # Check if the LLM step has tools - if so, use template system
+            # Check if the LLM step has tools or history - if so, use template system
             tools_config = step.config.get("tools", [])
             has_tools = len(tools_config) > 0
-            if has_tools:
-                # Use template system for steps with tools (supports MCP tools)
+            history_enabled = step.config.get("history_enabled", True)
+            if has_tools or history_enabled:
+                # Use template system for steps with tools or history
                 from graphflow_core.steps.registry import StepRegistry
                 try:
                     step_class = StepRegistry.get(step.type)

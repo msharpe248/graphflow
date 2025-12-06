@@ -175,6 +175,11 @@ class LLMStep(StepBase):
                     "default": 2,
                     "description": "Number of retries on failure"
                 },
+                "history_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable conversation history across session runs (uses session storage)"
+                },
             },
             "required": ["model"]
         }

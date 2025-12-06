@@ -8,6 +8,8 @@ Runtime manager for GraphFlow agents - FastAPI service for executing and managin
 - **Execution Engine**: Run agents with async background execution
 - **Memory Inspection**: Query memory state during execution
 - **Lifecycle Management**: Start, stop, and monitor agent runs
+- **Debug Control**: Pause, resume, step through, and set breakpoints
+- **Session History**: View chat history for LLM steps in multi-turn conversations
 - **REST API**: Complete API for all operations
 - **Auto-compilation**: Compile graphs on-the-fly or use pre-compiled agents
 
@@ -56,6 +58,18 @@ Once running, visit:
 ### Memory Inspection
 - `GET /api/v1/agents/{agent_id}/runs/{run_id}/memory` - Get memory state
 - `GET /api/v1/agents/{agent_id}/runs/{run_id}/memory/{key}` - Get specific value
+
+### Debug Control
+- `POST /api/v1/agents/{agent_id}/runs/{run_id}/debug/pause` - Pause a running agent
+- `POST /api/v1/agents/{agent_id}/runs/{run_id}/debug/resume` - Resume a paused agent
+- `POST /api/v1/agents/{agent_id}/runs/{run_id}/debug/step` - Execute single step
+- `GET /api/v1/agents/{agent_id}/runs/{run_id}/debug/state` - Get debug state
+- `POST /api/v1/agents/{agent_id}/runs/{run_id}/debug/breakpoints` - Set breakpoint
+- `DELETE /api/v1/agents/{agent_id}/runs/{run_id}/debug/breakpoints/{step_id}` - Clear breakpoint
+- `PUT /api/v1/agents/{agent_id}/runs/{run_id}/debug/memory` - Update memory value
+
+### Session History
+- `GET /api/v1/sessions/{session_id}/history` - Get chat history for a session
 
 ### Health
 - `GET /api/v1/health` - Health check

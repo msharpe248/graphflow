@@ -35,6 +35,7 @@ class AgentRun(Base):
 
     id = Column(String, primary_key=True)
     agent_id = Column(String, ForeignKey("agents.id"), nullable=False, index=True)
+    session_id = Column(String, nullable=True, index=True)  # Session ID for conversation history
     status = Column(String, nullable=False, index=True)  # pending|running|completed|failed|stopped
     inputs = Column(JSON, nullable=False)
     outputs = Column(JSON, nullable=True)

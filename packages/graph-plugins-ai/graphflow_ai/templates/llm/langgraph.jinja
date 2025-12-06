@@ -12,6 +12,11 @@
 from graphflow_ai.mcp_client import MCPServerPool, MCPServerConfig
 {% endif %}
 
+{% if history_enabled %}
+# Session history imports
+from graphflow_runtime.session import get_history, set_history
+{% endif %}
+
 {% if tool_code %}
 # Tool factory function
 {{ tool_code }}
@@ -102,8 +107,18 @@ else:
     # Default: treat as OpenAI
     llm = ChatOpenAI(model=_model, temperature=_temperature)
 
+{% if history_enabled %}
+# Load conversation history from session
+_session_id = self.memory.read("config.session_id") if self.memory.has_key("config.session_id") else None
+_message_history = get_history(_session_id, "{{ step.id }}") if _session_id else []
+{% endif %}
+
 # Build messages
 messages = []
+{% if history_enabled %}
+# Prepend history messages (if any)
+messages.extend(_message_history)
+{% endif %}
 if _system_prompt:
     messages.append(SystemMessage(content=_system_prompt))
 messages.append(HumanMessage(content=user_prompt_template))
@@ -166,6 +181,22 @@ else:
 # Invoke LLM (no tools)
 response = await llm.ainvoke(messages)
 response_content = response.content
+{% endif %}
+
+{% if history_enabled %}
+# Save updated conversation history
+if _session_id:
+    # Build history: current messages + assistant response
+    _history_to_save = messages.copy()
+    {% if tool_names or mcp_tools %}
+    if hasattr(response, 'tool_calls') and response.tool_calls:
+        _history_to_save.append(final_response)
+    else:
+        _history_to_save.append(response)
+    {% else %}
+    _history_to_save.append(response)
+    {% endif %}
+    set_history(_session_id, "{{ step.id }}", _history_to_save)
 {% endif %}
 
 # Write to memory using outputs dict

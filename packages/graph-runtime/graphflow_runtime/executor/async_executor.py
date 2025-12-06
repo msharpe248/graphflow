@@ -43,6 +43,7 @@ class AsyncExecutor:
         graph: GraphDefinition,
         inputs: Dict[str, Any],
         framework: str = "pydantic_ai",
+        session_id: Optional[str] = None,
         debug_mode: bool = False,
         breakpoints: Optional[list] = None,
         on_complete: Optional[callable] = None,
@@ -56,6 +57,7 @@ class AsyncExecutor:
             graph: Graph definition to compile and execute
             inputs: Input values for the agent
             framework: Framework to use for compilation
+            session_id: Session ID for conversation history
             debug_mode: Whether to run in debug mode
             breakpoints: Initial breakpoints (list of step IDs)
             on_complete: Callback for successful completion
@@ -85,6 +87,7 @@ class AsyncExecutor:
                 run_id=run_id,
                 module_path=module_path,
                 inputs=inputs,
+                session_id=session_id,
                 controller=controller,
                 on_complete=on_complete,
                 on_error=on_error
@@ -97,6 +100,7 @@ class AsyncExecutor:
         run_id: str,
         module_path: Path,
         inputs: Dict[str, Any],
+        session_id: Optional[str] = None,
         controller: Optional[ExecutionController] = None,
         on_complete: Optional[callable] = None,
         on_error: Optional[callable] = None
@@ -123,6 +127,10 @@ class AsyncExecutor:
 
             # Inject runtime config values into memory
             agent.memory.populate_config(runtime_config.get_all())
+
+            # Store session_id in config namespace for templates to access
+            if session_id:
+                agent.memory.set_config("session_id", session_id)
 
             # Run agent
             outputs = await agent.run(inputs)

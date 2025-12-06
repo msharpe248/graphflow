@@ -222,3 +222,13 @@ export const useUpdateMemory = () => {
     },
   });
 };
+
+// Session History
+export const useSessionHistory = (sessionId: string | null, enabled: boolean = true) =>
+  useQuery({
+    queryKey: ['sessions', sessionId, 'history'],
+    queryFn: () => runtime.getSessionHistory(sessionId!),
+    enabled: !!sessionId && enabled,
+    refetchInterval: enabled ? 2000 : false, // Poll every 2 seconds when active
+    retry: 1, // Don't retry too many times if session doesn't exist
+  });

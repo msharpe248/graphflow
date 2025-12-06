@@ -1,15 +1,18 @@
 import { useState, useMemo } from 'react';
-import { X, AlertCircle, AlertTriangle, Code2, FileText, Bug } from 'lucide-react';
+import { X, AlertCircle, AlertTriangle, Code2, FileText, Bug, History } from 'lucide-react';
 import { ValidationResult, ValidationIssue, formatValidationIssue } from '@/utils/graphValidator';
 import { MemorySchema } from '@/types/graph';
 
 interface RunInputModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRun: (inputs: Record<string, any>, debugMode?: boolean) => void;
+  onRun: (inputs: Record<string, any>, debugMode?: boolean, newSession?: boolean) => void;
   graphName: string;
   memory: MemorySchema;
   validation: ValidationResult;
+  // Optional: Show session control (for Runtime view)
+  showSessionControl?: boolean;
+  hasExistingSession?: boolean;  // Whether there's a previous session to continue
 }
 
 export default function RunInputModal({
@@ -19,12 +22,15 @@ export default function RunInputModal({
   graphName,
   memory,
   validation,
+  showSessionControl = false,
+  hasExistingSession = false,
 }: RunInputModalProps) {
   const [inputs, setInputs] = useState<Record<string, any>>({});
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [jsonText, setJsonText] = useState<string>('{}');
   const [jsonError, setJsonError] = useState<string>('');
   const [debugMode, setDebugMode] = useState<boolean>(false);
+  const [newSession, setNewSession] = useState<boolean>(false);
 
   // Initialize inputs with defaults
   useMemo(() => {
@@ -87,7 +93,7 @@ export default function RunInputModal({
       return;
     }
 
-    onRun(inputs, debugMode);
+    onRun(inputs, debugMode, newSession);
   };
 
   const renderIssue = (issue: ValidationIssue) => {
@@ -336,6 +342,32 @@ export default function RunInputModal({
                   </div>
                 </div>
               </div>
+
+              {/* Session Control - Only shown in Runtime view */}
+              {showSessionControl && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="newSession"
+                      checked={newSession}
+                      onChange={(e) => setNewSession(e.target.checked)}
+                      className="mt-0.5 rounded border-gray-300"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="newSession" className="flex items-center gap-2 text-sm font-medium text-purple-900 cursor-pointer">
+                        <History className="w-4 h-4" />
+                        Start New Session
+                      </label>
+                      <p className="text-xs text-purple-700 mt-1">
+                        {hasExistingSession
+                          ? 'Check this to start a fresh conversation. Otherwise, LLM steps will continue from the previous session\'s chat history.'
+                          : 'This will be the first session for this agent.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

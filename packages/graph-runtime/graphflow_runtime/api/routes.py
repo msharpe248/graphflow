@@ -40,6 +40,7 @@ class RunCreate(BaseModel):
     """Request to start a run."""
     inputs: dict = Field(..., description="Input values for the agent")
     run_id: Optional[str] = Field(None, description="Optional custom run ID")
+    session_id: Optional[str] = Field(None, description="Session ID for conversation history (auto-generated if not provided)")
     debug_mode: bool = Field(False, description="Enable debug mode")
     breakpoints: Optional[List[str]] = Field(None, description="Initial breakpoints (list of step IDs)")
 
@@ -48,6 +49,7 @@ class RunResponse(BaseModel):
     """Run response."""
     id: str
     agent_id: str
+    session_id: Optional[str]
     status: str
     inputs: dict
     outputs: Optional[dict]
@@ -234,9 +236,11 @@ async def start_run(
 
     # Create run record
     run_id = run_data.run_id or str(uuid.uuid4())
+    session_id = run_data.session_id or str(uuid.uuid4())
     run = AgentRun(
         id=run_id,
         agent_id=agent_id,
+        session_id=session_id,
         status="running",
         inputs=run_data.inputs,
         debug_mode=run_data.debug_mode,
@@ -287,6 +291,7 @@ async def start_run(
         graph=graph,
         inputs=run_data.inputs,
         framework=agent.framework,
+        session_id=session_id,
         debug_mode=run_data.debug_mode,
         breakpoints=run_data.breakpoints,
         on_complete=on_complete,
@@ -932,3 +937,66 @@ async def discover_mcp_tools(request: MCPDiscoverRequest):
             success=False,
             error=f"Discovery failed: {type(e).__name__}: {str(e)}",
         )
+
+
+# =============================================================================
+# Session Management Endpoints
+# =============================================================================
+
+
+class SessionListResponse(BaseModel):
+    """Response for listing sessions."""
+    sessions: List[str]
+
+
+class SessionDeleteResponse(BaseModel):
+    """Response for deleting a session."""
+    deleted: bool
+    session_id: str
+
+
+@router.get("/sessions", response_model=SessionListResponse)
+async def list_sessions():
+    """
+    List all active sessions.
+
+    Returns a list of session IDs that have conversation history stored.
+    Sessions are ephemeral and cleared on runtime restart.
+    """
+    from graphflow_runtime.session import list_sessions as get_sessions
+    return SessionListResponse(sessions=get_sessions())
+
+
+@router.delete("/sessions/{session_id}", response_model=SessionDeleteResponse)
+async def delete_session(session_id: str):
+    """
+    Delete a session and all its conversation history.
+
+    This clears all LLM step history associated with the given session ID.
+    """
+    from graphflow_runtime.session import clear_session
+    deleted = clear_session(session_id)
+    return SessionDeleteResponse(deleted=deleted, session_id=session_id)
+
+
+class SessionHistoryResponse(BaseModel):
+    """Response for session history."""
+    session_id: str
+    history: dict  # step_id -> list of messages
+
+
+@router.get("/sessions/{session_id}/history", response_model=SessionHistoryResponse)
+async def get_session_history_endpoint(session_id: str):
+    """
+    Get all conversation history for a session.
+
+    Returns the history for all LLM steps in the session, organized by step ID.
+    Each step's history contains the messages exchanged with the LLM.
+    """
+    from graphflow_runtime.session import get_session_history, session_exists
+
+    if not session_exists(session_id):
+        raise HTTPException(404, f"Session not found: {session_id}")
+
+    history = get_session_history(session_id)
+    return SessionHistoryResponse(session_id=session_id, history=history)

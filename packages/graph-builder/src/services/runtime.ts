@@ -113,3 +113,12 @@ export const updateMemory = (
 
 export const getDebugState = (agentId: string, runId: string): Promise<DebugState> =>
   apiCall(`/agents/${agentId}/runs/${runId}/debug/state`);
+
+// Session History
+export interface SessionHistory {
+  session_id: string;
+  history: Record<string, any[]>;  // step_id -> list of messages
+}
+
+export const getSessionHistory = (sessionId: string): Promise<SessionHistory> =>
+  apiCall(`/sessions/${sessionId}/history`);

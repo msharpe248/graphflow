@@ -12,6 +12,11 @@
 from graphflow_ai.mcp_client import MCPServerPool, MCPServerConfig
 {% endif %}
 
+{% if history_enabled %}
+# Session history imports
+from graphflow_runtime.session import get_history, set_history
+{% endif %}
+
 {% if output_schema and output_schema.properties %}
 # Define output schema
 class LLMOutput_{{ step.id }}(BaseModel):
@@ -48,12 +53,12 @@ mcp_servers["{{ server_key }}"] = await _mcp_pool.get_or_create(_mcp_cfg_{{ loop
 {% endfor %}
 
 {% endif %}
-# Read LLM configuration from memory
-_provider = self.memory.read("memory.{{ step.id }}.provider")
-_model = self.memory.read("memory.{{ step.id }}.model")
-_base_url = self.memory.read("memory.{{ step.id }}.base_url")
-_system_prompt = self.memory.read("memory.{{ step.id }}.system_prompt")
-_user_prompt = self.memory.read("memory.{{ step.id }}.user_prompt")
+# LLM configuration (embedded at compile time)
+_provider = {{ provider | repr }}
+_model = {{ model | repr }}
+_base_url = {{ base_url | repr if base_url else 'None' }}
+_system_prompt = {{ system_prompt | repr if system_prompt else 'None' }}
+_user_prompt = {{ user_prompt | repr if user_prompt else 'None' }}
 
 # Render prompts - replace any remaining memory references
 {% for key in memory_refs | sort %}
@@ -83,15 +88,21 @@ api_key = None  # Will use environment variable
 
 # Configure model based on provider (resolved at runtime)
 if _provider == "openai":
-    if _base_url:
-        from pydantic_ai.models.openai import OpenAIChatModel
-        from pydantic_ai.providers.openai import OpenAIProvider
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    if _base_url or api_key:
         _llm_provider = OpenAIProvider(base_url=_base_url, api_key=api_key)
         model_ref = OpenAIChatModel(_model, provider=_llm_provider)
     else:
         model_ref = f"openai:{_model}"
 elif _provider == "anthropic":
-    model_ref = f"anthropic:{_model}"
+    if api_key:
+        from pydantic_ai.models.anthropic import AnthropicModel
+        from pydantic_ai.providers.anthropic import AnthropicProvider
+        _llm_provider = AnthropicProvider(api_key=api_key)
+        model_ref = AnthropicModel(_model, provider=_llm_provider)
+    else:
+        model_ref = f"anthropic:{_model}"
 elif _provider == "ollama":
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.ollama import OllamaProvider
@@ -99,11 +110,29 @@ elif _provider == "ollama":
     _llm_provider = OllamaProvider(base_url=f"{_ollama_url}/v1")
     model_ref = OpenAIChatModel(_model, provider=_llm_provider)
 elif _provider == "groq":
-    model_ref = f"groq:{_model}"
+    if api_key:
+        from pydantic_ai.models.groq import GroqModel
+        from pydantic_ai.providers.groq import GroqProvider
+        _llm_provider = GroqProvider(api_key=api_key)
+        model_ref = GroqModel(_model, provider=_llm_provider)
+    else:
+        model_ref = f"groq:{_model}"
 elif _provider == "mistral":
-    model_ref = f"mistral:{_model}"
+    if api_key:
+        from pydantic_ai.models.mistral import MistralModel
+        from pydantic_ai.providers.mistral import MistralProvider
+        _llm_provider = MistralProvider(api_key=api_key)
+        model_ref = MistralModel(_model, provider=_llm_provider)
+    else:
+        model_ref = f"mistral:{_model}"
 elif _provider == "google":
-    model_ref = f"google-gla:{_model}"
+    if api_key:
+        from pydantic_ai.models.google import GoogleModel
+        from pydantic_ai.providers.google import GoogleProvider
+        _llm_provider = GoogleProvider(api_key=api_key)
+        model_ref = GoogleModel(_model, provider=_llm_provider)
+    else:
+        model_ref = f"google-gla:{_model}"
 elif _provider == "lmstudio":
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
@@ -138,10 +167,16 @@ agent = Agent(
 {% endif %}
 )
 
+{% if history_enabled %}
+# Load conversation history from session
+_session_id = self.memory.read("config.session_id") if self.memory.has_key("config.session_id") else None
+_message_history = get_history(_session_id, "{{ step.id }}") if _session_id else []
+{% endif %}
+
 # Run agent
 {% if tool_names or mcp_tools %}
 # Pass memory (and mcp_servers if applicable) in deps for tool access
-result = await agent.run(user_prompt_template, deps={"memory": self.memory{% if mcp_tools %}, "mcp_servers": mcp_servers{% endif %}})
+result = await agent.run(user_prompt_template, deps={"memory": self.memory{% if mcp_tools %}, "mcp_servers": mcp_servers{% endif %}}{% if history_enabled %}, message_history=_message_history{% endif %})
 
 # Log tool calls to execution log
 if hasattr(result, 'all_messages'):
@@ -163,7 +198,7 @@ if hasattr(result, 'all_messages'):
                         "result": part.content,
                     })
 {% else %}
-result = await agent.run(user_prompt_template)
+result = await agent.run(user_prompt_template{% if history_enabled %}, message_history=_message_history{% endif %})
 {% endif %}
 
 # Extract result
@@ -171,6 +206,12 @@ result = await agent.run(user_prompt_template)
 response_data = result.output.model_dump()
 {% else %}
 response_data = result.output
+{% endif %}
+
+{% if history_enabled %}
+# Save updated conversation history
+if _session_id:
+    set_history(_session_id, "{{ step.id }}", result.all_messages())
 {% endif %}
 
 # Write to memory using outputs dict

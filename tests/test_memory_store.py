@@ -779,8 +779,8 @@ class TestMemoryErrorCases:
         with pytest.raises(KeyError, match="Memory key not in schema"):
             memory.write("input_field", "modified")
 
-    def test_invalid_input_key(self):
-        """Test that invalid input key raises error."""
+    def test_extra_input_keys_accepted(self):
+        """Test that extra input keys not in schema are accepted and stored."""
         schema = MemorySchema(
             inputs={
                 "valid_input": FieldDefinition(type="string", required=True)
@@ -789,8 +789,12 @@ class TestMemoryErrorCases:
 
         memory = MemoryStore(schema=schema)
 
-        with pytest.raises(KeyError, match="Input key not in schema"):
-            memory.initialize_inputs({"invalid_key": "value"})
+        # Extra inputs should be accepted (for dynamic data like prompt variables)
+        memory.initialize_inputs({"valid_input": "required_value", "extra_key": "extra_value"})
+
+        # Both keys should be readable
+        assert memory.read("memory.valid_input") == "required_value"
+        assert memory.read("memory.extra_key") == "extra_value"
 
     def test_repr(self):
         """Test memory store string representation."""

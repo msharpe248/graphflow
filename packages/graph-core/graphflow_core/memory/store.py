@@ -72,15 +72,13 @@ class MemoryStore:
             inputs: Dictionary of input values
 
         Raises:
-            KeyError: If input key not in schema
             ValueError: If required input is missing
-        """
-        # Check all inputs are valid
-        for key in inputs:
-            if key not in self.schema.inputs:
-                raise KeyError(f"Input key not in schema: {key}")
 
-        # Apply defaults and check required inputs
+        Note:
+            Extra inputs not in the schema are accepted and stored.
+            This allows passing dynamic data that prompts can reference.
+        """
+        # Apply defaults and check required inputs for schema-defined inputs
         for key, field_def in self.schema.inputs.items():
             if key not in inputs:
                 # Apply default if available
@@ -90,6 +88,7 @@ class MemoryStore:
                 elif field_def.required:
                     raise ValueError(f"Required input missing: {key}")
 
+        # Accept all inputs (both schema-defined and extra dynamic inputs)
         self._inputs = inputs.copy()
         self._initialized = True
 
@@ -123,7 +122,9 @@ class MemoryStore:
                 elif field_key in self._outputs:
                     return self._outputs[field_key]
                 else:
-                    raise KeyError(f"Memory key not found: {field_key}")
+                    # Return empty string for missing keys (graceful handling)
+                    # This allows generated code to work even with incomplete schemas
+                    return ""
 
             elif namespace == "config":
                 # Proxy to global runtime config
@@ -293,6 +294,17 @@ class MemoryStore:
         global _RUNTIME_CONFIG
         _RUNTIME_CONFIG.update(config_values)
 
+    def set_config(self, key: str, value: Any) -> None:
+        """
+        Set a single configuration value.
+
+        Args:
+            key: Config key
+            value: Value to set
+        """
+        global _RUNTIME_CONFIG
+        _RUNTIME_CONFIG[key] = value
+
     def populate_environment(self, env_filter: Optional[list] = None) -> None:
         """
         Validate environment variables are available.
@@ -351,7 +363,35 @@ class MemoryStore:
         return warnings
 
     def has_key(self, key: str) -> bool:
-        """Check if key exists in any namespace."""
+        """Check if key exists in any namespace.
+
+        Supports both legacy format and namespaced format:
+        - Legacy: "field_name" (checks inputs → intermediate → outputs)
+        - Namespaced: "memory.field", "config.field", "env.field", "secrets.field"
+        """
+        # Check if namespaced
+        if "." in key:
+            namespace, field_key = key.split(".", 1)
+
+            if namespace == "memory":
+                return (
+                    field_key in self._inputs or
+                    field_key in self._intermediate or
+                    field_key in self._outputs
+                )
+            elif namespace == "config":
+                return field_key in _RUNTIME_CONFIG
+            elif namespace == "env":
+                if field_key in self.schema.environment:
+                    env_var_name = self.schema.environment[field_key].key
+                    return os.getenv(env_var_name) is not None
+                return False
+            elif namespace == "secrets":
+                return field_key in self.schema.secrets
+            else:
+                return False
+
+        # Legacy format: check memory namespaces
         return (
             key in self._inputs or
             key in self._intermediate or
