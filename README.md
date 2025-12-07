@@ -90,6 +90,9 @@ pip install -e packages/graph-compiler
 pip install -e packages/graph-runtime
 pip install -e packages/graph-plugins-ai
 pip install -e packages/graph-plugins-http
+pip install -e packages/graph-plugins-url
+pip install -e packages/graph-plugins-xmlhtml
+pip install -e packages/graph-plugins-encoding
 pip install -e packages/graphflow-plugin-example
 ```
 
@@ -235,12 +238,46 @@ GraphFlow provides a rich ecosystem of step types organized by category:
 
 See **[HTTP Plugin Documentation](packages/graph-plugins-http/README.md)** for complete details.
 
+| Step | Description |
+|------|-------------|
+| `http.HTTPGetStep` | HTTP GET request with auth, headers, retries |
+| `http.HTTPPostStep` | HTTP POST request with JSON/form body support |
+| `http.HTTPPutStep` | HTTP PUT request |
+| `http.HTTPPatchStep` | HTTP PATCH request |
+| `http.HTTPDeleteStep` | HTTP DELETE request |
+
+### URL Plugin Steps (graph-plugins-url)
+
+See **[URL Plugin Documentation](packages/graph-plugins-url/README.md)** for complete details.
+
+| Step | Description |
+|------|-------------|
+| `url.URLParseStep` | Parse URL into components (scheme, host, path, query) |
+| `url.URLBuildStep` | Build URL from components |
+| `url.URLEscapeStep` | URL encode a string (percent encoding) |
+| `url.URLUnescapeStep` | Decode percent-encoded string |
+
+### XML/HTML Plugin Steps (graph-plugins-xmlhtml)
+
+See **[XML/HTML Plugin Documentation](packages/graph-plugins-xmlhtml/README.md)** for complete details.
+
 | Category | Steps | Description |
 |----------|-------|-------------|
-| **HTTP Requests** | `http.get`, `http.post`, `http.put`, `http.patch`, `http.delete` | Full HTTP method support with auth, retries, SSL config |
-| **URL Utilities** | `http.url-parse`, `http.url-build`, `http.url-escape`, `http.url-unescape` | URL manipulation and construction |
-| **HTML Processing** | `http.html-strip`, `http.html-parse`, `http.html-find-links`, `http.html-table-extract` | Extract data from HTML content |
-| **Encoding** | `http.base64-encode`, `http.base64-decode` | Base64 encoding/decoding |
+| **HTML Core** | `HTMLStripStep`, `HTMLParseStep`, `HTMLFindLinksStep`, `HTMLTableExtractStep` | Extract data from HTML |
+| **HTML Extraction** | `HTMLSelectAllStep`, `HTMLAttributeExtractStep`, `HTMLFormExtractStep`, `HTMLMetaExtractStep` | Advanced HTML extraction |
+| **HTML Transform** | `HTMLToMarkdownStep`, `HTMLCleanStep`, `XPathStep` | Convert and sanitize HTML |
+| **XML** | `XMLParseStep`, `XMLToJSONStep`, `JSONToXMLStep` | XML parsing and conversion |
+
+### Encoding Plugin Steps (graph-plugins-encoding)
+
+See **[Encoding Plugin Documentation](packages/graph-plugins-encoding/README.md)** for complete details.
+
+| Category | Steps | Description |
+|----------|-------|-------------|
+| **Base64** | `Base64EncodeStep`, `Base64DecodeStep`, `Base64URLEncodeStep`, `Base64URLDecodeStep` | Base64 encoding/decoding |
+| **Hex** | `HexEncodeStep`, `HexDecodeStep` | Hexadecimal encoding |
+| **Hashing** | `MD5HashStep`, `SHA1HashStep`, `SHA256HashStep`, `SHA512HashStep` | Cryptographic hashing |
+| **Compression** | `GzipCompressStep`, `GzipDecompressStep` | Gzip compression |
 
 ### Text Plugin Steps (graph-plugins-text)
 
@@ -421,7 +458,10 @@ GraphFlow features an extensible plugin architecture that allows you to create c
 5. Install with `pip install -e .` and restart the runtime
 
 **Example Plugins:**
-- **[graph-plugins-http](packages/graph-plugins-http/README.md)**: Production-ready HTTP client with 17 steps
+- **[graph-plugins-http](packages/graph-plugins-http/README.md)**: HTTP client with 5 request steps
+- **[graph-plugins-url](packages/graph-plugins-url/README.md)**: URL parsing and manipulation (4 steps)
+- **[graph-plugins-xmlhtml](packages/graph-plugins-xmlhtml/README.md)**: XML/HTML processing (14 steps)
+- **[graph-plugins-encoding](packages/graph-plugins-encoding/README.md)**: Encoding, hashing, compression (12 steps)
 - **[graphflow-plugin-example](packages/graphflow-plugin-example/README.md)**: Reference implementation with notification steps
 
 See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.md) for a complete guide on creating custom plugins.
@@ -441,7 +481,10 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 - **[graph-builder](packages/graph-builder/README.md)** - React UI for visual graph construction (if available)
 
 ### Plugin Documentation
-- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - HTTP requests, URL utilities, and HTML processing
+- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - HTTP requests (GET, POST, PUT, PATCH, DELETE)
+- **[URL Plugin](packages/graph-plugins-url/README.md)** - URL parsing, building, and encoding
+- **[XML/HTML Plugin](packages/graph-plugins-xmlhtml/README.md)** - HTML extraction, XML parsing, conversions
+- **[Encoding Plugin](packages/graph-plugins-encoding/README.md)** - Base64, Hex, Hashing, Gzip compression
 - **[Text Plugin](packages/graph-plugins-text/README.md)** - String manipulation and regex operations
 - **[JSON Plugin](packages/graph-plugins-json/README.md)** - JSON parsing, JSONPath, and schema validation
 - **[YAML Plugin](packages/graph-plugins-yaml/README.md)** - YAML parsing and multi-document support
@@ -629,7 +672,7 @@ graphflow-runtime --reload
 - ✅ Memory schema management
 - ✅ Visual memory binding with "Bound to" buttons
 - ✅ Editable outputs section with clean memory locations
-- ✅ 6 production plugins (HTTP, Text, JSON, YAML, CSV, Example)
+- ✅ 9 production plugins (HTTP, URL, XML/HTML, Encoding, Text, JSON, YAML, CSV, Example)
 - ✅ Memory manipulation steps (read-memory, write-memory)
 - ✅ Position persistence (node layouts saved/restored)
 - ✅ Runtime monitoring view with agents/runs/details
@@ -675,7 +718,10 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 
 - **[Graph Format Specification](GRAPH_FORMAT.md)** - Complete JSON format documentation
 - **Plugin Documentation**:
-  - [HTTP Plugin](packages/graph-plugins-http/README.md) - Web requests and HTML processing
+  - [HTTP Plugin](packages/graph-plugins-http/README.md) - HTTP requests
+  - [URL Plugin](packages/graph-plugins-url/README.md) - URL parsing and encoding
+  - [XML/HTML Plugin](packages/graph-plugins-xmlhtml/README.md) - HTML/XML processing
+  - [Encoding Plugin](packages/graph-plugins-encoding/README.md) - Base64, Hex, Hashing, Gzip
   - [Text Plugin](packages/graph-plugins-text/README.md) - String manipulation and regex
   - [JSON Plugin](packages/graph-plugins-json/README.md) - JSON parsing and JSONPath
   - [YAML Plugin](packages/graph-plugins-yaml/README.md) - YAML parsing and conversion
