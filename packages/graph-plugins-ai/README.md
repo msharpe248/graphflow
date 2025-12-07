@@ -12,16 +12,17 @@ pip install -e packages/graph-plugins-ai
 
 ### LLMStep
 
-Call language models with tool support, prompts, and structured outputs.
+Call language models with tool support, prompts, structured outputs, and conversation history.
 
 **Features:**
-- Multiple LLM provider support (OpenAI, Anthropic, OpenRouter, Azure, custom)
-- Tool calling capabilities
+- Multiple LLM provider support (OpenAI, Anthropic, OpenRouter, Ollama, LM Studio)
+- Tool calling capabilities with MappedStepTools
 - Structured output schemas (Pydantic models)
 - Template-based prompts with memory variable interpolation
+- **Chat History / Sessions**: Maintain conversation context across multiple LLM calls
 - Framework-specific templates for Pydantic AI and LangGraph
 
-**Example:**
+**Basic Example:**
 ```json
 {
   "id": "llm_1",
@@ -38,6 +39,47 @@ Call language models with tool support, prompts, and structured outputs.
   }
 }
 ```
+
+## Chat History / Sessions
+
+LLM steps can maintain conversation history across multiple calls, enabling multi-turn conversations and context-aware responses.
+
+**Configuration:**
+- `history_memory_key` - Memory key to store/retrieve chat history (e.g., `"chat_history"`)
+
+When `history_memory_key` is set:
+1. Previous messages are loaded from memory before the LLM call
+2. The new user message and assistant response are appended to history
+3. Updated history is saved back to memory after each call
+
+**Example - Multi-turn Chat:**
+```json
+{
+  "id": "chat_llm",
+  "type": "llm",
+  "config": {
+    "provider": "ollama",
+    "model": "llama3.2",
+    "system_prompt": "You are a helpful assistant.",
+    "user_prompt": "{memory.user_message}",
+    "history_memory_key": "chat_history"
+  },
+  "outputs": {
+    "response": "{memory.assistant_response}"
+  }
+}
+```
+
+**How it works:**
+1. First call: Empty history, LLM sees only the system prompt and user message
+2. Second call: History contains previous exchange, LLM has full context
+3. Each subsequent call builds on the conversation
+
+**Use Cases:**
+- Chatbots with memory of previous exchanges
+- Multi-step reasoning where context matters
+- Agents that need to remember previous tool calls
+- Conversational workflows with human-in-the-loop
 
 ### HumanInputStep
 

@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "graphflow-plugins-http"
+name = "graphflow-plugins-url"
 version = "1.0.0"
-description = "HTTP client operations plugin for GraphFlow"
+description = "URL manipulation plugin for GraphFlow"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "GraphFlow Contributors"}
 ]
-keywords = ["graphflow", "http", "api", "web", "plugin"]
+keywords = ["graphflow", "url", "uri", "plugin"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -23,9 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-dependencies = [
-    "httpx>=0.24.0",
-]
+dependencies = []
 
 # Note: graphflow-core must be installed separately (pip install -e packages/graph-core)
 
@@ -34,31 +32,19 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "mypy>=1.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/your-org/graphflow"
-Documentation = "https://github.com/your-org/graphflow/tree/main/packages/graph-plugins-http"
+Documentation = "https://github.com/your-org/graphflow/tree/main/packages/graph-plugins-url"
 Repository = "https://github.com/your-org/graphflow"
 
 [project.entry-points."graphflow.plugins"]
-http = "graphflow_http"
+url = "graphflow_url"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["graphflow_http*"]
-
-[tool.black]
-line-length = 100
-target-version = ['py310', 'py311', 'py312']
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+include = ["graphflow_url*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

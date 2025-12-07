@@ -1,0 +1,23 @@
+{
+  "name": "encoding",
+  "version": "1.0.0",
+  "description": "Data encoding, hashing, and compression utilities",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["encoding", "base64", "hex", "hash", "md5", "sha", "compression", "gzip"],
+  "steps": [
+    "Base64EncodeStep",
+    "Base64DecodeStep",
+    "Base64URLEncodeStep",
+    "Base64URLDecodeStep",
+    "HexEncodeStep",
+    "HexDecodeStep",
+    "MD5HashStep",
+    "SHA1HashStep",
+    "SHA256HashStep",
+    "SHA512HashStep",
+    "GzipCompressStep",
+    "GzipDecompressStep"
+  ],
+  "ui_components": {}
+}

@@ -1,26 +1,28 @@
-"""HTML processing step implementations."""
+"""Core HTML processing step implementations."""
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict
+
 from bs4 import BeautifulSoup
 
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
+from graphflow_core.steps.registry import StepRegistry
 
 # Pattern for extracting memory references
 pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
 
+@StepRegistry.register(step_type="xmlhtml.HTMLStripStep", category="xmlhtml", description="Strip HTML tags", plugin="xmlhtml")
 class HTMLStripStep(StepBase):
     """Strip HTML tags from content step."""
 
     name = "HTML Strip"
     label = "HTML Strip"
     description = "Remove HTML tags from content, leaving only text"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "html-strip"
+        return "xmlhtml.HTMLStripStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -52,7 +54,7 @@ class HTMLStripStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to strip tags from "
+                    "description": "HTML content to strip tags from"
                 }
             },
             "required": ["html"]
@@ -65,7 +67,7 @@ class HTMLStripStep(StepBase):
             "properties": {
                 "text": {
                     "type": "string",
-                    "description": "Plain text with HTML tags removed "
+                    "description": "Plain text with HTML tags removed"
                 }
             }
         }
@@ -84,7 +86,6 @@ class HTMLStripStep(StepBase):
 
         # Strip excess whitespace if requested
         if strip_whitespace:
-            # Replace multiple whitespace with single space
             text = re.sub(r'\s+', ' ', text).strip()
 
         # Write output
@@ -92,21 +93,22 @@ class HTMLStripStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, text)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", text)
 
 
+@StepRegistry.register(step_type="xmlhtml.HTMLParseStep", category="xmlhtml", description="Parse HTML with CSS selectors", plugin="xmlhtml")
 class HTMLParseStep(StepBase):
     """Parse HTML and extract data using CSS selectors step."""
 
     name = "HTML Parse"
     label = "HTML Parse"
     description = "Extract data from HTML using CSS selectors"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "html-parse"
+        return "xmlhtml.HTMLParseStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -136,7 +138,7 @@ class HTMLParseStep(StepBase):
                     "description": "HTML parser to use (default: lxml)"
                 }
             },
-            "required": ["input_key", "output_key", "selectors"]
+            "required": ["input", "selectors"]
         }
 
     @classmethod
@@ -146,7 +148,7 @@ class HTMLParseStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to parse "
+                    "description": "HTML content to parse"
                 }
             },
             "required": ["html"]
@@ -159,7 +161,7 @@ class HTMLParseStep(StepBase):
             "properties": {
                 "data": {
                     "type": "object",
-                    "description": "Extracted data as object with keys from selectors "
+                    "description": "Extracted data as object with keys from selectors"
                 }
             }
         }
@@ -184,23 +186,17 @@ class HTMLParseStep(StepBase):
                 continue
 
             if multiple:
-                # Find all matching elements
                 elements = soup.select(css_selector)
                 if attribute:
-                    # Extract attribute from each element
                     extracted[key] = [elem.get(attribute) for elem in elements if elem.get(attribute)]
                 else:
-                    # Extract text from each element
                     extracted[key] = [elem.get_text().strip() for elem in elements]
             else:
-                # Find first matching element
                 element = soup.select_one(css_selector)
                 if element:
                     if attribute:
-                        # Extract attribute value
                         extracted[key] = element.get(attribute)
                     else:
-                        # Extract text content
                         extracted[key] = element.get_text().strip()
                 else:
                     extracted[key] = None
@@ -210,21 +206,22 @@ class HTMLParseStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, extracted)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", extracted)
 
 
+@StepRegistry.register(step_type="xmlhtml.HTMLFindLinksStep", category="xmlhtml", description="Extract links from HTML", plugin="xmlhtml")
 class HTMLFindLinksStep(StepBase):
     """Find all links in HTML content step."""
 
     name = "HTML Find Links"
     label = "HTML Find Links"
     description = "Extract all links (URLs) from HTML content"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "html-find-links"
+        return "xmlhtml.HTMLFindLinksStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -256,7 +253,7 @@ class HTMLFindLinksStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content to extract links from "
+                    "description": "HTML content to extract links from"
                 }
             },
             "required": ["html"]
@@ -270,7 +267,7 @@ class HTMLFindLinksStep(StepBase):
                 "links": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of URLs found in HTML "
+                    "description": "List of URLs found in HTML"
                 }
             }
         }
@@ -289,7 +286,6 @@ class HTMLFindLinksStep(StepBase):
         for link in soup.find_all('a', href=True):
             href = link['href']
 
-            # Filter by absolute URLs if requested
             if absolute_only and not (href.startswith('http://') or href.startswith('https://')):
                 continue
 
@@ -297,7 +293,6 @@ class HTMLFindLinksStep(StepBase):
 
         # Remove duplicates if requested
         if unique:
-            # Preserve order while removing duplicates
             seen = set()
             unique_links = []
             for link in links:
@@ -311,21 +306,22 @@ class HTMLFindLinksStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, links)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", links)
 
 
+@StepRegistry.register(step_type="xmlhtml.HTMLTableExtractStep", category="xmlhtml", description="Extract table data", plugin="xmlhtml")
 class HTMLTableExtractStep(StepBase):
     """Extract data from HTML tables step."""
 
     name = "HTML Table Extract"
     label = "HTML Table Extract"
     description = "Extract data from HTML tables into structured format"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "html-table-extract"
+        return "xmlhtml.HTMLTableExtractStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -362,7 +358,7 @@ class HTMLTableExtractStep(StepBase):
             "properties": {
                 "html": {
                     "type": "string",
-                    "description": "HTML content with table "
+                    "description": "HTML content with table"
                 }
             },
             "required": ["html"]
@@ -393,30 +389,29 @@ class HTMLTableExtractStep(StepBase):
         # Find the table
         table = soup.select_one(table_selector)
         if not table:
-            # Write empty output if table not found
             if "output" in self.outputs:
                 output_template = self.outputs["output"]
                 match = pattern.search(output_template)
                 if match:
-                    output_key = match.group(1)
-                    memory.write(output_key, [])
+                    namespace = match.group(1)
+                    field_key = match.group(2)
+                    memory.write(f"{namespace}.{field_key}", [])
             return
 
         # Extract all rows
         rows = table.find_all('tr')
 
-        # Skip rows if requested
         if skip_rows > 0:
             rows = rows[skip_rows:]
 
         if not rows:
-            # Write empty output if no rows
             if "output" in self.outputs:
                 output_template = self.outputs["output"]
                 match = pattern.search(output_template)
                 if match:
-                    output_key = match.group(1)
-                    memory.write(output_key, [])
+                    namespace = match.group(1)
+                    field_key = match.group(2)
+                    memory.write(f"{namespace}.{field_key}", [])
             return
 
         # Extract data
@@ -424,24 +419,19 @@ class HTMLTableExtractStep(StepBase):
         headers = None
 
         for i, row in enumerate(rows):
-            # Get all cells (th or td)
             cells = row.find_all(['th', 'td'])
             cell_values = [cell.get_text().strip() for cell in cells]
 
             if has_headers and i == 0:
-                # First row is headers
                 headers = cell_values
             else:
-                # Data row
                 if has_headers and headers:
-                    # Create dict with headers as keys
                     row_dict = {}
                     for j, value in enumerate(cell_values):
                         if j < len(headers):
                             row_dict[headers[j]] = value
                     table_data.append(row_dict)
                 else:
-                    # Just append array of values
                     table_data.append(cell_values)
 
         # Write output
@@ -449,5 +439,6 @@ class HTMLTableExtractStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, table_data)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", table_data)

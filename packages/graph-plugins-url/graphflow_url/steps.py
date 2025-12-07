@@ -5,22 +5,24 @@ from urllib.parse import quote, unquote, urlparse, urlunparse, parse_qs, urlenco
 
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
+from graphflow_core.steps.registry import StepRegistry
 
 # Pattern for extracting memory references
 pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
 
+@StepRegistry.register(step_type="url.URLEscapeStep", category="url", description="URL encode a string", plugin="url")
 class URLEscapeStep(StepBase):
     """URL encode/escape string step."""
 
     name = "URL Escape"
     label = "URL Escape"
     description = "URL encode a string for safe use in URLs"
-    category = "http"
+    category = "url"
 
     @classmethod
     def get_type(cls) -> str:
-        return "url-escape"
+        return "url.URLEscapeStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -47,7 +49,7 @@ class URLEscapeStep(StepBase):
             "properties": {
                 "input": {
                     "type": "string",
-                    "description": "String to URL encode "
+                    "description": "String to URL encode"
                 }
             },
             "required": ["input"]
@@ -60,7 +62,7 @@ class URLEscapeStep(StepBase):
             "properties": {
                 "output": {
                     "type": "string",
-                    "description": "URL encoded string "
+                    "description": "URL encoded string"
                 }
             }
         }
@@ -69,8 +71,8 @@ class URLEscapeStep(StepBase):
         """Execute URL escape."""
         # Extract input from config
         input_template = self.config.get("input", "")
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-        match = pattern.search(input_template)
+        mem_pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = mem_pattern.search(input_template)
         if match:
             input_key = match.group(1)
             input_value = memory.read(input_key)
@@ -87,23 +89,23 @@ class URLEscapeStep(StepBase):
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
-            match = pattern.search(output_template)
+            match = mem_pattern.search(output_template)
             if match:
                 output_key = match.group(1)
                 memory.write(output_key, encoded)
 
 
+@StepRegistry.register(step_type="url.URLUnescapeStep", category="url", description="URL decode a string", plugin="url")
 class URLUnescapeStep(StepBase):
     """URL decode/unescape string step."""
 
     name = "URL Unescape"
     label = "URL Unescape"
     description = "URL decode a percent-encoded string"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "url-unescape"
+        return "url.URLUnescapeStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -125,7 +127,7 @@ class URLUnescapeStep(StepBase):
             "properties": {
                 "input": {
                     "type": "string",
-                    "description": "URL encoded string to decode "
+                    "description": "URL encoded string to decode"
                 }
             },
             "required": ["input"]
@@ -138,7 +140,7 @@ class URLUnescapeStep(StepBase):
             "properties": {
                 "output": {
                     "type": "string",
-                    "description": "Decoded string "
+                    "description": "Decoded string"
                 }
             }
         }
@@ -147,8 +149,8 @@ class URLUnescapeStep(StepBase):
         """Execute URL unescape."""
         # Extract input from config
         input_template = self.config.get("input", "")
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-        match = pattern.search(input_template)
+        mem_pattern = re.compile(r'\{memory\.([^}]+)\}')
+        match = mem_pattern.search(input_template)
         if match:
             input_key = match.group(1)
             input_value = memory.read(input_key)
@@ -164,23 +166,23 @@ class URLUnescapeStep(StepBase):
         # Write output
         if "output" in self.outputs:
             output_template = self.outputs["output"]
-            match = pattern.search(output_template)
+            match = mem_pattern.search(output_template)
             if match:
                 output_key = match.group(1)
                 memory.write(output_key, decoded)
 
 
+@StepRegistry.register(step_type="url.URLBuildStep", category="url", description="Build a URL from components", plugin="url")
 class URLBuildStep(StepBase):
     """Build URL from components step."""
 
     name = "URL Build"
     label = "URL Build"
     description = "Construct a URL from components (scheme, host, path, params, etc.)"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "url-build"
+        return "url.URLBuildStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -215,7 +217,7 @@ class URLBuildStep(StepBase):
                     "description": "URL fragment/anchor (optional)"
                 }
             },
-            "required": ["host", "output_key"]
+            "required": ["host"]
         }
 
     @classmethod
@@ -234,7 +236,7 @@ class URLBuildStep(StepBase):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "Constructed URL "
+                    "description": "Constructed URL"
                 }
             }
         }
@@ -269,17 +271,17 @@ class URLBuildStep(StepBase):
                 memory.write(output_key, url)
 
 
+@StepRegistry.register(step_type="url.URLParseStep", category="url", description="Parse URL into components", plugin="url")
 class URLParseStep(StepBase):
     """Parse URL into components step."""
 
     name = "URL Parse"
     label = "URL Parse"
     description = "Extract components from a URL (scheme, host, path, params, etc.)"
-    category = "http"
 
     @classmethod
     def get_type(cls) -> str:
-        return "url-parse"
+        return "url.URLParseStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -301,7 +303,7 @@ class URLParseStep(StepBase):
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "URL to parse "
+                    "description": "URL to parse"
                 }
             },
             "required": ["url"]
@@ -324,7 +326,7 @@ class URLParseStep(StepBase):
                         "query": {"type": "string"},
                         "fragment": {"type": "string"}
                     },
-                    "description": "Parsed URL components "
+                    "description": "Parsed URL components"
                 }
             }
         }

@@ -20,12 +20,13 @@ GraphFlow is a comprehensive agent development platform that lets you:
 - **Interactive Debugger**: Set breakpoints before/after steps, step through execution, pause/resume, inspect and edit memory values in real-time
 - **LLM Tool Support**: Visual tool builder with MappedStepTools - wrap any step type as an LLM-callable tool
 - **Multi-Provider LLM**: Support for Ollama, LM Studio, OpenRouter, Anthropic, and OpenAI out of the box
+- **Chat History / Sessions**: LLM steps can maintain conversation context across multiple calls for multi-turn conversations
 - **Plugin System**: Extensible architecture with dynamically loaded step types, categorization, and search
 - **Decoupled Control & Data Flow**: Edges define control flow, memory store handles data independently
 - **Multi-Framework Support**: Compile the same graph to Pydantic AI or LangGraph
 - **Comprehensive Step Library**:
   - 10+ built-in steps (control flow, AI, data transformation)
-  - 60+ plugin steps across 6 plugins (HTTP, Text, JSON, YAML, CSV, Example)
+  - 80+ plugin steps across 10 plugins (HTTP, URL, XML/HTML, Encoding, Text, JSON, YAML, CSV, AI, Example)
   - Memory manipulation steps (read-memory, write-memory)
 - **Runtime Environment**: Long-running agents with queryable memory and full lifecycle management
 - **CLI Tools**: `graphflow-compile` and `graphflow-runtime`
@@ -48,7 +49,10 @@ GraphFlow consists of four main components plus an extensible plugin system:
 
 | Plugin | Description | Steps | Status |
 |--------|-------------|-------|--------|
-| **[graph-plugins-http](packages/graph-plugins-http/README.md)** | HTTP client with request handling, URL utilities, and HTML processing | 15 steps | ✅ Complete |
+| **[graph-plugins-http](packages/graph-plugins-http/README.md)** | HTTP client (GET, POST, PUT, PATCH, DELETE) | 5 steps | ✅ Complete |
+| **[graph-plugins-url](packages/graph-plugins-url/README.md)** | URL manipulation and parsing | 4 steps | ✅ Complete |
+| **[graph-plugins-xmlhtml](packages/graph-plugins-xmlhtml/README.md)** | XML parsing and HTML manipulation | 14 steps | ✅ Complete |
+| **[graph-plugins-encoding](packages/graph-plugins-encoding/README.md)** | Base64, Hex, Hashing, and Gzip compression | 12 steps | ✅ Complete |
 | **[graph-plugins-text](packages/graph-plugins-text/README.md)** | Text and string manipulation (join, split, replace, regex, case conversion) | 13 steps | ✅ Complete |
 | **[graph-plugins-json](packages/graph-plugins-json/README.md)** | JSON parsing, manipulation, JSONPath queries, and schema validation | 9 steps | ✅ Complete |
 | **[graph-plugins-yaml](packages/graph-plugins-yaml/README.md)** | YAML parsing, multi-document support, and JSON conversion | 10 steps | ✅ Complete |

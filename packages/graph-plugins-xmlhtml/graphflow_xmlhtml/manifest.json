@@ -1,0 +1,25 @@
+{
+  "name": "xmlhtml",
+  "version": "1.0.0",
+  "description": "XML parsing and HTML manipulation utilities",
+  "author": "GraphFlow Contributors",
+  "license": "MIT",
+  "tags": ["xml", "html", "parsing", "xpath", "css-selector", "markdown"],
+  "steps": [
+    "HTMLStripStep",
+    "HTMLParseStep",
+    "HTMLFindLinksStep",
+    "HTMLTableExtractStep",
+    "XMLParseStep",
+    "XMLToJSONStep",
+    "JSONToXMLStep",
+    "HTMLSelectAllStep",
+    "HTMLAttributeExtractStep",
+    "HTMLFormExtractStep",
+    "HTMLMetaExtractStep",
+    "HTMLToMarkdownStep",
+    "HTMLCleanStep",
+    "XPathStep"
+  ],
+  "ui_components": {}
+}

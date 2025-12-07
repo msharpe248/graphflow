@@ -1,26 +1,26 @@
-"""Data transformation step implementations - Base64 encoding/decoding."""
-import base64
+"""Hex encoding/decoding step implementations."""
 import re
 from typing import Any, Dict
 
 from graphflow_core.memory import MemoryStore
 from graphflow_core.steps.base import StepBase
+from graphflow_core.steps.registry import StepRegistry
 
 # Pattern for extracting memory references
 pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
 
-class Base64EncodeStep(StepBase):
-    """Encode data to Base64 step."""
+@StepRegistry.register(step_type="encoding.HexEncodeStep", category="encoding", description="Encode to hexadecimal", plugin="encoding")
+class HexEncodeStep(StepBase):
+    """Encode data to hexadecimal step."""
 
-    name = "Base64 Encode"
-    label = "Base64 Encode"
-    description = "Encode a string or bytes to Base64"
-    category = "http"
+    name = "Hex Encode"
+    label = "Hex Encode"
+    description = "Encode a string or bytes to hexadecimal"
 
     @classmethod
     def get_type(cls) -> str:
-        return "base64-encode"
+        return "encoding.HexEncodeStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -35,6 +35,11 @@ class Base64EncodeStep(StepBase):
                     "type": "string",
                     "default": "utf-8",
                     "description": "Text encoding to use if input is string (default: utf-8)"
+                },
+                "uppercase": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use uppercase hex characters (default: lowercase)"
                 }
             },
             "required": ["input"]
@@ -57,17 +62,18 @@ class Base64EncodeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "base64": {
+                "hex": {
                     "type": "string",
-                    "description": "Base64 encoded string"
+                    "description": "Hexadecimal encoded string"
                 }
             }
         }
 
     async def execute(self, memory: MemoryStore) -> None:
-        """Execute Base64 encode."""
+        """Execute hex encode."""
         data = memory.read(self.config["input"])
         encoding = self.config.get("encoding", "utf-8")
+        uppercase = self.config.get("uppercase", False)
 
         # Convert to bytes if string
         if isinstance(data, str):
@@ -75,11 +81,12 @@ class Base64EncodeStep(StepBase):
         elif isinstance(data, bytes):
             data_bytes = data
         else:
-            # Try to convert to string first
             data_bytes = str(data).encode(encoding)
 
-        # Encode to Base64
-        encoded = base64.b64encode(data_bytes).decode('ascii')
+        # Encode to hex
+        encoded = data_bytes.hex()
+        if uppercase:
+            encoded = encoded.upper()
 
         # Write output
         if "output" in self.outputs:
@@ -91,17 +98,17 @@ class Base64EncodeStep(StepBase):
                 memory.write(f"{namespace}.{field_key}", encoded)
 
 
-class Base64DecodeStep(StepBase):
-    """Decode Base64 data step."""
+@StepRegistry.register(step_type="encoding.HexDecodeStep", category="encoding", description="Decode from hexadecimal", plugin="encoding")
+class HexDecodeStep(StepBase):
+    """Decode hexadecimal data step."""
 
-    name = "Base64 Decode"
-    label = "Base64 Decode"
-    description = "Decode a Base64 encoded string"
-    category = "http"
+    name = "Hex Decode"
+    label = "Hex Decode"
+    description = "Decode a hexadecimal encoded string"
 
     @classmethod
     def get_type(cls) -> str:
-        return "base64-decode"
+        return "encoding.HexDecodeStep"
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:
@@ -131,12 +138,12 @@ class Base64DecodeStep(StepBase):
         return {
             "type": "object",
             "properties": {
-                "base64": {
+                "hex": {
                     "type": "string",
-                    "description": "Base64 encoded string to decode"
+                    "description": "Hexadecimal encoded string to decode"
                 }
             },
-            "required": ["base64"]
+            "required": ["hex"]
         }
 
     @classmethod
@@ -151,16 +158,16 @@ class Base64DecodeStep(StepBase):
         }
 
     async def execute(self, memory: MemoryStore) -> None:
-        """Execute Base64 decode."""
+        """Execute hex decode."""
         encoded = memory.read(self.config["input"])
         encoding = self.config.get("encoding", "utf-8")
         as_bytes = self.config.get("as_bytes", False)
 
-        # Decode from Base64
+        # Decode from hex
         try:
-            decoded_bytes = base64.b64decode(str(encoded))
-        except Exception as e:
-            raise ValueError(f"Invalid Base64 string: {e}")
+            decoded_bytes = bytes.fromhex(str(encoded))
+        except ValueError as e:
+            raise ValueError(f"Invalid hexadecimal string: {e}")
 
         # Convert to string unless as_bytes is True
         if as_bytes:

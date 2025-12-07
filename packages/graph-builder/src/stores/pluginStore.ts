@@ -132,6 +132,9 @@ const pluginColorMap: Record<string, string> = {
   csv: '#22c55e',    // green - spreadsheet/table
   text: '#14b8a6',   // teal - text manipulation
   http: '#3b82f6',   // blue - network/web
+  url: '#06b6d4',    // cyan - links/URLs
+  encoding: '#ec4899', // pink - encoding/security
+  xmlhtml: '#ef4444',  // red - markup/HTML
 };
 
 // Plugin-specific icon overrides
@@ -141,6 +144,9 @@ const pluginIconMap: Record<string, string> = {
   csv: 'Table',        // spreadsheet/table
   text: 'Type',        // text/typography
   http: 'Globe',       // network/web
+  url: 'Link',         // URL/links
+  encoding: 'Binary',  // encoding/binary data
+  xmlhtml: 'Code',     // markup/HTML tags
 };
 
 // Category color defaults
