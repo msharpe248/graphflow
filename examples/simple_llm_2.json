@@ -1,0 +1,170 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "name": "Simple LLM 2",
+    "description": "",
+    "version": "1.0",
+    "revision": 1,
+    "tags": [],
+    "author": "Michael Sharpe"
+  },
+  "memory": {
+    "inputs": {
+      "query": {
+        "type": "string",
+        "description": "",
+        "required": false
+      }
+    },
+    "outputs": {},
+    "intermediate": {
+      "llm_2.provider": {
+        "type": "string",
+        "description": "LLM provider",
+        "required": false,
+        "default": "ollama"
+      },
+      "llm_2.model": {
+        "type": "string",
+        "description": "Model identifier (e.g., 'llama3.1', 'gpt-4-turbo', 'claude-3-5-sonnet')",
+        "required": false,
+        "default": "llama3.1"
+      },
+      "llm_2.api_key_secret": {
+        "type": "string",
+        "description": "Secret key for API key (references secrets in memory schema)",
+        "required": false
+      },
+      "llm_2.base_url": {
+        "type": "string",
+        "description": "Base URL for API calls. Defaults to localhost:11434 for Ollama. Change for other providers or remote servers.",
+        "required": false,
+        "default": "http://localhost:11434"
+      },
+      "llm_2.system_prompt": {
+        "type": "string",
+        "description": "System prompt template (supports {{variable}} syntax)",
+        "required": false,
+        "default": "You are a polite helpful assistant. Answer the user questions as best you can."
+      },
+      "llm_2.tools": {
+        "type": "array",
+        "description": "List of tools available to the LLM",
+        "required": false
+      },
+      "llm_2.tool_choice": {
+        "type": "string",
+        "description": "Tool calling behavior",
+        "required": false,
+        "default": "auto"
+      },
+      "llm_2.output_schema": {
+        "type": "object",
+        "description": "JSON schema for structured output (Pydantic-compatible)",
+        "required": false
+      },
+      "llm_2.temperature": {
+        "type": "number",
+        "description": "Sampling temperature",
+        "required": false,
+        "default": 0.7
+      },
+      "llm_2.max_tokens": {
+        "type": "number",
+        "description": "Maximum tokens to generate",
+        "required": false
+      },
+      "llm_2.top_p": {
+        "type": "number",
+        "description": "Nucleus sampling parameter",
+        "required": false
+      },
+      "llm_2.response_format": {
+        "type": "string",
+        "description": "Response format",
+        "required": false,
+        "default": "text"
+      },
+      "llm_2.streaming": {
+        "type": "boolean",
+        "description": "Enable streaming responses",
+        "required": false,
+        "default": false
+      },
+      "llm_2.retries": {
+        "type": "number",
+        "description": "Number of retries on failure",
+        "required": false,
+        "default": 2
+      },
+      "llm_2.history_enabled": {
+        "type": "boolean",
+        "description": "Enable conversation history across session runs (uses session storage)",
+        "required": false,
+        "default": true
+      },
+      "llm_2.response": {
+        "type": "string",
+        "description": "LLM response (text or structured object based on output_schema)",
+        "required": false
+      },
+      "llm_2.tool_calls": {
+        "type": "array",
+        "description": "Tool calls made by LLM (optional)",
+        "required": false
+      }
+    },
+    "secrets": {},
+    "config": {},
+    "environment": {}
+  },
+  "steps": [
+    {
+      "id": "start_1",
+      "type": "start",
+      "config": {},
+      "outputs": {},
+      "position": {
+        "x": 474,
+        "y": 164
+      }
+    },
+    {
+      "id": "llm_2",
+      "type": "llm",
+      "config": {
+        "provider": "{memory.llm_2.provider}",
+        "model": "{memory.llm_2.model}",
+        "api_key_secret": "{memory.llm_2.api_key_secret}",
+        "base_url": "{memory.llm_2.base_url}",
+        "system_prompt": "{memory.llm_2.system_prompt}",
+        "user_prompt": "{memory.query}",
+        "tools": "{memory.llm_2.tools}",
+        "tool_choice": "{memory.llm_2.tool_choice}",
+        "output_schema": "{memory.llm_2.output_schema}",
+        "temperature": "{memory.llm_2.temperature}",
+        "max_tokens": "{memory.llm_2.max_tokens}",
+        "top_p": "{memory.llm_2.top_p}",
+        "response_format": "{memory.llm_2.response_format}",
+        "streaming": "{memory.llm_2.streaming}",
+        "retries": "{memory.llm_2.retries}",
+        "history_enabled": "{memory.llm_2.history_enabled}"
+      },
+      "outputs": {
+        "response": "{memory.llm_2.response}",
+        "tool_calls": "{memory.llm_2.tool_calls}"
+      },
+      "position": {
+        "x": 727,
+        "y": 464
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "estart_1-llm_2",
+      "from": "start_1",
+      "to": "llm_2"
+    }
+  ]
+}
