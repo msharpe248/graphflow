@@ -252,9 +252,12 @@ Steps are the nodes in your graph. Each step represents a unit of work.
 
 Plugin steps are namespaced with the plugin name (e.g., `http.HTTPGetStep`, `ai.LLMStep`). See plugin documentation for details:
 
-- **HTTP Plugin**: HTTP requests, URL/JSON/HTML utilities (`http-get`, `http-post`, `url-parse`, `json-parse`, `html-parse`, etc.)
+- **HTTP Plugin**: HTTP requests (`http.HTTPGetStep`, `http.HTTPPostStep`, etc.)
+- **URL Plugin**: URL parsing and manipulation (`url.URLParseStep`, `url.URLBuildStep`, etc.)
+- **XML/HTML Plugin**: HTML/XML processing (`xmlhtml.HTMLParseStep`, `xmlhtml.XMLToJSONStep`, etc.)
+- **Encoding Plugin**: Base64, Hex, Hashing, Gzip (`encoding.Base64EncodeStep`, `encoding.SHA256HashStep`, etc.)
 - **AI Plugin**: LLM and human interaction steps (`ai.LLMStep`, `ai.HumanInputStep`)
-- **Custom Plugins**: See [Plugin Development Guide](packages/graphflow-plugin-example/README.md)
+- **Custom Plugins**: See [Plugin Development Guide](../packages/graphflow-plugin-example/README.md)
 
 ### Config Object
 
@@ -929,13 +932,16 @@ graphflow-compile validate my_graph.json
 
 ## Related Documentation
 
-- **[HTTP Plugin](packages/graph-plugins-http/README.md)** - HTTP step types and configuration
-- **[Plugin Development](packages/graphflow-plugin-example/README.md)** - Creating custom step types
-- **[Core Library](packages/graph-core/README.md)** - Built-in step types
-- **[Compiler](packages/graph-compiler/README.md)** - Compiling graphs to Python code
+- **[HTTP Plugin](../packages/graph-plugins-http/README.md)** - HTTP requests
+- **[URL Plugin](../packages/graph-plugins-url/README.md)** - URL parsing and manipulation
+- **[XML/HTML Plugin](../packages/graph-plugins-xmlhtml/README.md)** - HTML/XML processing
+- **[Encoding Plugin](../packages/graph-plugins-encoding/README.md)** - Base64, Hex, Hashing, Gzip
+- **[Plugin Development](../packages/graphflow-plugin-example/README.md)** - Creating custom step types
+- **[Core Library](../packages/graph-core/README.md)** - Built-in step types
+- **[Compiler](../packages/graph-compiler/README.md)** - Compiling graphs to Python code
 - **[Runtime API](http://localhost:8000/docs)** - REST API for running graphs
 
 ---
 
 **Version:** 1.0
-**Last Updated:** 2025-11-27
+**Last Updated:** 2025-12-06

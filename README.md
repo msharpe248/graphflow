@@ -469,9 +469,9 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 ## 📖 Documentation
 
 ### Core Documentation
-- **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** - **Complete JSON format specification** for graph definitions
-- **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - Complete technical specification
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What we built and how it works
+- **[GRAPH_FORMAT.md](docs/GRAPH_FORMAT.md)** - **Complete JSON format specification** for graph definitions
+- **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete technical specification
+- **[TEMPLATE_ARCHITECTURE.md](docs/TEMPLATE_ARCHITECTURE.md)** - Step template system design
 - **API Docs** - Visit http://localhost:8000/docs when runtime is running
 
 ### Component Documentation
@@ -523,7 +523,7 @@ See **[tests/README.md](tests/README.md)** for detailed testing documentation.
 
 ## 🎨 Graph Definition Format
 
-Graphs are defined in JSON format. See **[GRAPH_FORMAT.md](GRAPH_FORMAT.md)** for the complete specification.
+Graphs are defined in JSON format. See **[GRAPH_FORMAT.md](docs/GRAPH_FORMAT.md)** for the complete specification.
 
 **Key Components:**
 - **version**: Format version (currently `"1.0"`)
@@ -716,7 +716,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 
 ## 🔗 Quick Links
 
-- **[Graph Format Specification](GRAPH_FORMAT.md)** - Complete JSON format documentation
+- **[Graph Format Specification](docs/GRAPH_FORMAT.md)** - Complete JSON format documentation
 - **Plugin Documentation**:
   - [HTTP Plugin](packages/graph-plugins-http/README.md) - HTTP requests
   - [URL Plugin](packages/graph-plugins-url/README.md) - URL parsing and encoding
