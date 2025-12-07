@@ -267,8 +267,9 @@ class URLBuildStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, url)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", url)
 
 
 @StepRegistry.register(step_type="url.URLParseStep", category="url", description="Parse URL into components", plugin="url")
@@ -374,5 +375,6 @@ class URLParseStep(StepBase):
             output_template = self.outputs["output"]
             match = pattern.search(output_template)
             if match:
-                output_key = match.group(1)
-                memory.write(output_key, components)
+                namespace = match.group(1)
+                field_key = match.group(2)
+                memory.write(f"{namespace}.{field_key}", components)
