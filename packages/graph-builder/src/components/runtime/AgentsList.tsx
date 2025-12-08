@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
-import { Trash2, Play, Upload, Loader2 } from 'lucide-react';
+import { Trash2, Play, Upload, Loader2, MessageSquare } from 'lucide-react';
 import { useAgents, useDeleteAgent, useCreateAgent, useCreateRun } from '@/hooks/useRuntime';
 import { useGraphStore } from '@/stores/graphStore';
 import { Agent } from '@/types/runtime';
 import { getRuns } from '@/services/runtime';
 import RunInputModal from '../RunInputModal';
 import { GraphDefinition } from '@/types/graph';
+import { isGraphChatEligible, openChatWithAgent } from '@/utils/chatEligibility';
 
 interface AgentsListProps {
   onSelectAgent: (agent: Agent) => void;
@@ -225,6 +226,18 @@ export default function AgentsList({ onSelectAgent, selectedAgentId }: AgentsLis
                   >
                     <Play className="w-4 h-4" />
                   </button>
+                  {isGraphChatEligible(agent.graph_definition as GraphDefinition) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openChatWithAgent(agent.id);
+                      }}
+                      className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors"
+                      title="Open in Chat UI"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

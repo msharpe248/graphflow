@@ -1,4 +1,4 @@
-.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop dev-start dev-stop status stats loc
+.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop chat-start chat-stop dev-start dev-stop status stats loc
 
 # Colors for output
 BLUE := \033[0;34m
@@ -40,6 +40,7 @@ clean: ## Clean all build artifacts, caches, and compiled files
 	find . -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	cd packages/graph-builder && rm -rf node_modules/.vite dist 2>/dev/null || true
+	cd packages/graph-chat && rm -rf node_modules/.vite dist 2>/dev/null || true
 	@echo "$(GREEN)✓ Cleaned all artifacts$(NC)"
 
 clean-install: clean install ## Clean everything and reinstall packages
@@ -69,15 +70,16 @@ runtime-stop: ## Stop the GraphFlow runtime server
 runtime-logs: ## Show runtime logs
 	@tail -f /tmp/graphflow-runtime.log
 
-builder-start: ## Start the builder UI dev server
+builder-start: ## Start the builder UI dev server (port 3000)
 	@echo "$(BLUE)Starting builder UI...$(NC)"
-	@cd packages/graph-builder && npm run dev > /tmp/vite-dev.log 2>&1 &
+	@lsof -ti:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
+	@sleep 1
+	@cd packages/graph-builder && npm run dev > /tmp/graphflow-builder.log 2>&1 &
 	@sleep 3
-	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1 || lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
-		PORT=$$(lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1 && echo "3000" || echo "3001"); \
-		echo "$(GREEN)✓ Builder started on http://localhost:$$PORT$(NC)"; \
+	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
+		echo "$(GREEN)✓ Builder started on http://localhost:3000$(NC)"; \
 	else \
-		echo "$(RED)✗ Builder failed to start. Check /tmp/vite-dev.log$(NC)"; \
+		echo "$(RED)✗ Builder failed to start. Check /tmp/graphflow-builder.log$(NC)"; \
 		exit 1; \
 	fi
 
@@ -85,27 +87,54 @@ builder-stop: ## Stop the builder UI dev server
 	@echo "$(BLUE)Stopping builder UI...$(NC)"
 	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
 		lsof -ti:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
-		echo "$(GREEN)✓ Builder stopped (port 3000)$(NC)"; \
-	elif lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
-		lsof -ti:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
-		echo "$(GREEN)✓ Builder stopped (port 3001)$(NC)"; \
+		echo "$(GREEN)✓ Builder stopped$(NC)"; \
 	else \
 		echo "$(YELLOW)Builder is not running$(NC)"; \
 	fi
 
 builder-logs: ## Show builder logs
-	@tail -f /tmp/vite-dev.log
+	@tail -f /tmp/graphflow-builder.log
+
+chat-start: ## Start the chat UI dev server (port 3001)
+	@echo "$(BLUE)Starting chat UI...$(NC)"
+	@lsof -ti:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
+	@sleep 1
+	@cd packages/graph-chat && npm run dev > /tmp/graphflow-chat.log 2>&1 &
+	@sleep 3
+	@if lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
+		echo "$(GREEN)✓ Chat UI started on http://localhost:3001$(NC)"; \
+	else \
+		echo "$(RED)✗ Chat UI failed to start. Check /tmp/graphflow-chat.log$(NC)"; \
+		exit 1; \
+	fi
+
+chat-stop: ## Stop the chat UI dev server
+	@echo "$(BLUE)Stopping chat UI...$(NC)"
+	@if lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
+		lsof -ti:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null; \
+		echo "$(GREEN)✓ Chat UI stopped$(NC)"; \
+	else \
+		echo "$(YELLOW)Chat UI is not running$(NC)"; \
+	fi
+
+chat-logs: ## Show chat UI logs
+	@tail -f /tmp/graphflow-chat.log
+
+chat-build: ## Build the chat UI for production
+	@echo "$(BLUE)Building chat UI...$(NC)"
+	cd packages/graph-chat && npm run build
+	@echo "$(GREEN)✓ Chat UI built$(NC)"
 
 builder-build: ## Build the builder UI for production
 	@echo "$(BLUE)Building builder UI...$(NC)"
 	cd packages/graph-builder && npm run build
 	@echo "$(GREEN)✓ Builder built$(NC)"
 
-dev-start: runtime-start builder-start ## Start both runtime and builder (full dev environment)
+dev-start: runtime-start builder-start chat-start ## Start runtime, builder, and chat UI (full dev environment)
 
-dev-stop: runtime-stop builder-stop ## Stop both runtime and builder
+dev-stop: runtime-stop builder-stop chat-stop ## Stop runtime, builder, and chat UI
 
-status: ## Show status of runtime and builder
+status: ## Show status of runtime, builder, and chat UI
 	@echo "$(BLUE)GraphFlow Status:$(NC)"
 	@echo ""
 	@echo "Runtime (port 8000):"
@@ -115,10 +144,15 @@ status: ## Show status of runtime and builder
 		echo "  $(RED)✗ Not running$(NC)"; \
 	fi
 	@echo ""
-	@echo "Builder (port 3000/3001):"
+	@echo "Builder (port 3000):"
 	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
 		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3000)"; \
-	elif lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
+	else \
+		echo "  $(RED)✗ Not running$(NC)"; \
+	fi
+	@echo ""
+	@echo "Chat UI (port 3001):"
+	@if lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
 		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3001)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \

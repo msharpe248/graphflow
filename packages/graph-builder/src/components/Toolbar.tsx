@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { Download, Upload, Trash2, Settings, FileJson, Play } from 'lucide-react';
+import { Download, Upload, Trash2, Settings, FileJson, Play, MessageSquare } from 'lucide-react';
 import { useGraphStore } from '@/stores/graphStore';
 import { useAppStore } from '@/stores/appStore';
 import { useCreateAgent, useCreateRun } from '@/hooks/useRuntime';
 import { getAgent } from '@/services/runtime';
 import RunInputModal from './RunInputModal';
+import { isMemoryChatEligible, openChatWithAgent } from '@/utils/chatEligibility';
 
 interface ToolbarProps {
   onOpenSettings: () => void;
@@ -65,6 +66,51 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
 
     // Show modal regardless (modal will handle errors)
     setShowRunModal(true);
+  };
+
+  const isChatEligible = isMemoryChatEligible(memory);
+
+  const handleOpenChat = async () => {
+    try {
+      const graph = exportGraph();
+
+      // Check if linked to an existing agent
+      const agentId = metadata.linkedAgentId;
+
+      let targetAgentId: string;
+
+      // Check if linked agent exists in runtime
+      let agentExists = false;
+      if (agentId) {
+        try {
+          await getAgent(agentId);
+          agentExists = true;
+        } catch {
+          agentExists = false;
+        }
+      }
+
+      if (agentId && agentExists) {
+        targetAgentId = agentId;
+      } else {
+        // Create new agent
+        const createResult = await createAgent.mutateAsync({
+          name: graph.metadata.name,
+          description: graph.metadata.description,
+          framework: 'pydantic_ai',
+          graph_definition: graph,
+        });
+
+        targetAgentId = createResult.id;
+        linkToAgent(targetAgentId);
+      }
+
+      // Open chat UI with the agent
+      openChatWithAgent(targetAgentId);
+    } catch (error) {
+      console.error('Failed to open chat:', error);
+      alert(`Failed to open chat: ${(error as Error).message}`);
+    }
   };
 
   const handleRunWithInputs = async (inputs: Record<string, any>, debugMode?: boolean) => {
@@ -178,6 +224,16 @@ export default function Toolbar({ onOpenSettings }: ToolbarProps) {
         >
           <Play className="w-4 h-4" />
           Run
+        </button>
+
+        <button
+          onClick={handleOpenChat}
+          disabled={!isChatEligible}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isChatEligible ? "Open in Chat UI" : "Graph needs 'query' input and 'query_response' output for chat"}
+        >
+          <MessageSquare className="w-4 h-4" />
+          Chat
         </button>
 
         <div className="h-6 w-px bg-gray-300" />

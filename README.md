@@ -16,6 +16,7 @@ GraphFlow is a comprehensive agent development platform that lets you:
 ## ✨ Key Features
 
 - **Visual Graph Builder**: Drag-and-drop UI with ReactFlow for building agent workflows
+- **Chat UI**: Standalone conversational interface for interacting with chat-enabled graphs
 - **Dynamic Memory Management**: Dedicated Memory Schema panel with auto-binding, usage tracking, and editable outputs
 - **Interactive Debugger**: Set breakpoints before/after steps, step through execution, pause/resume, inspect and edit memory values in real-time
 - **LLM Tool Support**: Visual tool builder with MappedStepTools - wrap any step type as an LLM-callable tool
@@ -44,6 +45,7 @@ GraphFlow consists of four main components plus an extensible plugin system:
 | **graph-compiler** | Transpiler from graph JSON to Python (Pydantic AI / LangGraph) | ✅ Complete |
 | **graph-runtime** | FastAPI service for executing and managing agents | ✅ Complete |
 | **graph-builder** | React UI for visual graph construction and runtime monitoring | ✅ Complete |
+| **graph-chat** | React UI for conversational interaction with chat-enabled graphs | ✅ Complete |
 
 ### Plugin Packages
 
@@ -99,19 +101,20 @@ pip install -e packages/graphflow-plugin-example
 ### Visual UI (Recommended)
 
 ```bash
-# Using Makefile (easiest)
+# Using Makefile (easiest) - starts runtime, builder, and chat UI
 make dev-start
 
 # Or manually:
-# Terminal 1: Start runtime server
+# Terminal 1: Start runtime server (port 8000)
 graphflow-runtime
 
-# Terminal 2: Start UI
-cd packages/graph-builder
-npm install
-npm run dev
+# Terminal 2: Start Builder UI (port 3000)
+cd packages/graph-builder && npm install && npm run dev
 
-# Visit http://localhost:3000
+# Terminal 3: Start Chat UI (port 3001)
+cd packages/graph-chat && npm install && npm run dev
+
+# Visit http://localhost:3000 for Builder
 # - Builder tab: Visual graph editor with drag-and-drop steps
 #   - Step Palette: Browse steps by category or plugin
 #   - Properties Panel: Configure step settings and memory bindings
@@ -121,6 +124,11 @@ npm run dev
 #   - Enable debug mode with breakpoints and step-through execution
 #   - Inspect and edit memory values in real-time
 #   - View execution logs and step properties
+
+# Visit http://localhost:3001 for Chat UI
+# - Conversational interface for chat-enabled graphs
+# - Multi-graph and multi-session support
+# - Per-conversation debug mode toggle
 ```
 
 ### Example 1: Compile and Run Standalone Agent
@@ -369,6 +377,32 @@ The visual graph builder provides an intuitive interface for creating agent work
 - Visual highlighting of bound fields with blue background
 - Autocomplete suggestions for memory field names
 
+## 💬 Chat UI
+
+The Chat UI provides a conversational interface for interacting with chat-enabled graphs:
+
+**Graph Eligibility**
+- Graphs must have a `query` input and `query_response` output in their memory schema
+- Eligible graphs show a chat icon in the Runtime agents list
+- The "Chat" button in the Builder toolbar opens eligible graphs in Chat UI
+
+**Core Features**
+- **Multi-Graph Support**: Multiple graphs can be active simultaneously in the sidebar
+- **Multi-Session**: Create multiple conversations per graph with independent history
+- **Real-time Responses**: Poll-based message delivery with typing indicators
+- **Debug Mode Toggle**: Per-conversation debug mode - when enabled, runs appear in Runtime UI for debugging
+- **Session Persistence**: Conversations use session IDs for multi-turn context in LLM steps
+
+**Accessing Chat UI**
+- From Builder: Click "Chat" button in toolbar (green, shows when graph is eligible)
+- From Runtime: Click chat icon next to eligible agents in the agents list
+- Direct URL: `http://localhost:3001?agentId={agent_id}`
+
+**Adding Graphs**
+- Click "+" button to add graphs from runtime or upload files
+- Upload new graph files directly (creates agent in runtime automatically)
+- Select from existing eligible agents in runtime
+
 ## 🐛 Interactive Debugger
 
 GraphFlow includes a full-featured debugger for troubleshooting and understanding agent execution:
@@ -478,7 +512,8 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 - **[graph-core](packages/graph-core/README.md)** - Core library with step types and memory management
 - **[graph-compiler](packages/graph-compiler/README.md)** - Transpiler from graph JSON to Python code
 - **[graph-runtime](packages/graph-runtime/README.md)** - FastAPI service for agent execution
-- **[graph-builder](packages/graph-builder/README.md)** - React UI for visual graph construction (if available)
+- **[graph-builder](packages/graph-builder/README.md)** - React UI for visual graph construction
+- **[graph-chat](packages/graph-chat/README.md)** - React UI for conversational interaction with graphs
 
 ### Plugin Documentation
 - **[HTTP Plugin](packages/graph-plugins-http/README.md)** - HTTP requests (GET, POST, PUT, PATCH, DELETE)
@@ -688,6 +723,10 @@ graphflow-runtime --reload
 - ✅ Live execution log with tool call visibility during debugging
 - ✅ Tool error handling (errors returned to LLM for adaptive behavior)
 - ✅ MCP tool integration for LLM steps (connect to any MCP server)
+- ✅ Chat UI for conversational interaction with eligible graphs
+- ✅ Multi-graph and multi-session chat support
+- ✅ Per-conversation debug mode toggle
+- ✅ Cross-app navigation (Builder/Runtime to Chat)
 
 **Phase 5: Future Enhancements**
 - 🚧 Graph templates
