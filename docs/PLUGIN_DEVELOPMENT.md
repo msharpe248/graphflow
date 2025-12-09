@@ -311,22 +311,34 @@ The `get_schema()` method should return a JSON Schema (draft 7) defining your st
 
 ### Memory Operations
 
-Steps interact with shared memory to pass data between nodes:
+Steps interact with shared memory to pass data between nodes. GraphFlow supports six memory namespaces with different purposes.
+
+> **Deep Dive:** For complete memory system documentation, see [Memory System Technical Reference](MEMORY_SYSTEM.md).
+
+#### Memory Namespaces
+
+| Namespace | Syntax | Purpose | Read | Write |
+|-----------|--------|---------|------|-------|
+| `memory.*` | `{memory.field}` | Inputs, intermediate, outputs | Yes | Yes |
+| `config.*` | `{config.field}` | System configuration | Yes | No |
+| `env.*` | `{env.field}` | Environment variables | Yes | Yes |
+| `secrets.*` | `{secrets.field}` | Sensitive values (API keys) | Yes | No |
+
+#### Basic Read/Write Operations
 
 ```python
 async def execute(self, memory: MemoryStore) -> None:
-    # Read from memory
-    value = memory.read("key_name")  # Raises KeyError if not found
+    # Read with namespaced syntax (recommended)
+    user_input = memory.read("memory.user_question")
+    api_url = memory.read("config.runtime_url")
+    base_url = memory.read("env.api_base")
+    api_key = memory.read("secrets.openai_key")
 
-    # Check if key exists
-    if memory.exists("key_name"):
-        value = memory.read("key_name")
+    # Legacy syntax (searches inputs → intermediate → outputs)
+    value = memory.read("key_name")
 
-    # Write to memory
-    memory.write("output_key", {"result": "data"})
-
-    # Update existing value
-    memory.update("key_name", new_value)
+    # Write to memory namespace
+    memory.write("memory.output_field", {"result": "data"})
 
     # Get all memory state
     state = memory.get_state()  # Returns {inputs, outputs, intermediate}
@@ -339,6 +351,80 @@ async def execute(self, memory: MemoryStore) -> None:
 - **Intermediate**: Temporary values passed between steps
 
 > **Note on Debugging:** When running in debug mode, users can edit memory values while execution is paused. Your step may receive modified or unexpected values. Implement defensive validation to handle this gracefully.
+
+#### Template Rendering Pattern
+
+Most plugins need to render configuration values that contain memory bindings. Use this pattern:
+
+```python
+import re
+from graphflow_core.memory.store import MemoryStore
+
+class MyStep(StepBase):
+    def _render_template(self, template: str, memory: MemoryStore) -> str:
+        """
+        Render template string with memory values.
+        Supports: {memory.field}, {config.field}, {env.field}, {secrets.field}
+        """
+        if not template:
+            return ""
+
+        # Pattern matches {namespace.field} syntax
+        pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
+        matches = re.findall(pattern, template)
+
+        result = template
+        for namespace, field in matches:
+            full_key = f"{namespace}.{field}"
+            try:
+                value = memory.read(full_key)
+                if value is not None:
+                    result = result.replace(f'{{{full_key}}}', str(value))
+            except KeyError:
+                pass  # Leave placeholder if not found
+
+        return result
+
+    def _render_dict(self, data: dict, memory: MemoryStore) -> dict:
+        """Recursively render all string values in a dict."""
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                result[key] = self._render_template(value, memory)
+            elif isinstance(value, dict):
+                result[key] = self._render_dict(value, memory)
+            elif isinstance(value, list):
+                result[key] = [
+                    self._render_template(v, memory) if isinstance(v, str) else v
+                    for v in value
+                ]
+            else:
+                result[key] = value
+        return result
+
+    async def execute(self, memory: MemoryStore) -> None:
+        # Render config values with memory bindings
+        url = self._render_template(self.config["url"], memory)
+        headers = self._render_dict(self.config.get("headers", {}), memory)
+
+        # Use rendered values
+        response = await self._make_request(url, headers)
+        # ...
+```
+
+#### Graceful Handling of Missing Keys
+
+The memory namespace returns empty string for missing keys instead of raising errors:
+
+```python
+# This returns "" if field doesn't exist (no error)
+value = memory.read("memory.possibly_missing_field")
+
+# Check explicitly if needed
+if value:
+    # Field exists and has a value
+    process(value)
+```
 
 **Automatic Memory Tracking:**
 

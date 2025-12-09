@@ -95,7 +95,11 @@ Metadata provides descriptive information about the graph.
 
 ## Memory Schema
 
-The memory schema defines all data locations used by the graph. Memory is organized into six namespaces:
+The memory schema defines all data locations used by the graph. Memory is organized into six namespaces.
+
+> **Related Documentation:**
+> - [Memory User Guide](MEMORY_USER_GUIDE.md) - How to use memory in the Builder UI
+> - [Memory System Technical Reference](MEMORY_SYSTEM.md) - Implementation details
 
 1. **inputs**: Data provided when the graph starts
 2. **outputs**: Final results produced by the graph
@@ -932,11 +936,18 @@ graphflow-compile validate my_graph.json
 
 ## Related Documentation
 
+**Memory System:**
+- **[Memory User Guide](MEMORY_USER_GUIDE.md)** - How to use memory bindings and namespaces
+- **[Memory System Technical Reference](MEMORY_SYSTEM.md)** - Implementation details
+
+**Plugins:**
 - **[HTTP Plugin](../packages/graph-plugins-http/README.md)** - HTTP requests
 - **[URL Plugin](../packages/graph-plugins-url/README.md)** - URL parsing and manipulation
 - **[XML/HTML Plugin](../packages/graph-plugins-xmlhtml/README.md)** - HTML/XML processing
 - **[Encoding Plugin](../packages/graph-plugins-encoding/README.md)** - Base64, Hex, Hashing, Gzip
-- **[Plugin Development](../packages/graphflow-plugin-example/README.md)** - Creating custom step types
+- **[Plugin Development](PLUGIN_DEVELOPMENT.md)** - Creating custom step types
+
+**Core:**
 - **[Core Library](../packages/graph-core/README.md)** - Built-in step types
 - **[Compiler](../packages/graph-compiler/README.md)** - Compiling graphs to Python code
 - **[Runtime API](http://localhost:8000/docs)** - REST API for running graphs

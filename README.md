@@ -504,6 +504,9 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 
 ### Core Documentation
 - **[GRAPH_FORMAT.md](docs/GRAPH_FORMAT.md)** - **Complete JSON format specification** for graph definitions
+- **[MEMORY_USER_GUIDE.md](docs/MEMORY_USER_GUIDE.md)** - **User guide for memory system** - bindings, namespaces, Builder UI
+- **[MEMORY_SYSTEM.md](docs/MEMORY_SYSTEM.md)** - Technical reference for memory implementation
+- **[PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md)** - Guide to creating custom plugin steps
 - **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete technical specification
 - **[TEMPLATE_ARCHITECTURE.md](docs/TEMPLATE_ARCHITECTURE.md)** - Step template system design
 - **API Docs** - Visit http://localhost:8000/docs when runtime is running
@@ -756,6 +759,8 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 ## 🔗 Quick Links
 
 - **[Graph Format Specification](docs/GRAPH_FORMAT.md)** - Complete JSON format documentation
+- **[Memory User Guide](docs/MEMORY_USER_GUIDE.md)** - How to use memory bindings and namespaces
+- **[Memory Technical Reference](docs/MEMORY_SYSTEM.md)** - Memory system internals
 - **Plugin Documentation**:
   - [HTTP Plugin](packages/graph-plugins-http/README.md) - HTTP requests
   - [URL Plugin](packages/graph-plugins-url/README.md) - URL parsing and encoding
