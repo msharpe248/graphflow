@@ -83,6 +83,28 @@ make dev-start
 
 **For detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md)**
 
+### Makefile Commands
+
+GraphFlow includes a comprehensive Makefile for development. Here are the most common commands:
+
+| Command | Description |
+|---------|-------------|
+| `make help` | Show all available commands |
+| `make install` | Install all packages in editable mode |
+| `make dev-start` | Start full dev environment (runtime + builder + chat) |
+| `make dev-stop` | Stop all services |
+| `make status` | Show status of all services |
+| `make test` | Run all tests |
+| `make reset` | Full reset: stop, clean, reinstall, restart |
+
+**Service Control:**
+- `make runtime-start` / `make runtime-stop` - Runtime server (port 8000)
+- `make builder-start` / `make builder-stop` - Builder UI (port 3000)
+- `make chat-start` / `make chat-stop` - Chat UI (port 3001)
+- `make runtime-logs` / `make builder-logs` / `make chat-logs` - View logs
+
+**See [docs/MAKEFILE.md](docs/MAKEFILE.md) for complete documentation.**
+
 ### Alternative: Manual Installation
 
 ```bash
@@ -506,6 +528,7 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 - **[GRAPH_FORMAT.md](docs/GRAPH_FORMAT.md)** - **Complete JSON format specification** for graph definitions
 - **[MEMORY_USER_GUIDE.md](docs/MEMORY_USER_GUIDE.md)** - **User guide for memory system** - bindings, namespaces, Builder UI
 - **[MEMORY_SYSTEM.md](docs/MEMORY_SYSTEM.md)** - Technical reference for memory implementation
+- **[MAKEFILE.md](docs/MAKEFILE.md)** - Complete Makefile command reference
 - **[PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md)** - Guide to creating custom plugin steps
 - **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete technical specification
 - **[TEMPLATE_ARCHITECTURE.md](docs/TEMPLATE_ARCHITECTURE.md)** - Step template system design
@@ -761,6 +784,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
 - **[Graph Format Specification](docs/GRAPH_FORMAT.md)** - Complete JSON format documentation
 - **[Memory User Guide](docs/MEMORY_USER_GUIDE.md)** - How to use memory bindings and namespaces
 - **[Memory Technical Reference](docs/MEMORY_SYSTEM.md)** - Memory system internals
+- **[Makefile Reference](docs/MAKEFILE.md)** - Complete development command reference
 - **Plugin Documentation**:
   - [HTTP Plugin](packages/graph-plugins-http/README.md) - HTTP requests
   - [URL Plugin](packages/graph-plugins-url/README.md) - URL parsing and encoding
