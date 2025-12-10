@@ -6,9 +6,11 @@ Tests both namespaced and legacy syntax patterns
 Tests all usage patterns used throughout GraphFlow project
 """
 
+import logging
 import pytest
 import os
 from graphflow_core import MemoryStore, MemorySchema, FieldDefinition, SecretDefinition, ConfigDefinition, EnvironmentDefinition
+from graphflow_core.memory import MemoryError, MemoryKeyError, MemoryTypeError
 from graphflow_core.memory.store import _RUNTIME_CONFIG
 
 
@@ -147,19 +149,21 @@ class TestMemoryNamespaces:
         assert memory.read("processed_name") == "BOB"
 
     def test_read_from_unknown_memory_key(self, namespaced_schema):
-        """Test reading from non-existent memory key raises error."""
+        """Test reading from non-existent memory key returns empty string (graceful handling)."""
         memory = MemoryStore(schema=namespaced_schema)
         memory.initialize_inputs({"user_name": "Charlie"})
 
-        with pytest.raises(KeyError, match="Memory key not found"):
-            memory.read("memory.nonexistent_field")
+        # Graceful handling: returns empty string for missing keys
+        # This allows generated code to work even with incomplete schemas
+        result = memory.read("memory.nonexistent_field")
+        assert result == ""
 
     def test_write_to_unknown_memory_key(self, namespaced_schema):
         """Test writing to non-existent memory key raises error."""
         memory = MemoryStore(schema=namespaced_schema)
         memory.initialize_inputs({"user_name": "Diana"})
 
-        with pytest.raises(KeyError, match="Memory key not in schema"):
+        with pytest.raises(MemoryKeyError, match="not found in memory"):
             memory.write("memory.unknown_field", "value")
 
 
@@ -776,7 +780,7 @@ class TestMemoryErrorCases:
         memory.initialize_inputs({"input_field": "original"})
 
         # Cannot write to inputs using legacy syntax
-        with pytest.raises(KeyError, match="Memory key not in schema"):
+        with pytest.raises(MemoryKeyError, match="not found in memory"):
             memory.write("input_field", "modified")
 
     def test_extra_input_keys_accepted(self):
@@ -812,3 +816,379 @@ class TestMemoryErrorCases:
         assert "inputs=0" in repr_str
         assert "outputs=" in repr_str
         assert "intermediate=" in repr_str
+
+
+class TestDebugInterface:
+    """Test debug interface methods used by AsyncExecutor."""
+
+    @pytest.fixture
+    def debug_schema(self):
+        """Schema with all namespace types for debug interface testing."""
+        return MemorySchema(
+            inputs={
+                "user_input": FieldDefinition(type="string", required=True)
+            },
+            outputs={
+                "result": FieldDefinition(type="string", required=True)
+            },
+            intermediate={
+                "temp_value": FieldDefinition(type="string", required=False)
+            },
+            environment={
+                "api_url": EnvironmentDefinition(type="string", key="TEST_DEBUG_API_URL", required=False)
+            }
+        )
+
+    @pytest.fixture(autouse=True)
+    def setup_env(self):
+        """Set up test environment variables."""
+        os.environ['TEST_DEBUG_API_URL'] = 'http://localhost:8000'
+        yield
+        os.environ.pop('TEST_DEBUG_API_URL', None)
+
+    def test_set_output_writes_to_outputs(self, debug_schema):
+        """Test set_output() writes to outputs namespace."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        memory.set_output("result", "debug output")
+
+        assert memory.read("memory.result") == "debug output"
+        assert memory.get_all_outputs()["result"] == "debug output"
+
+    def test_set_output_invalid_key_raises(self, debug_schema):
+        """Test set_output() raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.set_output("nonexistent", "value")
+
+        assert exc_info.value.key == "nonexistent"
+        assert exc_info.value.namespace == "outputs"
+        assert "result" in exc_info.value.available
+
+    def test_set_intermediate_writes_to_intermediate(self, debug_schema):
+        """Test set_intermediate() writes to intermediate namespace."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        memory.set_intermediate("temp_value", "debug intermediate")
+
+        assert memory.read("memory.temp_value") == "debug intermediate"
+        assert memory.get_all_intermediate()["temp_value"] == "debug intermediate"
+
+    def test_set_intermediate_invalid_key_raises(self, debug_schema):
+        """Test set_intermediate() raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.set_intermediate("nonexistent", "value")
+
+        assert exc_info.value.key == "nonexistent"
+        assert exc_info.value.namespace == "intermediate"
+
+    def test_set_environment_updates_os_environ(self, debug_schema):
+        """Test set_environment() updates os.environ."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        memory.set_environment("api_url", "http://newhost:9000")
+
+        assert os.environ['TEST_DEBUG_API_URL'] == "http://newhost:9000"
+        assert memory.read("env.api_url") == "http://newhost:9000"
+
+    def test_set_environment_invalid_key_raises(self, debug_schema):
+        """Test set_environment() raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=debug_schema)
+        memory.initialize_inputs({"user_input": "test"})
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.set_environment("nonexistent", "value")
+
+        assert exc_info.value.key == "nonexistent"
+        assert exc_info.value.namespace == "environment"
+
+
+class TestTypeValidation:
+    """Test type validation with warn-only approach."""
+
+    @pytest.fixture
+    def typed_schema(self):
+        """Schema with various field types."""
+        return MemorySchema(
+            inputs={
+                "str_input": FieldDefinition(type="string", required=False),
+                "num_input": FieldDefinition(type="number", required=False),
+                "bool_input": FieldDefinition(type="boolean", required=False),
+            },
+            outputs={
+                "str_output": FieldDefinition(type="string", required=False),
+                "num_output": FieldDefinition(type="number", required=False),
+                "bool_output": FieldDefinition(type="boolean", required=False),
+                "obj_output": FieldDefinition(type="object", required=False),
+                "arr_output": FieldDefinition(type="array", required=False),
+                "any_output": FieldDefinition(type="any", required=False),
+            },
+            intermediate={}
+        )
+
+    def test_valid_string_type_no_warning(self, typed_schema, caplog):
+        """Test writing valid string doesn't log warning."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("str_output", "valid string")
+
+        assert "Type mismatch" not in caplog.text
+        assert memory.read("str_output") == "valid string"
+
+    def test_valid_number_types_no_warning(self, typed_schema, caplog):
+        """Test writing int and float to number field works."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("num_output", 42)
+            assert memory.read("num_output") == 42
+
+            memory.write("num_output", 3.14)
+            assert memory.read("num_output") == 3.14
+
+        assert "Type mismatch" not in caplog.text
+
+    def test_invalid_type_logs_warning(self, typed_schema, caplog):
+        """Test writing wrong type logs warning but still writes."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("num_output", "not a number")
+
+        assert "Type mismatch" in caplog.text
+        assert "num_output" in caplog.text
+        assert "expected number" in caplog.text
+        # Value should still be written (warn-only)
+        assert memory.read("num_output") == "not a number"
+
+    def test_boolean_not_confused_with_number(self, typed_schema, caplog):
+        """Test boolean doesn't pass number validation."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("num_output", True)
+
+        assert "Type mismatch" in caplog.text
+        assert "bool" in caplog.text
+
+    def test_none_allowed_for_any_type(self, typed_schema, caplog):
+        """Test None is accepted for any field type without warning."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("str_output", None)
+            memory.write("num_output", None)
+            memory.write("bool_output", None)
+            memory.write("obj_output", None)
+            memory.write("arr_output", None)
+
+        assert "Type mismatch" not in caplog.text
+
+    def test_object_type_validation(self, typed_schema, caplog):
+        """Test object type validation."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("obj_output", {"key": "value"})
+
+        assert "Type mismatch" not in caplog.text
+        assert memory.read("obj_output") == {"key": "value"}
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            memory.write("obj_output", "not an object")
+
+        assert "Type mismatch" in caplog.text
+
+    def test_array_type_validation(self, typed_schema, caplog):
+        """Test array type validation."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("arr_output", [1, 2, 3])
+
+        assert "Type mismatch" not in caplog.text
+        assert memory.read("arr_output") == [1, 2, 3]
+
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            memory.write("arr_output", "not an array")
+
+        assert "Type mismatch" in caplog.text
+
+    def test_any_type_accepts_anything(self, typed_schema, caplog):
+        """Test any type accepts all values without warning."""
+        memory = MemoryStore(schema=typed_schema)
+
+        with caplog.at_level(logging.WARNING):
+            memory.write("any_output", "string")
+            memory.write("any_output", 42)
+            memory.write("any_output", True)
+            memory.write("any_output", {"key": "value"})
+            memory.write("any_output", [1, 2, 3])
+
+        assert "Type mismatch" not in caplog.text
+
+
+class TestSecretsSchemaValidation:
+    """Test schema validation for secrets writes."""
+
+    @pytest.fixture
+    def secrets_schema(self):
+        """Schema with secrets namespace."""
+        return MemorySchema(
+            inputs={},
+            outputs={},
+            intermediate={},
+            secrets={
+                "api_key": SecretDefinition(provider="env", key="TEST_API_KEY"),
+                "db_password": SecretDefinition(provider="env", key="TEST_DB_PASSWORD")
+            }
+        )
+
+    @pytest.fixture(autouse=True)
+    def setup_secrets(self):
+        """Set up test secrets in environment."""
+        os.environ['TEST_API_KEY'] = 'test-key'
+        os.environ['TEST_DB_PASSWORD'] = 'test-password'
+        yield
+        os.environ.pop('TEST_API_KEY', None)
+        os.environ.pop('TEST_DB_PASSWORD', None)
+
+    def test_write_valid_secret(self, secrets_schema):
+        """Test writing to a valid secret key."""
+        memory = MemoryStore(schema=secrets_schema)
+
+        memory.write("secrets.api_key", "new-key-value")
+
+        assert memory.read("secrets.api_key") == "new-key-value"
+
+    def test_write_invalid_secret_raises(self, secrets_schema):
+        """Test writing to invalid secret key raises MemoryKeyError."""
+        memory = MemoryStore(schema=secrets_schema)
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.write("secrets.nonexistent", "value")
+
+        assert exc_info.value.key == "nonexistent"
+        assert exc_info.value.namespace == "secrets"
+        assert "api_key" in exc_info.value.available
+        assert "db_password" in exc_info.value.available
+
+
+class TestCustomExceptions:
+    """Test custom exception classes."""
+
+    def test_memory_key_error_inherits_key_error(self):
+        """Test MemoryKeyError inherits from both MemoryError and KeyError."""
+        error = MemoryKeyError("test_key", "outputs")
+
+        assert isinstance(error, MemoryError)
+        assert isinstance(error, KeyError)
+
+    def test_memory_key_error_attributes(self):
+        """Test MemoryKeyError has correct attributes."""
+        error = MemoryKeyError("test_key", "outputs", ["key1", "key2", "key3"])
+
+        assert error.key == "test_key"
+        assert error.namespace == "outputs"
+        assert error.available == ["key1", "key2", "key3"]
+
+    def test_memory_key_error_message_with_available_keys(self):
+        """Test MemoryKeyError message includes available keys."""
+        error = MemoryKeyError("bad_key", "outputs", ["good_key1", "good_key2"])
+
+        message = str(error)
+        assert "bad_key" in message
+        assert "outputs" in message
+        assert "good_key1" in message
+        assert "good_key2" in message
+
+    def test_memory_key_error_message_truncates_long_list(self):
+        """Test MemoryKeyError truncates long available keys list."""
+        many_keys = [f"key{i}" for i in range(10)]
+        error = MemoryKeyError("bad_key", "outputs", many_keys)
+
+        message = str(error)
+        assert "and 5 more" in message
+
+    def test_memory_type_error_inherits_type_error(self):
+        """Test MemoryTypeError inherits from both MemoryError and TypeError."""
+        error = MemoryTypeError("test_key", "string", int)
+
+        assert isinstance(error, MemoryError)
+        assert isinstance(error, TypeError)
+
+    def test_memory_type_error_attributes(self):
+        """Test MemoryTypeError has correct attributes."""
+        error = MemoryTypeError("test_key", "string", int)
+
+        assert error.key == "test_key"
+        assert error.expected == "string"
+        assert error.got == int
+
+    def test_memory_type_error_message(self):
+        """Test MemoryTypeError message is helpful."""
+        error = MemoryTypeError("count", "number", str)
+
+        message = str(error)
+        assert "count" in message
+        assert "number" in message
+        assert "str" in message
+
+
+class TestMemoryKeyErrorUsage:
+    """Test that MemoryKeyError is used in the right places."""
+
+    @pytest.fixture
+    def simple_schema(self):
+        """Simple schema for testing error raises."""
+        return MemorySchema(
+            inputs={
+                "valid_input": FieldDefinition(type="string", required=True)
+            },
+            outputs={
+                "valid_output": FieldDefinition(type="string", required=True)
+            },
+            intermediate={
+                "valid_intermediate": FieldDefinition(type="string", required=False)
+            }
+        )
+
+    def test_set_input_invalid_key_uses_memory_key_error(self, simple_schema):
+        """Test set_input raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=simple_schema)
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.set_input("nonexistent", "value")
+
+        assert exc_info.value.namespace == "inputs"
+
+    def test_write_invalid_key_uses_memory_key_error(self, simple_schema):
+        """Test write raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=simple_schema)
+        memory.initialize_inputs({"valid_input": "test"})
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.write("nonexistent", "value")
+
+        assert exc_info.value.namespace == "memory (outputs/intermediate)"
+
+    def test_write_namespaced_invalid_key_uses_memory_key_error(self, simple_schema):
+        """Test write with namespace raises MemoryKeyError for invalid key."""
+        memory = MemoryStore(schema=simple_schema)
+        memory.initialize_inputs({"valid_input": "test"})
+
+        with pytest.raises(MemoryKeyError) as exc_info:
+            memory.write("memory.nonexistent", "value")
+
+        assert exc_info.value.namespace == "memory (outputs/intermediate)"

@@ -1,16 +1,51 @@
 """Memory store implementation for graph execution."""
 
+import logging
 import os
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from graphflow_core.models import MemorySchema
 
 if TYPE_CHECKING:
     from graphflow_core.memory.resolver import TemplateResolver
 
+logger = logging.getLogger(__name__)
+
 # Global runtime config registry
 # This is populated by the runtime executor before agent execution
 # Allows config namespace to redirect to runtime config without circular dependency
 _RUNTIME_CONFIG: Dict[str, Any] = {}
+
+
+class MemoryError(Exception):
+    """Base class for memory-related errors."""
+    pass
+
+
+class MemoryKeyError(MemoryError, KeyError):
+    """Key not found or not allowed in memory."""
+
+    def __init__(self, key: str, namespace: str, available: Optional[List[str]] = None):
+        self.key = key
+        self.namespace = namespace
+        self.available = available or []
+        msg = f"Key '{key}' not found in {namespace}"
+        if available:
+            msg += f". Available keys: {', '.join(available[:5])}"
+            if len(available) > 5:
+                msg += f" (and {len(available) - 5} more)"
+        super().__init__(msg)
+
+
+class MemoryTypeError(MemoryError, TypeError):
+    """Type mismatch when writing to memory."""
+
+    def __init__(self, key: str, expected: str, got: type):
+        self.key = key
+        self.expected = expected
+        self.got = got
+        super().__init__(
+            f"Type mismatch writing to '{key}': expected {expected}, got {got.__name__}"
+        )
 
 
 class MemoryStore:
@@ -66,6 +101,42 @@ class MemoryStore:
             'any': None,
         }
         return zero_values.get(field_type, None)
+
+    def _check_type(self, value: Any, expected_type: str, key: str) -> bool:
+        """
+        Check if value matches expected type.
+
+        Logs a warning if there's a mismatch but does not raise an exception.
+        This provides visibility into type issues without breaking execution.
+
+        Args:
+            value: Value to check
+            expected_type: Expected type ('string', 'number', 'boolean', 'object', 'array', 'any')
+            key: Key name for logging
+
+        Returns:
+            True if valid, False if type mismatch
+        """
+        if value is None:
+            return True  # None is allowed for any type (represents "not set")
+
+        type_checks = {
+            'string': lambda v: isinstance(v, str),
+            'number': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+            'boolean': lambda v: isinstance(v, bool),
+            'object': lambda v: isinstance(v, dict),
+            'array': lambda v: isinstance(v, list),
+            'any': lambda v: True,
+        }
+
+        checker = type_checks.get(expected_type, lambda v: True)
+        if not checker(value):
+            logger.warning(
+                f"Type mismatch: writing {type(value).__name__} to '{key}' "
+                f"(expected {expected_type})"
+            )
+            return False
+        return True
 
     def initialize_inputs(self, inputs: Dict[str, Any]) -> None:
         """
@@ -187,13 +258,21 @@ class MemoryStore:
             namespace, field_key = key.split(".", 1)
 
             if namespace == "memory":
-                # Write to memory namespaces
+                # Write to memory namespaces with type validation
                 if field_key in self.schema.outputs:
+                    field_def = self.schema.outputs[field_key]
+                    self._check_type(value, field_def.type, field_key)
                     self._outputs[field_key] = value
                 elif field_key in self.schema.intermediate:
+                    field_def = self.schema.intermediate[field_key]
+                    self._check_type(value, field_def.type, field_key)
                     self._intermediate[field_key] = value
                 else:
-                    raise KeyError(f"Memory key not in schema: {field_key}")
+                    raise MemoryKeyError(
+                        field_key,
+                        "memory (outputs/intermediate)",
+                        list(self.schema.outputs.keys()) + list(self.schema.intermediate.keys())
+                    )
 
             elif namespace == "config":
                 raise ValueError("Config namespace is read-only")
@@ -208,20 +287,34 @@ class MemoryStore:
                     raise KeyError(f"Environment key not in schema: {field_key}")
 
             elif namespace == "secrets":
-                # Steps can create/update secrets at runtime
+                # Validate secret key exists in schema before write
+                if field_key not in self.schema.secrets:
+                    raise MemoryKeyError(
+                        field_key,
+                        "secrets",
+                        list(self.schema.secrets.keys())
+                    )
                 self._secrets[field_key] = str(value)
 
             else:
                 raise KeyError(f"Unknown namespace: {namespace}")
 
         else:
-            # Legacy format
+            # Legacy format with type validation
             if key in self.schema.outputs:
+                field_def = self.schema.outputs[key]
+                self._check_type(value, field_def.type, key)
                 self._outputs[key] = value
             elif key in self.schema.intermediate:
+                field_def = self.schema.intermediate[key]
+                self._check_type(value, field_def.type, key)
                 self._intermediate[key] = value
             else:
-                raise KeyError(f"Memory key not in schema (outputs or intermediate): {key}")
+                raise MemoryKeyError(
+                    key,
+                    "memory (outputs/intermediate)",
+                    list(self.schema.outputs.keys()) + list(self.schema.intermediate.keys())
+                )
 
     def set_input(self, key: str, value: Any) -> None:
         """
@@ -235,8 +328,60 @@ class MemoryStore:
             KeyError: If key not in inputs schema
         """
         if key not in self.schema.inputs:
-            raise KeyError(f"Not an input key: {key}")
+            raise MemoryKeyError(key, "inputs", list(self.schema.inputs.keys()))
+        field_def = self.schema.inputs[key]
+        self._check_type(value, field_def.type, key)
         self._inputs[key] = value
+
+    def set_output(self, key: str, value: Any) -> None:
+        """
+        Set output value directly (used by debug interface).
+
+        Args:
+            key: Output key
+            value: Value to set
+
+        Raises:
+            MemoryKeyError: If key not in outputs schema
+        """
+        if key not in self.schema.outputs:
+            raise MemoryKeyError(key, "outputs", list(self.schema.outputs.keys()))
+        field_def = self.schema.outputs[key]
+        self._check_type(value, field_def.type, key)
+        self._outputs[key] = value
+
+    def set_intermediate(self, key: str, value: Any) -> None:
+        """
+        Set intermediate value directly (used by debug interface).
+
+        Args:
+            key: Intermediate key
+            value: Value to set
+
+        Raises:
+            MemoryKeyError: If key not in intermediate schema
+        """
+        if key not in self.schema.intermediate:
+            raise MemoryKeyError(key, "intermediate", list(self.schema.intermediate.keys()))
+        field_def = self.schema.intermediate[key]
+        self._check_type(value, field_def.type, key)
+        self._intermediate[key] = value
+
+    def set_environment(self, key: str, value: Any) -> None:
+        """
+        Set environment variable (used by debug interface).
+
+        Args:
+            key: Environment schema key (not the actual env var name)
+            value: Value to set
+
+        Raises:
+            MemoryKeyError: If key not in environment schema
+        """
+        if key not in self.schema.environment:
+            raise MemoryKeyError(key, "environment", list(self.schema.environment.keys()))
+        env_var_name = self.schema.environment[key].key
+        os.environ[env_var_name] = str(value)
 
     def get_secret(self, key: str) -> str:
         """
