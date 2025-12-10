@@ -7,11 +7,15 @@ from abc import ABC
 import httpx
 
 from graphflow_core.steps.base import StepBase
+from graphflow_core.steps import MemoryMixin
 from graphflow_core.memory import MemoryStore
 
 
-class BaseHTTPStep(StepBase, ABC):
-    """Base class for HTTP steps with shared functionality."""
+class BaseHTTPStep(StepBase, MemoryMixin, ABC):
+    """Base class for HTTP steps with shared functionality.
+
+    Inherits from MemoryMixin for centralized template resolution.
+    """
 
     category = "http"
     can_be_tool = True  # All HTTP steps can be wrapped as LLM tools
@@ -20,59 +24,33 @@ class BaseHTTPStep(StepBase, ABC):
         """
         Render template string with memory values.
 
+        Delegates to MemoryMixin._resolve for centralized template resolution.
+
         Supports namespaced syntax:
         - {memory.variable}
         - {config.variable}
         - {env.variable}
         - {secrets.variable}
         """
-        if not template:
-            return ""
-
-        # Find all {namespace.variable} patterns
-        pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
-        matches = re.findall(pattern, template)
-
-        result = template
-        for namespace, field in matches:
-            # Create the full namespaced key
-            full_key = f"{namespace}.{field}"
-
-            # Try to read from memory using namespaced key
-            try:
-                value = memory.read(full_key)
-            except KeyError:
-                value = None
-
-            # Replace in template
-            if value is not None:
-                result = result.replace(f'{{{full_key}}}', str(value))
-
-        return result
+        return self._resolve(template, memory)
 
     def _render_dict(self, data: Dict[str, Any], memory: MemoryStore) -> Dict[str, Any]:
-        """Render all string values in a dict through template engine."""
+        """Render all string values in a dict through template engine.
+
+        Delegates to MemoryMixin._resolve_dict for centralized template resolution.
+        """
         if not data:
             return {}
 
         # If data is a string (memory template), render it first
         if isinstance(data, str):
-            rendered = self._render_template(data, memory)
+            rendered = self._resolve(data, memory)
             # If the rendered value is not a dict, return empty dict
             if not isinstance(rendered, dict):
                 return {}
             data = rendered
 
-        result = {}
-        for key, value in data.items():
-            if isinstance(value, str):
-                result[key] = self._render_template(value, memory)
-            elif isinstance(value, dict):
-                result[key] = self._render_dict(value, memory)
-            else:
-                result[key] = value
-
-        return result
+        return self._resolve_dict(data, memory)
 
     async def _make_request(
         self,

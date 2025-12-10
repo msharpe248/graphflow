@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict
 from graphflow_core.steps.base import StepBase
 from graphflow_core.steps.registry import StepRegistry
+from graphflow_core.steps.memory_mixin import MemoryMixin
 from graphflow_core.memory.store import MemoryStore
 
 
@@ -46,12 +47,14 @@ class StartStep(StepBase):
 
 
 @StepRegistry.register(category="control", description="Map intermediate values to outputs")
-class OutputStep(StepBase):
+class OutputStep(StepBase, MemoryMixin):
     """
     Output step - map intermediate/input values to output namespace.
 
     Outputs dict maps output names to memory locations using {memory.variable} syntax.
     Example: {"answer": "{memory.llm_response}", "score": "{memory.confidence}"}
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     can_be_tool = False
@@ -98,17 +101,15 @@ class OutputStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Map values from memory to outputs."""
-        import re
-
-        # Pattern to extract memory reference from {memory.variable}
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        resolver = self._get_resolver(memory)
 
         for output_key, source_template in self.outputs.items():
             try:
-                # Extract source key from {memory.variable} syntax
-                match = pattern.search(source_template)
-                if match:
-                    source_key = match.group(1)
+                # Extract source key from {namespace.field} syntax
+                refs = resolver.extract_references(source_template)
+                if refs:
+                    # Get the first reference (output bindings typically have one ref)
+                    source_key = next(iter(refs))
                     value = memory.read(source_key)
                     memory.write(output_key, value)
                 else:
@@ -123,7 +124,7 @@ class OutputStep(StepBase):
 
 
 @StepRegistry.register(category="control", description="Conditional branching based on memory values")
-class ConditionalStep(StepBase):
+class ConditionalStep(StepBase, MemoryMixin):
     """
     Conditional step - evaluates condition and sets branch indicator.
 
@@ -138,6 +139,8 @@ class ConditionalStep(StepBase):
 
     The condition expression can reference memory keys using {memory.variable}.
     Example: "{memory.score} > 0.8 and {memory.status} == 'ready'"
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     can_be_tool = False
@@ -189,32 +192,36 @@ class ConditionalStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Evaluate condition and write result."""
-        import re
-
         condition = self.config.get("condition")
         if not condition:
             raise ValueError(f"ConditionalStep {self.id}: condition not specified")
 
-        # Extract memory references from condition
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        resolver = self._get_resolver(memory)
+
+        # Extract all memory references from condition
+        refs = resolver.extract_references(condition)
 
         # Build evaluation context from memory references
         eval_context = {}
         adjusted_condition = condition
 
-        for match in pattern.finditer(condition):
-            memory_key = match.group(1)
+        for full_key in refs:
+            # full_key is like "memory.variable" or "config.setting"
+            parts = full_key.split('.', 1)
+            namespace = parts[0]
+            field_key = parts[1] if len(parts) > 1 else full_key
+
             # Prefix with _mem_ to avoid shadowing Python built-ins
-            var_name = '_mem_' + memory_key.replace('.', '_')
+            var_name = '_mem_' + full_key.replace('.', '_')
 
             try:
-                eval_context[var_name] = memory.read(memory_key)
+                eval_context[var_name] = memory.read(full_key)
             except KeyError:
                 # Allow missing keys (treat as None)
                 eval_context[var_name] = None
 
-            # Replace {memory.variable} with var_name in condition
-            adjusted_condition = adjusted_condition.replace(f'{{memory.{memory_key}}}', var_name)
+            # Replace {namespace.variable} with var_name in condition
+            adjusted_condition = adjusted_condition.replace(f'{{{full_key}}}', var_name)
 
         # Evaluate condition
         try:
@@ -223,9 +230,9 @@ class ConditionalStep(StepBase):
             # Write result to output location
             if self.outputs and 'result' in self.outputs:
                 result_template = self.outputs['result']
-                match = pattern.search(result_template)
-                if match:
-                    result_key = match.group(1)
+                output_refs = resolver.extract_references(result_template)
+                if output_refs:
+                    result_key = next(iter(output_refs))
                     memory.write(result_key, bool(result))
                 else:
                     raise ValueError(f"ConditionalStep {self.id}: Invalid output reference '{result_template}'")
@@ -239,7 +246,7 @@ class ConditionalStep(StepBase):
 
 
 @StepRegistry.register(category="data", description="Transform data using Python code")
-class TransformStep(StepBase):
+class TransformStep(StepBase, MemoryMixin):
     """
     Transform step - apply Python function to transform data.
 
@@ -252,6 +259,8 @@ class TransformStep(StepBase):
 
     The code should return a value that will be written to the output location.
     Memory references in code using {memory.variable} will be available as variables.
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     can_be_tool = True  # Transform steps can be wrapped as LLM tools
@@ -302,31 +311,31 @@ class TransformStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Execute transformation code."""
-        import re
-
         code = self.config.get("code")
         if not code:
             raise ValueError(f"TransformStep {self.id}: code not specified")
 
-        # Extract memory references from code
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        resolver = self._get_resolver(memory)
+
+        # Extract all memory references from code
+        refs = resolver.extract_references(code)
 
         # Build execution context
         exec_context: Dict[str, Any] = {}
         adjusted_code = code
 
-        for match in pattern.finditer(code):
-            memory_key = match.group(1)
+        for full_key in refs:
+            # full_key is like "memory.variable" or "config.setting"
             # Prefix with _mem_ to avoid shadowing Python built-ins like input, id, etc.
-            var_name = '_mem_' + memory_key.replace('.', '_')
+            var_name = '_mem_' + full_key.replace('.', '_')
 
             try:
-                exec_context[var_name] = memory.read(memory_key)
+                exec_context[var_name] = memory.read(full_key)
             except KeyError:
                 exec_context[var_name] = None
 
-            # Replace {memory.variable} with var_name in code
-            adjusted_code = adjusted_code.replace(f'{{memory.{memory_key}}}', var_name)
+            # Replace {namespace.variable} with var_name in code
+            adjusted_code = adjusted_code.replace(f'{{{full_key}}}', var_name)
 
         # Add json module for convenience
         exec_context['json'] = json
@@ -346,9 +355,9 @@ class TransformStep(StepBase):
             # Write result to output location
             if self.outputs and 'result' in self.outputs:
                 result_template = self.outputs['result']
-                match = pattern.search(result_template)
-                if match:
-                    output_key = match.group(1)
+                output_refs = resolver.extract_references(result_template)
+                if output_refs:
+                    output_key = next(iter(output_refs))
                     memory.write(output_key, result)
                 else:
                     raise ValueError(f"TransformStep {self.id}: Invalid output reference '{result_template}'")
@@ -420,7 +429,7 @@ class JoinStep(StepBase):
 
 
 @StepRegistry.register(category="data", description="Read value from memory")
-class ReadMemoryStep(StepBase):
+class ReadMemoryStep(StepBase, MemoryMixin):
     """
     Read Memory step - read a value from any memory section.
 
@@ -432,6 +441,8 @@ class ReadMemoryStep(StepBase):
 
     Outputs:
         value: {memory.variable} - Where to write the copied value
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     name = "Read Memory"
@@ -484,27 +495,25 @@ class ReadMemoryStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Read value from memory."""
-        import re
-
         source_template = self.config.get("source")
         if not source_template:
             raise ValueError(f"ReadMemoryStep {self.id}: source not specified")
 
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
+        resolver = self._get_resolver(memory)
 
         try:
-            # Extract source key
-            match = pattern.search(source_template)
-            if match:
-                source_key = match.group(1)
+            # Extract source key using resolver
+            source_refs = resolver.extract_references(source_template)
+            if source_refs:
+                source_key = next(iter(source_refs))
                 value = memory.read(source_key)
 
                 # Write to output location
                 if self.outputs and 'value' in self.outputs:
                     output_template = self.outputs['value']
-                    output_match = pattern.search(output_template)
-                    if output_match:
-                        output_key = output_match.group(1)
+                    output_refs = resolver.extract_references(output_template)
+                    if output_refs:
+                        output_key = next(iter(output_refs))
                         memory.write(output_key, value)
                     else:
                         raise ValueError(f"ReadMemoryStep {self.id}: Invalid output reference '{output_template}'")
@@ -520,7 +529,7 @@ class ReadMemoryStep(StepBase):
 
 
 @StepRegistry.register(category="data", description="Write value to memory")
-class WriteMemoryStep(StepBase):
+class WriteMemoryStep(StepBase, MemoryMixin):
     """
     Write Memory step - write a value to any memory section.
 
@@ -532,6 +541,8 @@ class WriteMemoryStep(StepBase):
 
     Outputs:
         value: {memory.variable} - Where to write the value
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     name = "Write Memory"
@@ -584,33 +595,26 @@ class WriteMemoryStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Write value to memory."""
-        import re
-
         source_template = self.config.get("source")
         if not source_template:
             raise ValueError(f"WriteMemoryStep {self.id}: source not specified")
 
-        # Support all namespaces: {memory.*}, {config.*}, {env.*}, {secrets.*}
-        pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
+        resolver = self._get_resolver(memory)
 
         try:
-            # Extract source key
-            match = pattern.search(source_template)
-            if match:
-                namespace = match.group(1)
-                field_key = match.group(2)
-                # Read with full namespaced key
-                value = memory.read(f"{namespace}.{field_key}")
+            # Extract source key using resolver (supports all namespaces)
+            source_refs = resolver.extract_references(source_template)
+            if source_refs:
+                source_key = next(iter(source_refs))
+                value = memory.read(source_key)
 
                 # Write to output location
                 if self.outputs and 'value' in self.outputs:
                     output_template = self.outputs['value']
-                    output_match = pattern.search(output_template)
-                    if output_match:
-                        output_namespace = output_match.group(1)
-                        output_field_key = output_match.group(2)
-                        # Write with full namespaced key
-                        memory.write(f"{output_namespace}.{output_field_key}", value)
+                    output_refs = resolver.extract_references(output_template)
+                    if output_refs:
+                        output_key = next(iter(output_refs))
+                        memory.write(output_key, value)
                     else:
                         raise ValueError(f"WriteMemoryStep {self.id}: Invalid output reference '{output_template}'")
                 else:
@@ -625,7 +629,7 @@ class WriteMemoryStep(StepBase):
 
 
 @StepRegistry.register(category="control", description="Sleep/delay for a specified duration")
-class SleepStep(StepBase):
+class SleepStep(StepBase, MemoryMixin):
     """
     Sleep step - pause execution for a specified duration.
 
@@ -641,6 +645,8 @@ class SleepStep(StepBase):
     Example:
         {"duration": 2.5}  # Sleep for 2.5 seconds
         {"duration": "{memory.delay_seconds}"}  # Read from memory
+
+    Inherits from MemoryMixin for centralized template resolution.
     """
 
     name = "Sleep"
@@ -688,20 +694,20 @@ class SleepStep(StepBase):
 
     async def execute(self, memory: MemoryStore) -> None:
         """Sleep for the specified duration."""
-        import re
         import asyncio
 
         duration_config = self.config.get("duration")
         if duration_config is None:
             raise ValueError(f"SleepStep {self.id}: duration not specified")
 
+        resolver = self._get_resolver(memory)
+
         # Check if duration is a memory reference
         if isinstance(duration_config, str):
-            pattern = re.compile(r'\{memory\.([^}]+)\}')
-            match = pattern.search(duration_config)
-            if match:
+            refs = resolver.extract_references(duration_config)
+            if refs:
                 # Read duration from memory
-                memory_key = match.group(1)
+                memory_key = next(iter(refs))
                 try:
                     duration = memory.read(memory_key)
                     # Convert to float

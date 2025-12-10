@@ -3,6 +3,7 @@
 from typing import Any, Dict, List
 from graphflow_core.steps.base import StepBase
 from graphflow_core.steps.registry import StepRegistry
+from graphflow_core.steps.memory_mixin import MemoryMixin
 from graphflow_core.memory.store import MemoryStore
 
 
@@ -112,7 +113,7 @@ class LoopStep(StepBase):
     category="data",
     description="Execute database query using SQL"
 )
-class DBQueryStep(StepBase):
+class DBQueryStep(StepBase, MemoryMixin):
     """
     Database query step - execute SQL queries.
 
@@ -120,7 +121,7 @@ class DBQueryStep(StepBase):
         connection: str or Dict - Database connection info
             - String: connection string (e.g., "postgresql://user:pass@host/db")
             - Dict: {driver, host, port, database, user, password_secret}
-        query: str - SQL query template (supports {{variable}} syntax)
+        query: str - SQL query template (supports {{variable}} syntax for legacy)
         params: Dict - Query parameters (for parameterized queries)
         fetch_mode: str - "all", "one", or "none" (default: "all")
         results_key: str - Memory key to write query results
@@ -133,6 +134,9 @@ class DBQueryStep(StepBase):
             "fetch_mode": "all",
             "results_key": "users"
         }
+
+    Inherits from MemoryMixin for centralized template resolution.
+    Supports legacy {{variable}} syntax for backwards compatibility.
     """
 
     can_be_tool = True  # Database queries can be wrapped as LLM tools
@@ -204,8 +208,8 @@ class DBQueryStep(StepBase):
         results_key = self.config["results_key"]
         row_count_key = self.config.get("row_count_key")
 
-        # Render query template
-        rendered_query = self._render_template(query, memory)
+        # Render query template using centralized resolver with legacy support
+        rendered_query = self._resolve(query, memory, allow_legacy=True)
 
         # Mock execution
         # In real implementation, would use SQLAlchemy or database driver
@@ -226,25 +230,3 @@ class DBQueryStep(StepBase):
 
         if row_count_key:
             memory.write(row_count_key, len(mock_results) if mock_results else 0)
-
-    def _render_template(self, template: str, memory: MemoryStore) -> str:
-        """Render template with memory values (supports {{variable}} syntax)."""
-        if not template:
-            return ""
-
-        import re
-        pattern = r'\{\{([^}]+)\}\}'
-        matches = re.findall(pattern, template)
-
-        rendered = template
-        for var_name in matches:
-            var_name = var_name.strip()
-            try:
-                value = memory.read(var_name)
-                value_str = str(value) if value is not None else ""
-                rendered = rendered.replace(f"{{{{{var_name}}}}}", value_str)
-            except KeyError:
-                # Leave placeholder if key not found
-                pass
-
-        return rendered

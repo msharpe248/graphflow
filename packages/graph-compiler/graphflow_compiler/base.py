@@ -7,6 +7,7 @@ from pathlib import Path
 import jinja2
 from graphflow_core.models import GraphDefinition, Step, ToolDefinition, MappedStepTool, MCPTool
 from graphflow_core.steps.registry import StepRegistry
+from graphflow_core.memory.resolver import TemplateResolver
 from graphflow_compiler.tools.compiler import ToolCompiler
 
 
@@ -49,6 +50,8 @@ class CodeGenerator(ABC):
         If value is a string like "{memory.llm_2.tools}", looks up the default value
         from the memory schema. Otherwise returns the value as-is.
 
+        Uses TemplateResolver for pattern matching.
+
         Args:
             value: Config value that might be a memory reference
             graph: Graph definition containing memory schema
@@ -59,12 +62,19 @@ class CodeGenerator(ABC):
         if not isinstance(value, str):
             return value
 
-        # Check if this is a memory reference: {memory.key}
-        match = re.match(r'^\{memory\.([^}]+)\}$', value)
-        if not match:
+        # Check if this is a memory reference using TemplateResolver
+        refs = TemplateResolver.find_references(value)
+        if not refs:
             return value
 
-        memory_key = match.group(1)
+        # Get the first reference (typically only one for config values)
+        full_key = next(iter(refs))
+
+        # Only resolve memory namespace references to schema defaults
+        if not full_key.startswith("memory."):
+            return value
+
+        memory_key = full_key[7:]  # Remove "memory." prefix
 
         # Look up in memory schema (intermediate, inputs, or outputs)
         for namespace in [graph.memory.intermediate, graph.memory.inputs, graph.memory.outputs]:
@@ -74,7 +84,7 @@ class CodeGenerator(ABC):
                     return field_def.default
                 break
 
-        # If no default found, return empty list for tools (common case)
+        # If no default found, return original value
         return value
 
     @abstractmethod
@@ -487,31 +497,21 @@ Generated: {graph.metadata.created}
 
     def _extract_memory_refs(self, config: Dict[str, Any]) -> Set[str]:
         """
-        Extract all memory references from config.
+        Extract memory variable names from config (without namespace prefix).
 
-        Looks for {memory.variable} pattern in config values.
+        Uses centralized TemplateResolver for pattern matching, but strips
+        the "memory." prefix for backwards compatibility with code templates.
 
         Args:
             config: Step configuration dict
 
         Returns:
-            Set of memory keys referenced
+            Set of memory variable names (e.g., "user_input", "query")
+            Note: Only returns variables from memory namespace, not config/env/secrets
         """
-        refs = set()
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-
-        def extract_from_value(value):
-            if isinstance(value, str):
-                refs.update(pattern.findall(value))
-            elif isinstance(value, dict):
-                for v in value.values():
-                    extract_from_value(v)
-            elif isinstance(value, list):
-                for item in value:
-                    extract_from_value(item)
-
-        extract_from_value(config)
-        return refs
+        full_refs = TemplateResolver.find_references_in_dict(config)
+        # Extract only memory namespace refs and strip the "memory." prefix
+        return {ref[7:] for ref in full_refs if ref.startswith("memory.")}
 
     def _generate_generic_step_code(self, step: Step) -> str:
         """
@@ -538,15 +538,13 @@ await step.execute(self.memory)
 
     def _generate_output_step_code(self, step: Step) -> str:
         """Generate code for output step."""
-        import re
         lines = ["# Output step - map to outputs"]
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
 
         for output_name, source_template in step.outputs.items():
-            match = pattern.search(source_template)
-            if match:
-                source_key = match.group(1)
-                lines.append(f'self.memory.write("memory.{output_name}", self.memory.read("memory.{source_key}"))')
+            refs = TemplateResolver.find_references(source_template)
+            if refs:
+                source_key = next(iter(refs))
+                lines.append(f'self.memory.write("memory.{output_name}", self.memory.read("{source_key}"))')
 
         return "\n".join(lines)
 
@@ -600,19 +598,16 @@ await step.execute(self.memory)
 
     def _generate_http_step_code(self, step: Step) -> str:
         """Generate code for HTTP step."""
-        import re
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-
         lines = ["# HTTP GET step", "import httpx", ""]
 
         # Read config values from memory
         for key, value in step.config.items():
-            if isinstance(value, str) and '{memory.' in value:
-                match = pattern.search(value)
-                if match:
-                    mem_key = match.group(1)
+            if isinstance(value, str) and TemplateResolver.contains_bindings(value):
+                refs = TemplateResolver.find_references(value)
+                if refs:
+                    mem_key = next(iter(refs))
                     var_name = key
-                    lines.append(f'{var_name} = self.memory.read("memory.{mem_key}")')
+                    lines.append(f'{var_name} = self.memory.read("{mem_key}")')
 
         lines.append("")
         lines.append("# Make HTTP request")
@@ -628,14 +623,14 @@ await step.execute(self.memory)
         # Write outputs to memory
         lines.append("# Write outputs to memory")
         for output_name, output_template in step.outputs.items():
-            match = pattern.search(output_template)
-            if match:
-                output_key = match.group(1)
+            refs = TemplateResolver.find_references(output_template)
+            if refs:
+                output_key = next(iter(refs))
                 if output_name == "response":
-                    lines.append(f'self.memory.write("memory.{output_key}", response.text)')
+                    lines.append(f'self.memory.write("{output_key}", response.text)')
                 elif output_name == "status_code":
-                    lines.append(f'self.memory.write("memory.{output_key}", response.status_code)')
+                    lines.append(f'self.memory.write("{output_key}", response.status_code)')
                 elif output_name == "headers":
-                    lines.append(f'self.memory.write("memory.{output_key}", dict(response.headers))')
+                    lines.append(f'self.memory.write("{output_key}", dict(response.headers))')
 
         return "\n".join(lines)

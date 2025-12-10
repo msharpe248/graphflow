@@ -4,30 +4,40 @@ from abc import ABC
 from typing import Any, Dict, Optional
 
 from graphflow_core.steps.base import StepBase
-from graphflow_core.memory import MemoryStore
+from graphflow_core.steps import MemoryMixin
+from graphflow_core.memory import MemoryStore, TemplateResolver
 
 
-class BaseCSVStep(StepBase, ABC):
-    """Base class for CSV steps with shared functionality."""
+class BaseCSVStep(StepBase, MemoryMixin, ABC):
+    """Base class for CSV steps with shared functionality.
+
+    Inherits from MemoryMixin for centralized template resolution.
+    """
 
     category = "csv"
     can_be_tool = True
 
-    # Pattern for extracting memory references
+    # Pattern for extracting memory references (used for output binding parsing)
     _memory_pattern = re.compile(r'\{(memory|config|env|secrets)\.([^}]+)\}')
 
     def _get_input_value(self, memory: MemoryStore, config_key: str) -> Any:
-        """Get input value from memory using config reference."""
+        """
+        Get input value from memory using config reference.
+
+        Uses centralized TemplateResolver for reference extraction.
+        """
+        from graphflow_core.memory.resolver import TemplateResolver
+
         if config_key not in self.config:
             raise ValueError(f"{self.__class__.__name__} {self.id}: Missing required config '{config_key}'")
 
         template = self.config[config_key]
-        match = self._memory_pattern.search(template)
+        # Use static method for reference extraction (works with mock memory)
+        refs = TemplateResolver.find_references(template)
 
-        if match:
-            namespace = match.group(1)
-            field_key = match.group(2)
-            full_key = f"{namespace}.{field_key}"
+        if refs:
+            # Get the first reference (config values typically have one ref)
+            full_key = list(refs)[0]  # Use list() to avoid StopIteration in async
             return memory.read(full_key)
         else:
             raise ValueError(f"{self.__class__.__name__} {self.id}: Invalid input reference in '{config_key}'")

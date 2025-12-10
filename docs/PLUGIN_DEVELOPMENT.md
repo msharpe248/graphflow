@@ -352,64 +352,79 @@ async def execute(self, memory: MemoryStore) -> None:
 
 > **Note on Debugging:** When running in debug mode, users can edit memory values while execution is paused. Your step may receive modified or unexpected values. Implement defensive validation to handle this gracefully.
 
-#### Template Rendering Pattern
+#### Using MemoryMixin (Recommended)
 
-Most plugins need to render configuration values that contain memory bindings. Use this pattern:
+GraphFlow provides a centralized `MemoryMixin` class that gives your steps standardized memory operations. This is the recommended approach:
 
 ```python
-import re
+from graphflow_core.steps.base import StepBase
+from graphflow_core.steps.memory_mixin import MemoryMixin
+from graphflow_core.memory.store import MemoryStore
+
+class MyStep(StepBase, MemoryMixin):
+    """Step using the MemoryMixin for standardized memory operations."""
+
+    async def execute(self, memory: MemoryStore) -> None:
+        # Resolve template strings (replaces {memory.field} with actual values)
+        url = self._resolve(self.config["url"], memory)
+
+        # Resolve all strings in a dictionary
+        headers = self._resolve_dict(self.config.get("headers", {}), memory)
+
+        # Get a value with fallback and optional resolution
+        timeout = self._get_value("timeout", memory, default=30)
+
+        # Use resolved values
+        response = await self._make_request(url, headers, timeout)
+
+        # Write output to memory (handles namespace automatically)
+        self._write_output("result", response.json(), memory)
+```
+
+**MemoryMixin Methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `_resolve(template, memory)` | Resolve `{namespace.field}` patterns in a string |
+| `_resolve_dict(data, memory)` | Recursively resolve all strings in a dict |
+| `_get_value(key, memory, default, resolve)` | Read value with optional default and resolution |
+| `_write_output(key, value, memory, namespace)` | Write to memory with namespace handling |
+
+#### Using TemplateResolver Directly
+
+For cases where you need more control, you can use `TemplateResolver` directly:
+
+```python
+from graphflow_core.memory.resolver import TemplateResolver
 from graphflow_core.memory.store import MemoryStore
 
 class MyStep(StepBase):
-    def _render_template(self, template: str, memory: MemoryStore) -> str:
-        """
-        Render template string with memory values.
-        Supports: {memory.field}, {config.field}, {env.field}, {secrets.field}
-        """
-        if not template:
-            return ""
-
-        # Pattern matches {namespace.field} syntax
-        pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
-        matches = re.findall(pattern, template)
-
-        result = template
-        for namespace, field in matches:
-            full_key = f"{namespace}.{field}"
-            try:
-                value = memory.read(full_key)
-                if value is not None:
-                    result = result.replace(f'{{{full_key}}}', str(value))
-            except KeyError:
-                pass  # Leave placeholder if not found
-
-        return result
-
-    def _render_dict(self, data: dict, memory: MemoryStore) -> dict:
-        """Recursively render all string values in a dict."""
-        result = {}
-        for key, value in data.items():
-            if isinstance(value, str):
-                result[key] = self._render_template(value, memory)
-            elif isinstance(value, dict):
-                result[key] = self._render_dict(value, memory)
-            elif isinstance(value, list):
-                result[key] = [
-                    self._render_template(v, memory) if isinstance(v, str) else v
-                    for v in value
-                ]
-            else:
-                result[key] = value
-        return result
-
     async def execute(self, memory: MemoryStore) -> None:
-        # Render config values with memory bindings
-        url = self._render_template(self.config["url"], memory)
-        headers = self._render_dict(self.config.get("headers", {}), memory)
+        # Create resolver instance
+        resolver = TemplateResolver(memory)
 
-        # Use rendered values
-        response = await self._make_request(url, headers)
-        # ...
+        # Resolve a template
+        url = resolver.resolve(self.config["url"])
+
+        # Resolve dictionary recursively
+        headers = resolver.resolve_dict(self.config.get("headers", {}))
+
+        # Static method: extract references without resolving
+        refs = TemplateResolver.find_references(self.config["url"])
+        # Returns: {"memory.user_id", "config.api_base"}
+
+        # ...rest of implementation
+```
+
+#### Legacy Pattern (Deprecated)
+
+> **Note:** The manual regex approach below is deprecated. Use `MemoryMixin` or `TemplateResolver` instead.
+
+```python
+# DEPRECATED - use MemoryMixin._resolve() instead
+def _render_template(self, template: str, memory: MemoryStore) -> str:
+    pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
+    # ... manual regex handling
 ```
 
 #### Graceful Handling of Missing Keys
@@ -455,45 +470,37 @@ The framework will automatically:
 
 **Helper Pattern for Writing Outputs:**
 
-Since extracting memory keys from outputs is common, consider this reusable pattern:
+Use `MemoryMixin._write_output()` for standardized output handling:
 
 ```python
-import re
+from graphflow_core.steps.memory_mixin import MemoryMixin
 
-def _write_output(self, memory: MemoryStore, output_name: str, value: any) -> None:
-    """
-    Helper to write an output value to memory.
+class MyStep(StepBase, MemoryMixin):
+    async def execute(self, memory: MemoryStore) -> None:
+        result = {"status": "success", "data": "..."}
 
-    Args:
-        memory: Memory store
-        output_name: Name of the output in self.outputs dict
-        value: Value to write
-    """
-    if output_name in self.outputs:
-        pattern = re.compile(r'\{memory\.([^}]+)\}')
-        match = pattern.search(self.outputs[output_name])
-        if match:
-            memory_key = match.group(1)
-            memory.write(memory_key, value)
-
-# Usage in execute():
-async def execute(self, memory: MemoryStore) -> None:
-    result = {"status": "success", "data": "..."}
-    self._write_output(memory, "result", result)
+        # Use MemoryMixin helper - handles namespace extraction automatically
+        self._write_output("result", result, memory)
 ```
+
+The `_write_output` method automatically:
+1. Extracts the memory key from `self.outputs["result"]` (e.g., `{memory.step_result}`)
+2. Handles namespace prefixes correctly
+3. Writes the value to the appropriate location
 
 ## Complete Example
 
-Here's a complete example plugin that integrates with an external API:
+Here's a complete example plugin that integrates with an external API using `MemoryMixin`:
 
 ```python
 from typing import Any, Dict
 import httpx
 from graphflow_core.steps.base import StepBase
+from graphflow_core.steps.memory_mixin import MemoryMixin
 from graphflow_core.memory.store import MemoryStore
 
 
-class WeatherLookupStep(StepBase):
+class WeatherLookupStep(StepBase, MemoryMixin):
     """Fetch weather data from an external API."""
 
     label = "Weather Lookup"
@@ -528,10 +535,10 @@ class WeatherLookupStep(StepBase):
         }
 
     async def execute(self, memory: MemoryStore) -> None:
-        # Get configuration
-        location = self.config["location"]
-        api_key = self.config["api_key"]
-        units = self.config.get("units", "celsius")
+        # Resolve configuration values (handles {memory.field} patterns)
+        location = self._resolve(self.config["location"], memory)
+        api_key = self._resolve(self.config["api_key"], memory)
+        units = self._get_value("units", memory, default="celsius")
 
         # Make API request
         async with httpx.AsyncClient() as client:
@@ -546,15 +553,8 @@ class WeatherLookupStep(StepBase):
             response.raise_for_status()
             weather_data = response.json()
 
-        # Write to memory
-        # Extract memory key from outputs dictionary
-        if "result" in self.outputs:
-            import re
-            pattern = re.compile(r'\{memory\.([^}]+)\}')
-            match = pattern.search(self.outputs["result"])
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, weather_data)
+        # Write to memory using MemoryMixin helper
+        self._write_output("result", weather_data, memory)
 ```
 
 ## Installation and Testing
@@ -647,40 +647,30 @@ GraphFlow includes a built-in debugger that allows users to:
 
 ### Error Handling
 
-Implement robust error handling in your steps:
+Implement robust error handling in your steps. Use `MemoryMixin` for cleaner output handling:
 
 ```python
-async def execute(self, memory: MemoryStore) -> None:
-    import re
+class MyStep(StepBase, MemoryMixin):
+    async def execute(self, memory: MemoryStore) -> None:
+        try:
+            # Your logic here
+            result = await self._do_api_call()
 
-    try:
-        # Your logic here
-        result = await self._do_api_call()
+            # Write success result using MemoryMixin
+            self._write_output("result", result, memory)
 
-        # Write success result
-        if "result" in self.outputs:
-            pattern = re.compile(r'\{memory\.([^}]+)\}')
-            match = pattern.search(self.outputs["result"])
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, result)
+        except httpx.HTTPError as e:
+            # Log the error
+            logger.error(f"API call failed: {e}")
 
-    except httpx.HTTPError as e:
-        # Log the error
-        logger.error(f"API call failed: {e}")
+            # Optionally write error state
+            self._write_output("result", {
+                "error": str(e),
+                "status": "failed"
+            }, memory)
 
-        # Optionally write error state
-        if "result" in self.outputs:
-            pattern = re.compile(r'\{memory\.([^}]+)\}')
-            match = pattern.search(self.outputs["result"])
-            if match:
-                output_key = match.group(1)
-                memory.write(output_key, {
-                    "error": str(e),
-                    "status": "failed"
-                })
-        # Re-raise to stop graph execution
-        raise
+            # Re-raise to stop graph execution
+            raise
 ```
 
 ### Validation

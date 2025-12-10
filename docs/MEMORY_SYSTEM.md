@@ -363,69 +363,96 @@ The standard template syntax uses single braces with namespaced keys:
 
 ### Legacy Syntax: `{{variable}}`
 
-Used in specific contexts like SQL queries:
+Used in specific contexts like SQL queries (deprecated, use namespaced syntax):
 
 ```python
-def _render_template(self, template: str, memory: MemoryStore) -> str:
-    """Render template with {{variable}} syntax."""
-    pattern = r'\{\{([^}]+)\}\}'
-    matches = re.findall(pattern, template)
-
-    for var_name in matches:
-        value = memory.read(var_name.strip())
-        template = template.replace(f"{{{{{var_name}}}}}", str(value))
-
-    return template
+# Legacy syntax - still supported for backwards compatibility
+"SELECT * FROM users WHERE id = {{user_id}}"
 ```
 
-### Template Resolution Implementation
+---
 
-#### Plugin Pattern (`_render_template`)
+## Centralized Template Resolution
 
-Most plugins use this pattern for template resolution:
+### TemplateResolver Class
+
+GraphFlow provides a centralized `TemplateResolver` class in `graph-core` that all plugins and steps should use for template resolution. This ensures consistent behavior across the entire platform.
+
+**Location:** `packages/graph-core/graphflow_core/memory/resolver.py`
 
 ```python
-def _render_template(self, template: str, memory: MemoryStore) -> str:
-    """
-    Render template string with memory values.
-    Supports: {memory.field}, {config.field}, {env.field}, {secrets.field}
-    """
-    if not template:
-        return ""
+from graphflow_core.memory.resolver import TemplateResolver
 
-    pattern = r'\{(memory|config|env|secrets)\.(\w+(?:\.\w+)*)\}'
-    matches = re.findall(pattern, template)
+# Instance usage (runtime resolution)
+resolver = TemplateResolver(memory)
+result = resolver.resolve("Hello {memory.user_name}!")
+data = resolver.resolve_dict({"url": "{config.api_base}/users"})
 
-    result = template
-    for namespace, field in matches:
-        full_key = f"{namespace}.{field}"
-        try:
-            value = memory.read(full_key)
-            if value is not None:
-                result = result.replace(f'{{{full_key}}}', str(value))
-        except KeyError:
-            pass  # Leave placeholder if not found
-
-    return result
+# Static usage (compile-time analysis)
+refs = TemplateResolver.find_references("{memory.query} and {secrets.api_key}")
+# Returns: {"memory.query", "secrets.api_key"}
 ```
 
-#### Recursive Dict Rendering
+### TemplateResolver API
 
-For nested configuration objects:
+| Method | Type | Purpose |
+|--------|------|---------|
+| `resolve(template)` | Instance | Resolve all `{namespace.field}` patterns in a string |
+| `resolve_dict(data)` | Instance | Recursively resolve all strings in a dictionary |
+| `resolve_list(data)` | Instance | Recursively resolve all strings in a list |
+| `find_references(template)` | Static | Extract all memory references without resolving |
+
+### MemoryMixin for Steps
+
+Steps can use the `MemoryMixin` class to get standardized memory operations:
+
+**Location:** `packages/graph-core/graphflow_core/steps/memory_mixin.py`
 
 ```python
-def _render_dict(self, data: Dict[str, Any], memory: MemoryStore) -> Dict[str, Any]:
-    """Render all string values in a dict through template engine."""
-    result = {}
-    for key, value in data.items():
-        if isinstance(value, str):
-            result[key] = self._render_template(value, memory)
-        elif isinstance(value, dict):
-            result[key] = self._render_dict(value, memory)
-        else:
-            result[key] = value
-    return result
+from graphflow_core.steps.memory_mixin import MemoryMixin
+
+class MyStep(StepBase, MemoryMixin):
+    async def execute(self, memory: MemoryStore) -> None:
+        # Resolve a template string
+        url = self._resolve(self.config["url"], memory)
+
+        # Resolve all strings in a dict
+        headers = self._resolve_dict(self.config["headers"], memory)
+
+        # Get a value with optional resolution
+        value = self._get_value("field_name", memory, default="fallback")
+
+        # Write output to memory
+        self._write_output("result", my_data, memory)
 ```
+
+### MemoryMixin API
+
+| Method | Purpose |
+|--------|---------|
+| `_get_resolver(memory)` | Get a TemplateResolver for the memory store |
+| `_resolve(template, memory)` | Resolve a single template string |
+| `_resolve_dict(data, memory)` | Resolve all strings in a dictionary |
+| `_get_value(key, memory, default, resolve)` | Read and optionally resolve a value |
+| `_write_output(key, value, memory, namespace)` | Write to memory with namespace handling |
+
+### MemoryStore Convenience Methods
+
+The `MemoryStore` class also provides direct access to template resolution:
+
+```python
+# Get a resolver
+resolver = memory.get_resolver()
+
+# Or use the convenience method
+result = memory.resolve_template("Hello {memory.user_name}!")
+```
+
+---
+
+## Legacy Template Resolution (Deprecated)
+
+> **Note:** The patterns below are deprecated. Use `TemplateResolver` and `MemoryMixin` instead.
 
 #### Variable Name Prefixing (eval/exec contexts)
 
@@ -632,6 +659,8 @@ Content-Type: application/json
 | File | Description |
 |------|-------------|
 | `packages/graph-core/graphflow_core/memory/store.py` | `MemoryStore` class - main memory container |
+| `packages/graph-core/graphflow_core/memory/resolver.py` | `TemplateResolver` - centralized template resolution |
+| `packages/graph-core/graphflow_core/steps/memory_mixin.py` | `MemoryMixin` - standardized step memory operations |
 | `packages/graph-core/graphflow_core/models/graph.py` | Schema models (`MemorySchema`, `FieldDefinition`, etc.) |
 | `packages/graph-core/graphflow_core/steps/base.py` | `StepBase` with memory reference extraction |
 
@@ -647,8 +676,9 @@ Content-Type: application/json
 
 | File | Description |
 |------|-------------|
-| `packages/graph-plugins-http/graphflow_http/base.py` | Template rendering pattern |
+| `packages/graph-plugins-http/graphflow_http/base.py` | HTTP step using MemoryMixin |
 | `packages/graph-plugins-ai/graphflow_ai/templates/llm/pydantic_ai.jinja` | LLM step memory access |
+| `packages/graph-plugins-json/graphflow_json/base.py` | JSON step using MemoryMixin |
 
 ---
 
@@ -660,5 +690,5 @@ Content-Type: application/json
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2025-12-08
+**Version:** 1.1
+**Last Updated:** 2025-12-09

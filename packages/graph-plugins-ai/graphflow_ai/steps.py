@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from graphflow_core.steps.base import StepBase
 from graphflow_core.steps.registry import StepRegistry
+from graphflow_core.steps import MemoryMixin
 from graphflow_core.memory.store import MemoryStore
 
 
 @StepRegistry.register(category="ai", description="LLM call with tool support, prompts, and structured outputs")
-class LLMStep(StepBase):
+class LLMStep(StepBase, MemoryMixin):
     """
     LLM/Agent step - call an LLM with tools and structured outputs.
 
@@ -342,7 +343,8 @@ class LLMStep(StepBase):
         """
         Render template with memory values.
 
-        Supports {memory.variable} and {memory.nested.path} syntax.
+        Delegates to MemoryMixin._resolve for centralized template resolution.
+        Supports all namespaces: {memory.variable}, {config.variable}, {env.variable}, {secrets.variable}
 
         Args:
             template: Template string
@@ -351,32 +353,11 @@ class LLMStep(StepBase):
         Returns:
             Rendered string
         """
-        if not template:
-            return ""
-
-        import re
-
-        # Find all {memory.variable} patterns
-        pattern = r'\{memory\.([^}]+)\}'
-        matches = re.findall(pattern, template)
-
-        rendered = template
-        for var_name in matches:
-            var_name = var_name.strip()
-            try:
-                value = memory.read(var_name)
-                # Convert to string
-                value_str = str(value) if value is not None else ""
-                rendered = rendered.replace(f"{{memory.{var_name}}}", value_str)
-            except KeyError:
-                # Leave placeholder if key not found
-                pass
-
-        return rendered
+        return self._resolve(template, memory)
 
 
 @StepRegistry.register(category="ai", description="Wait for human input during execution")
-class HumanInputStep(StepBase):
+class HumanInputStep(StepBase, MemoryMixin):
     """
     Human input step - pause execution and wait for human input.
 
@@ -453,8 +434,8 @@ class HumanInputStep(StepBase):
         input_type = self.config.get("input_type", "text")
         output_key = self.config["output_key"]
 
-        # Render prompt
-        rendered_prompt = self._render_template(prompt, memory)
+        # Render prompt using centralized resolver
+        rendered_prompt = self._resolve(prompt, memory)
 
         # Mock human input
         # In real implementation, would pause and wait for human

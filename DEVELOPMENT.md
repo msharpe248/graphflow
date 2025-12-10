@@ -6,7 +6,7 @@
 # Install all packages in editable mode
 make install
 
-# Start development environment (runtime + builder)
+# Start development environment (runtime + builder + chat UI)
 make dev-start
 
 # Check status
@@ -28,12 +28,16 @@ make status
 - `make runtime-stop` - Stop GraphFlow runtime server
 - `make runtime-logs` - Show runtime logs
 
-- `make builder-start` - Start builder UI dev server (port 3000/3001)
+- `make builder-start` - Start builder UI dev server (port 3000)
 - `make builder-stop` - Stop builder UI dev server
 - `make builder-logs` - Show builder logs
 
-- `make dev-start` - Start both runtime and builder
-- `make dev-stop` - Stop both runtime and builder
+- `make chat-start` - Start chat UI dev server (port 3001)
+- `make chat-stop` - Stop chat UI dev server
+- `make chat-logs` - Show chat UI logs
+
+- `make dev-start` - Start runtime, builder, and chat UI (full dev environment)
+- `make dev-stop` - Stop runtime, builder, and chat UI
 
 ### Status & Testing
 
@@ -46,7 +50,9 @@ make status
 - `make lint` - Run linting checks
 - `make format` - Format code (Python with black, TypeScript with prettier)
 - `make builder-build` - Build builder UI for production
+- `make chat-build` - Build chat UI for production
 - `make reset` - **Full reset**: stop everything, clean, reinstall, restart
+- `make stats` / `make loc` - Show code statistics (lines of code by file type)
 
 ### Help
 
@@ -63,7 +69,7 @@ make check-install
 # If not in editable mode, reinstall
 make install
 
-# Start both runtime and builder
+# Start runtime, builder, and chat UI
 make dev-start
 
 # Check everything is running
@@ -91,8 +97,8 @@ make status
 
 # View logs
 make runtime-logs
-# or
 make builder-logs
+make chat-logs
 ```
 
 ### Before Committing
@@ -129,8 +135,9 @@ If ports 8000, 3000, or 3001 are already in use:
 make dev-stop
 
 # Find and kill conflicting processes
-lsof -ti:8000 | xargs kill -9
-lsof -ti:3000 | xargs kill -9
+lsof -ti:8000 | xargs kill -9  # Runtime
+lsof -ti:3000 | xargs kill -9  # Builder
+lsof -ti:3001 | xargs kill -9  # Chat UI
 ```
 
 ### Clean Slate
@@ -156,6 +163,7 @@ graphflow/
 │   ├── graph-core/          # Core graph execution engine
 │   ├── graph-runtime/       # Multi-graph runtime server
 │   ├── graph-builder/       # React UI for building graphs
+│   ├── graph-chat/          # React UI for chat interactions
 │   ├── graph-plugins-ai/    # AI plugin (LLM, Human Input)
 │   ├── graph-plugins-http/  # HTTP plugin (requests, parsing)
 │   └── graph-plugin-example/# Example plugin
@@ -190,6 +198,13 @@ When developing plugins:
 → Hard refresh browser (Cmd+Shift+R)
 → Check API response: `curl http://localhost:8000/api/v1/steps`
 → Restart runtime: `make runtime-stop && make runtime-start`
+
+### "Chat UI won't start"
+
+→ Check logs: `make chat-logs`
+→ Check port: `lsof -ti:3001`
+→ Try: `make chat-stop && make chat-start`
+→ Make sure npm dependencies are installed: `cd packages/graph-chat && npm install`
 
 ### "Tests failing mysteriously"
 

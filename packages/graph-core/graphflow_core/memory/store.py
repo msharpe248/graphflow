@@ -1,8 +1,11 @@
 """Memory store implementation for graph execution."""
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from graphflow_core.models import MemorySchema
+
+if TYPE_CHECKING:
+    from graphflow_core.memory.resolver import TemplateResolver
 
 # Global runtime config registry
 # This is populated by the runtime executor before agent execution
@@ -449,6 +452,41 @@ class MemoryStore:
     def clear_intermediate(self) -> None:
         """Clear all intermediate values (useful for memory management)."""
         self._intermediate.clear()
+
+    def get_resolver(self) -> "TemplateResolver":
+        """
+        Get a TemplateResolver instance for this memory store.
+
+        The resolver provides centralized template resolution for
+        {memory.field}, {config.field}, {env.field}, {secrets.field} patterns.
+
+        Returns:
+            TemplateResolver instance bound to this memory store
+
+        Example:
+            resolver = memory.get_resolver()
+            result = resolver.resolve("Hello, {memory.user_name}!")
+        """
+        from graphflow_core.memory.resolver import TemplateResolver
+        return TemplateResolver(self)
+
+    def resolve_template(self, template: str, *, allow_legacy: bool = False) -> str:
+        """
+        Convenience method to resolve a template string.
+
+        This is a shortcut for get_resolver().resolve(template).
+
+        Args:
+            template: String containing {namespace.field} patterns
+            allow_legacy: If True, also resolve {{variable}} patterns
+
+        Returns:
+            String with all bindings resolved
+
+        Example:
+            url = memory.resolve_template("{config.api_base}/users/{memory.user_id}")
+        """
+        return self.get_resolver().resolve(template, allow_legacy=allow_legacy)
 
     def __repr__(self) -> str:
         return (

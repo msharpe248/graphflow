@@ -15,6 +15,7 @@ from graphflow_core.models import (
     MCPServerConfig,
     MCPToolDefinition,
 )
+from graphflow_core.memory.resolver import TemplateResolver
 
 
 class ToolCompiler:
@@ -56,6 +57,30 @@ class ToolCompiler:
         if sanitized and sanitized[0].isdigit():
             sanitized = '_' + sanitized
         return sanitized
+
+    def _generate_memory_read_code(self, value: str, indent: str = "    ") -> tuple[str, str | None]:
+        """
+        Generate code to read a value, resolving memory references.
+
+        Uses TemplateResolver to detect memory binding patterns and generates
+        appropriate memory.read() code.
+
+        Args:
+            value: The value which may be a memory reference like "{memory.xxx}"
+            indent: Indentation for generated code
+
+        Returns:
+            Tuple of (generated_code, None) for memory refs, or (None, repr(value)) for constants
+        """
+        refs = TemplateResolver.find_references(value)
+        if refs:
+            # Get the first reference (tool configs typically have one ref per property)
+            full_key = next(iter(refs))
+            # Generate memory.read() with the full key (e.g., "memory.llm_1.url")
+            return (f'memory.read("{full_key}")', None)
+        else:
+            # Not a memory reference - return as constant
+            return (None, repr(value))
 
     def compile_tool(self, tool: ToolDefinition) -> str:
         """
@@ -172,17 +197,11 @@ class ToolCompiler:
         # Add runtime parameters (memory bindings resolved at runtime)
         for mapping in tool.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
-                    # Memory binding - extract the path (e.g., {memory.llm_1.aa.url} -> llm_1.aa.url)
-                    mem_path = mapping.runtime_value[8:-1]  # Remove {memory. and }
-                    lines.append(f'    step_config["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
-                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    # Other binding types (config, env, secrets)
-                    binding = mapping.runtime_value[1:-1]  # Remove { and }
-                    lines.append(f'    step_config["{mapping.source_property}"] = memory.read("{binding}")')
+                mem_read, const_val = self._generate_memory_read_code(mapping.runtime_value)
+                if mem_read:
+                    lines.append(f'    step_config["{mapping.source_property}"] = {mem_read}')
                 else:
-                    # Constant value - try to parse as JSON, fallback to string
-                    lines.append(f'    step_config["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+                    lines.append(f'    step_config["{mapping.source_property}"] = {const_val}')
 
         # Add LLM parameters (values passed by LLM)
         for mapping in llm_params:
@@ -263,17 +282,11 @@ class ToolCompiler:
         # Add runtime parameters (memory bindings resolved at runtime)
         for mapping in tool.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
-                    # Memory binding - extract the path (e.g., {memory.llm_1.aa.url} -> llm_1.aa.url)
-                    mem_path = mapping.runtime_value[8:-1]  # Remove {memory. and }
-                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
-                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    # Other binding types (config, env, secrets)
-                    binding = mapping.runtime_value[1:-1]  # Remove { and }
-                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = memory.read("{binding}")')
+                mem_read, const_val = self._generate_memory_read_code(mapping.runtime_value)
+                if mem_read:
+                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = {mem_read}')
                 else:
-                    # Constant value
-                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+                    lines.append(f'{ind}    step_config["{mapping.source_property}"] = {const_val}')
 
         # Add LLM parameters (values passed by LLM)
         for mapping in llm_params:
@@ -495,14 +508,11 @@ class ToolCompiler:
         # Add runtime parameters
         for mapping in definition.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
-                    mem_path = mapping.runtime_value[8:-1]
-                    lines.append(f'    tool_args["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
-                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    binding = mapping.runtime_value[1:-1]
-                    lines.append(f'    tool_args["{mapping.source_property}"] = memory.read("{binding}")')
+                mem_read, const_val = self._generate_memory_read_code(mapping.runtime_value)
+                if mem_read:
+                    lines.append(f'    tool_args["{mapping.source_property}"] = {mem_read}')
                 else:
-                    lines.append(f'    tool_args["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+                    lines.append(f'    tool_args["{mapping.source_property}"] = {const_val}')
 
         # Add LLM parameters
         for mapping in llm_params:
@@ -580,14 +590,11 @@ class ToolCompiler:
         # Add runtime parameters
         for mapping in definition.get_runtime_parameters():
             if mapping.runtime_value:
-                if mapping.runtime_value.startswith("{memory.") and mapping.runtime_value.endswith("}"):
-                    mem_path = mapping.runtime_value[8:-1]
-                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = memory.read("intermediate.{mem_path}")')
-                elif mapping.runtime_value.startswith("{") and mapping.runtime_value.endswith("}"):
-                    binding = mapping.runtime_value[1:-1]
-                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = memory.read("{binding}")')
+                mem_read, const_val = self._generate_memory_read_code(mapping.runtime_value)
+                if mem_read:
+                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = {mem_read}')
                 else:
-                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = {repr(mapping.runtime_value)}')
+                    lines.append(f'{ind}    tool_args["{mapping.source_property}"] = {const_val}')
 
         # Add LLM parameters
         for mapping in llm_params:

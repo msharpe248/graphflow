@@ -5,6 +5,9 @@ from graphflow_compiler.generators.pydantic_ai import PydanticAIGenerator
 from graphflow_compiler.generators.langgraph import LangGraphGenerator
 from graphflow_compiler.tools.compiler import ToolCompiler
 
+# Import AI plugin to register LLM step with template support
+import graphflow_ai  # noqa: F401
+
 # Register built-in generators
 CompilerRegistry.register("pydantic_ai", PydanticAIGenerator)
 CompilerRegistry.register("langgraph", LangGraphGenerator)

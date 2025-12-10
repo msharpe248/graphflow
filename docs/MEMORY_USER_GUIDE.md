@@ -168,10 +168,12 @@ Bindings can be used in **any text field** in step configuration:
 
 ### How Resolution Works
 
-When your graph runs:
-1. The system finds all `{...}` patterns
+When your graph runs, GraphFlow uses a centralized `TemplateResolver` to handle all memory bindings:
+
+1. The system finds all `{namespace.field}` patterns
 2. Each pattern is replaced with the actual value from memory
 3. Missing values become empty strings (no errors)
+4. Resolution works the same way in all steps (HTTP, LLM, Transform, etc.)
 
 **Example:**
 ```
@@ -179,6 +181,8 @@ Input:  "Hello, {memory.user_name}! Your ID is {memory.user_id}."
 Memory: { user_name: "Alice", user_id: "12345" }
 Output: "Hello, Alice! Your ID is 12345."
 ```
+
+> **For Developers:** The `TemplateResolver` class provides the consistent resolution API. See the [Memory System Technical Reference](MEMORY_SYSTEM.md) for implementation details.
 
 ---
 
@@ -513,5 +517,5 @@ Use debug mode to inspect memory values:
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2025-12-08
+**Version:** 1.1
+**Last Updated:** 2025-12-09
