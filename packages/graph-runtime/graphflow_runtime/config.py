@@ -15,7 +15,8 @@ class RuntimeConfig:
         """Initialize runtime config with default values."""
         self._config: Dict[str, Any] = {
             'cwd': os.getcwd(),
-            'runtime_url': os.getenv('GRAPHFLOW_RUNTIME_URL', 'http://localhost:8000'),
+            'runtime_url': os.getenv('GRAPHFLOW_RUNTIME_URL', 'https://localhost:8000'),
+            'insecure': os.getenv('GRAPHFLOW_INSECURE', 'false').lower() == 'true',
         }
 
     def get_all(self) -> Dict[str, Any]:

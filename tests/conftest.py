@@ -14,6 +14,25 @@ import pytest
 pytest_plugins = ("pytest_asyncio",)
 
 
+# SSL Configuration Fixtures
+@pytest.fixture(scope="session")
+def ssl_verify():
+    """
+    Return SSL verification setting based on environment.
+
+    When GRAPHFLOW_INSECURE is set to 'true', SSL verification is disabled.
+    This is useful for testing with self-signed certificates.
+    """
+    insecure = os.environ.get("GRAPHFLOW_INSECURE", "true").lower() == "true"
+    return not insecure  # verify=False when insecure=True
+
+
+@pytest.fixture(scope="session")
+def runtime_protocol():
+    """Return protocol to use for runtime connections (http or https)."""
+    return os.environ.get("GRAPHFLOW_TEST_PROTOCOL", "https")
+
+
 @pytest.fixture(scope="session")
 def project_root():
     """Return the project root directory."""

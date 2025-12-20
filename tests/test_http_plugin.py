@@ -31,25 +31,29 @@ def fetchurl_graph(fixtures_dir):
 
 
 @pytest.fixture(scope="module")
-def runtime_server():
-    """Start runtime server for tests."""
+def runtime_server(ssl_verify, runtime_protocol):
+    """Start runtime server for tests with HTTPS support."""
     port = 18701  # Use non-standard port to avoid conflicts
 
-    # Start runtime server
+    # Start runtime server with auto-ssl for HTTPS
+    cmd = ["graphflow-runtime", "--port", str(port)]
+    if runtime_protocol == "https":
+        cmd.append("--auto-ssl")
+
     process = subprocess.Popen(
-        ["graphflow-runtime", "--port", str(port)],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
 
     # Wait for server to start
-    base_url = f"http://localhost:{port}"
+    base_url = f"{runtime_protocol}://localhost:{port}"
     server_ready = False
     for _ in range(30):  # 30 seconds max
         time.sleep(1)
         try:
-            response = requests.get(f"{base_url}/api/v1/health", timeout=2)
+            response = requests.get(f"{base_url}/api/v1/health", timeout=2, verify=ssl_verify)
             if response.status_code == 200:
                 server_ready = True
                 break
@@ -61,7 +65,7 @@ def runtime_server():
         stdout, stderr = process.communicate(timeout=5)
         pytest.fail(f"Runtime server failed to start. stdout: {stdout}, stderr: {stderr}")
 
-    yield {"process": process, "port": port, "base_url": base_url}
+    yield {"process": process, "port": port, "base_url": base_url, "verify": ssl_verify}
 
     # Cleanup
     process.terminate()
@@ -80,6 +84,7 @@ class TestHTTPPluginMemoryDefaults:
     def fetchurl_agent(self, runtime_server, fetchurl_graph):
         """Create FetchURL test agent and clean up after."""
         base_url = runtime_server["base_url"]
+        verify = runtime_server["verify"]
 
         response = requests.post(
             f"{base_url}/api/v1/agents",
@@ -90,26 +95,29 @@ class TestHTTPPluginMemoryDefaults:
                 "graph_definition": fetchurl_graph,
             },
             timeout=30,
+            verify=verify,
         )
 
         assert response.status_code in [200, 201], f"Failed to create agent: {response.text}"
         agent_id = response.json()["id"]
 
-        yield {"agent_id": agent_id, "base_url": base_url}
+        yield {"agent_id": agent_id, "base_url": base_url, "verify": verify}
 
         # Cleanup
-        requests.delete(f"{base_url}/api/v1/agents/{agent_id}", timeout=10)
+        requests.delete(f"{base_url}/api/v1/agents/{agent_id}", timeout=10, verify=verify)
 
     def test_http_get_with_default_url(self, fetchurl_agent):
         """Test HTTP GET step executes successfully with default URL."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run with default URL (http://www.google.com)
         response = requests.post(
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {}},  # Use default URL from graph
             timeout=30,
+            verify=verify,
         )
 
         assert response.status_code in [200, 201], f"Failed to start run: {response.text}"
@@ -124,6 +132,7 @@ class TestHTTPPluginMemoryDefaults:
             response = requests.get(
                 f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
                 timeout=10,
+                verify=verify,
             )
             assert response.status_code in [200, 201]
             data = response.json()
@@ -148,12 +157,14 @@ class TestHTTPPluginMemoryDefaults:
         """Test that memory defaults are properly initialized."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run
         response = requests.post(
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {}},
             timeout=30,
+            verify=verify,
         )
         run_id = response.json()["id"]
 
@@ -164,6 +175,7 @@ class TestHTTPPluginMemoryDefaults:
         response = requests.get(
             f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}/memory",
             timeout=10,
+            verify=verify,
         )
 
         assert response.status_code in [200, 201]
@@ -196,6 +208,7 @@ class TestHTTPPluginMemoryDefaults:
         """Test HTTP GET step with custom URL input."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run with custom URL
         custom_url = "https://httpbin.org/get"
@@ -203,6 +216,7 @@ class TestHTTPPluginMemoryDefaults:
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {"url": custom_url}},
             timeout=30,
+            verify=verify,
         )
 
         assert response.status_code in [200, 201]
@@ -213,6 +227,7 @@ class TestHTTPPluginMemoryDefaults:
             response = requests.get(
                 f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
                 timeout=10,
+                verify=verify,
             )
             data = response.json()
 
@@ -237,12 +252,14 @@ class TestHTTPPluginMemoryDefaults:
         """Test that HTTP status code is written to memory."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run with httpbin (reliable test endpoint)
         response = requests.post(
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {"url": "https://httpbin.org/status/200"}},
             timeout=30,
+            verify=verify,
         )
         run_id = response.json()["id"]
 
@@ -251,6 +268,7 @@ class TestHTTPPluginMemoryDefaults:
             response = requests.get(
                 f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
                 timeout=10,
+                verify=verify,
             )
             data = response.json()
 
@@ -259,6 +277,7 @@ class TestHTTPPluginMemoryDefaults:
                 mem_response = requests.get(
                     f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}/memory",
                     timeout=10,
+                    verify=verify,
                 )
                 memory = mem_response.json()
 
@@ -279,12 +298,14 @@ class TestHTTPPluginMemoryDefaults:
         """Test that object-type memory fields (params, headers, auth) are initialized."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run
         response = requests.post(
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {}},
             timeout=30,
+            verify=verify,
         )
         run_id = response.json()["id"]
 
@@ -295,6 +316,7 @@ class TestHTTPPluginMemoryDefaults:
         response = requests.get(
             f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}/memory",
             timeout=10,
+            verify=verify,
         )
 
         memory = response.json()
@@ -320,6 +342,7 @@ class TestHTTPPluginErrorHandling:
     def fetchurl_agent(self, runtime_server, fetchurl_graph):
         """Create FetchURL test agent."""
         base_url = runtime_server["base_url"]
+        verify = runtime_server["verify"]
 
         response = requests.post(
             f"{base_url}/api/v1/agents",
@@ -329,24 +352,27 @@ class TestHTTPPluginErrorHandling:
                 "graph_definition": fetchurl_graph,
             },
             timeout=30,
+            verify=verify,
         )
         agent_id = response.json()["id"]
 
-        yield {"agent_id": agent_id, "base_url": base_url}
+        yield {"agent_id": agent_id, "base_url": base_url, "verify": verify}
 
         # Cleanup
-        requests.delete(f"{base_url}/api/v1/agents/{agent_id}", timeout=10)
+        requests.delete(f"{base_url}/api/v1/agents/{agent_id}", timeout=10, verify=verify)
 
     def test_http_get_invalid_url(self, fetchurl_agent):
         """Test HTTP GET with invalid URL."""
         base_url = fetchurl_agent["base_url"]
         agent_id = fetchurl_agent["agent_id"]
+        verify = fetchurl_agent["verify"]
 
         # Start run with invalid URL
         response = requests.post(
             f"{base_url}/api/v1/agents/{agent_id}/runs",
             json={"inputs": {"url": "not-a-valid-url"}},
             timeout=30,
+            verify=verify,
         )
         run_id = response.json()["id"]
 
@@ -355,6 +381,7 @@ class TestHTTPPluginErrorHandling:
             response = requests.get(
                 f"{base_url}/api/v1/agents/{agent_id}/runs/{run_id}",
                 timeout=10,
+                verify=verify,
             )
             data = response.json()
 

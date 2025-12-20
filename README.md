@@ -93,7 +93,7 @@ GraphFlow includes a comprehensive Makefile for development. Here are the most c
 | `make install` | Install all packages in editable mode |
 | `make dev-start` | Start full dev environment (runtime + builder + chat) |
 | `make dev-stop` | Stop all services |
-| `make status` | Show status of all services |
+| `make status` | Show status of all services and certificates |
 | `make test` | Run all tests |
 | `make reset` | Full reset: stop, clean, reinstall, restart |
 
@@ -102,6 +102,11 @@ GraphFlow includes a comprehensive Makefile for development. Here are the most c
 - `make builder-start` / `make builder-stop` - Builder UI (port 3000)
 - `make chat-start` / `make chat-stop` - Chat UI (port 3001)
 - `make runtime-logs` / `make builder-logs` / `make chat-logs` - View logs
+
+**SSL Certificates:**
+- `make certs` - Generate self-signed SSL certificates
+- `make certs-check` - Check certificate status and validity
+- `make certs-clean` - Remove certificates
 
 **See [docs/MAKEFILE.md](docs/MAKEFILE.md) for complete documentation.**
 
@@ -136,7 +141,7 @@ cd packages/graph-builder && npm install && npm run dev
 # Terminal 3: Start Chat UI (port 3001)
 cd packages/graph-chat && npm install && npm run dev
 
-# Visit http://localhost:3000 for Builder
+# Visit https://localhost:3000 for Builder (accept self-signed cert)
 # - Builder tab: Visual graph editor with drag-and-drop steps
 #   - Step Palette: Browse steps by category or plugin
 #   - Properties Panel: Configure step settings and memory bindings
@@ -147,7 +152,7 @@ cd packages/graph-chat && npm install && npm run dev
 #   - Inspect and edit memory values in real-time
 #   - View execution logs and step properties
 
-# Visit http://localhost:3001 for Chat UI
+# Visit https://localhost:3001 for Chat UI (accept self-signed cert)
 # - Conversational interface for chat-enabled graphs
 # - Multi-graph and multi-session support
 # - Per-conversation debug mode toggle
@@ -193,10 +198,10 @@ import json
 with open("examples/simple_agent.json") as f:
     graph = json.load(f)
 
-# Create agent in runtime
-async with httpx.AsyncClient() as client:
+# Create agent in runtime (use verify=False for self-signed certs)
+async with httpx.AsyncClient(verify=False) as client:
     # Upload agent
-    response = await client.post("http://localhost:8000/api/v1/agents", json={
+    response = await client.post("https://localhost:8000/api/v1/agents", json={
         "name": "My Agent",
         "framework": "pydantic_ai",
         "graph_definition": graph
@@ -205,14 +210,14 @@ async with httpx.AsyncClient() as client:
 
     # Start run
     response = await client.post(
-        f"http://localhost:8000/api/v1/agents/{agent['id']}/runs",
+        f"https://localhost:8000/api/v1/agents/{agent['id']}/runs",
         json={"inputs": {"user_question": "What is AI?"}}
     )
     run = response.json()
 
     # Check status
     response = await client.get(
-        f"http://localhost:8000/api/v1/agents/{agent['id']}/runs/{run['id']}"
+        f"https://localhost:8000/api/v1/agents/{agent['id']}/runs/{run['id']}"
     )
     print(response.json())
 ```
@@ -418,7 +423,7 @@ The Chat UI provides a conversational interface for interacting with chat-enable
 **Accessing Chat UI**
 - From Builder: Click "Chat" button in toolbar (green, shows when graph is eligible)
 - From Runtime: Click chat icon next to eligible agents in the agents list
-- Direct URL: `http://localhost:3001?agentId={agent_id}`
+- Direct URL: `https://localhost:3001?agentId={agent_id}`
 
 **Adding Graphs**
 - Click "+" button to add graphs from runtime or upload files
@@ -532,7 +537,7 @@ See the [Example Plugin Documentation](packages/graphflow-plugin-example/README.
 - **[PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md)** - Guide to creating custom plugin steps
 - **[PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** - Complete technical specification
 - **[TEMPLATE_ARCHITECTURE.md](docs/TEMPLATE_ARCHITECTURE.md)** - Step template system design
-- **API Docs** - Visit http://localhost:8000/docs when runtime is running
+- **API Docs** - Visit https://localhost:8000/docs when runtime is running
 
 ### Component Documentation
 - **[graph-core](packages/graph-core/README.md)** - Core library with step types and memory management
@@ -662,14 +667,75 @@ graphflow-compile list-frameworks
 ### graphflow-runtime
 
 ```bash
-# Start server
+# Start server (auto-generates SSL certificates)
 graphflow-runtime
 
 # Custom port
 graphflow-runtime --port 9000
 
-# Development mode
+# Development mode with auto-reload
 graphflow-runtime --reload
+
+# Disable SSL verification for client calls (self-signed certs)
+graphflow-runtime --insecure
+
+# Use custom certificates
+graphflow-runtime --ssl-keyfile /path/to/key --ssl-certfile /path/to/cert
+
+# Use certificates from custom directory
+graphflow-runtime --cert-dir /path/to/certs
+```
+
+## 🔐 HTTPS / SSL Configuration
+
+All GraphFlow services run with HTTPS by default using self-signed certificates for secure local development.
+
+### Quick Start
+
+```bash
+# Generate certificates (optional - auto-generated on first run)
+make certs
+
+# Start all services with HTTPS
+make dev-start
+
+# Check certificate status
+make certs-check
+```
+
+### Certificate Management
+
+| Command | Description |
+|---------|-------------|
+| `make certs` | Generate self-signed SSL certificates in `.certs/` |
+| `make certs-check` | Verify certificates exist and show expiry dates |
+| `make certs-clean` | Remove certificates (will be regenerated on next start) |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GRAPHFLOW_SSL_KEYFILE` | Path to SSL private key | `.certs/graphflow.key` |
+| `GRAPHFLOW_SSL_CERTFILE` | Path to SSL certificate | `.certs/graphflow.crt` |
+| `GRAPHFLOW_CERT_DIR` | Certificate directory | `.certs` |
+| `GRAPHFLOW_AUTO_SSL` | Auto-generate certs if missing | `true` |
+| `GRAPHFLOW_INSECURE` | Skip SSL verification for client calls | `false` |
+
+### Browser Certificate Warning
+
+When first visiting HTTPS URLs with self-signed certificates, browsers will show a security warning:
+
+- **Chrome/Edge**: Click "Advanced" → "Proceed to localhost (unsafe)"
+- **Safari**: Click "Show Details" → "visit this website"
+- **Firefox**: Click "Advanced..." → "Accept the Risk and Continue"
+
+You'll need to accept the certificate for each port (8000, 3000, 3001) on first visit.
+
+### Command Line Access
+
+```bash
+# Use -k flag with curl to skip certificate verification
+curl -k https://localhost:8000/api/v1/health
 ```
 
 ## 📊 API Endpoints
@@ -796,7 +862,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (co
   - [CSV Plugin](packages/graph-plugins-csv/README.md) - CSV manipulation and analysis
 - **[Plugin Development Guide](packages/graphflow-plugin-example/README.md)** - Create your own custom steps
 - **[Core Documentation](packages/graph-core/README.md)** - Step types and memory management
-- **[Runtime API](http://localhost:8000/docs)** - FastAPI documentation (when server is running)
+- **[Runtime API](https://localhost:8000/docs)** - FastAPI documentation (when server is running)
 
 ---
 

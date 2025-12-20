@@ -1,4 +1,4 @@
-.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop chat-start chat-stop dev-start dev-stop status stats loc
+.PHONY: help install clean dev-install build test runtime-start runtime-stop builder-start builder-stop chat-start chat-stop dev-start dev-stop status stats loc certs certs-clean certs-check
 
 # Colors for output
 BLUE := \033[0;34m
@@ -6,6 +6,11 @@ GREEN := \033[0;32m
 YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
+
+# SSL Certificate configuration
+CERT_DIR := .certs
+SSL_KEY := $(CERT_DIR)/graphflow.key
+SSL_CERT := $(CERT_DIR)/graphflow.crt
 
 help: ## Show this help message
 	@echo "$(BLUE)GraphFlow Development Commands$(NC)"
@@ -45,14 +50,41 @@ clean: ## Clean all build artifacts, caches, and compiled files
 
 clean-install: clean install ## Clean everything and reinstall packages
 
-runtime-start: ## Start the GraphFlow runtime server
+# SSL Certificate Management
+certs: ## Generate self-signed SSL certificates
+	@echo "$(BLUE)Generating SSL certificates...$(NC)"
+	@mkdir -p $(CERT_DIR)
+	@openssl req -x509 -nodes -days 365 \
+		-newkey rsa:2048 \
+		-keyout $(SSL_KEY) \
+		-out $(SSL_CERT) \
+		-subj "/CN=localhost" \
+		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" 2>/dev/null
+	@chmod 600 $(SSL_KEY)
+	@chmod 644 $(SSL_CERT)
+	@echo "$(GREEN)✓ Certificates generated in $(CERT_DIR)/$(NC)"
+
+certs-clean: ## Remove SSL certificates
+	@echo "$(BLUE)Removing SSL certificates...$(NC)"
+	@rm -rf $(CERT_DIR)
+	@echo "$(GREEN)✓ Certificates removed$(NC)"
+
+certs-check: ## Check if SSL certificates exist and are valid
+	@if [ -f "$(SSL_KEY)" ] && [ -f "$(SSL_CERT)" ]; then \
+		echo "$(GREEN)✓ Certificates exist$(NC)"; \
+		openssl x509 -in $(SSL_CERT) -noout -dates 2>/dev/null | sed 's/^/  /' || echo "$(RED)✗ Certificate invalid$(NC)"; \
+	else \
+		echo "$(YELLOW)No certificates found. Run 'make certs' to generate.$(NC)"; \
+	fi
+
+runtime-start: ## Start the GraphFlow runtime server (HTTPS)
 	@echo "$(BLUE)Starting GraphFlow runtime...$(NC)"
 	@lsof -ti:8000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	graphflow-runtime > /tmp/graphflow-runtime.log 2>&1 &
 	@sleep 2
 	@if lsof -ti:8000 -sTCP:LISTEN > /dev/null; then \
-		echo "$(GREEN)✓ Runtime started on http://localhost:8000$(NC)"; \
+		echo "$(GREEN)✓ Runtime started on https://localhost:8000$(NC)"; \
 	else \
 		echo "$(RED)✗ Runtime failed to start. Check /tmp/graphflow-runtime.log$(NC)"; \
 		exit 1; \
@@ -70,14 +102,14 @@ runtime-stop: ## Stop the GraphFlow runtime server
 runtime-logs: ## Show runtime logs
 	@tail -f /tmp/graphflow-runtime.log
 
-builder-start: ## Start the builder UI dev server (port 3000)
+builder-start: ## Start the builder UI dev server (HTTPS, port 3000)
 	@echo "$(BLUE)Starting builder UI...$(NC)"
 	@lsof -ti:3000 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
 	@sleep 1
-	@cd packages/graph-builder && npm run dev > /tmp/graphflow-builder.log 2>&1 &
+	@cd packages/graph-builder && GRAPHFLOW_HTTPS=true npm run dev > /tmp/graphflow-builder.log 2>&1 &
 	@sleep 3
 	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
-		echo "$(GREEN)✓ Builder started on http://localhost:3000$(NC)"; \
+		echo "$(GREEN)✓ Builder started on https://localhost:3000$(NC)"; \
 	else \
 		echo "$(RED)✗ Builder failed to start. Check /tmp/graphflow-builder.log$(NC)"; \
 		exit 1; \
@@ -95,14 +127,14 @@ builder-stop: ## Stop the builder UI dev server
 builder-logs: ## Show builder logs
 	@tail -f /tmp/graphflow-builder.log
 
-chat-start: ## Start the chat UI dev server (port 3001)
+chat-start: ## Start the chat UI dev server (HTTPS, port 3001)
 	@echo "$(BLUE)Starting chat UI...$(NC)"
 	@lsof -ti:3001 -sTCP:LISTEN | xargs kill -9 2>/dev/null || true
 	@sleep 1
-	@cd packages/graph-chat && npm run dev > /tmp/graphflow-chat.log 2>&1 &
+	@cd packages/graph-chat && GRAPHFLOW_HTTPS=true npm run dev > /tmp/graphflow-chat.log 2>&1 &
 	@sleep 3
 	@if lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
-		echo "$(GREEN)✓ Chat UI started on http://localhost:3001$(NC)"; \
+		echo "$(GREEN)✓ Chat UI started on https://localhost:3001$(NC)"; \
 	else \
 		echo "$(RED)✗ Chat UI failed to start. Check /tmp/graphflow-chat.log$(NC)"; \
 		exit 1; \
@@ -137,23 +169,30 @@ dev-stop: runtime-stop builder-stop chat-stop ## Stop runtime, builder, and chat
 status: ## Show status of runtime, builder, and chat UI
 	@echo "$(BLUE)GraphFlow Status:$(NC)"
 	@echo ""
+	@echo "Certificates:"
+	@if [ -f "$(SSL_KEY)" ] && [ -f "$(SSL_CERT)" ]; then \
+		echo "  $(GREEN)✓ SSL certificates present$(NC)"; \
+	else \
+		echo "  $(YELLOW)✗ No certificates$(NC) (run 'make certs')"; \
+	fi
+	@echo ""
 	@echo "Runtime (port 8000):"
 	@if lsof -ti:8000 -sTCP:LISTEN > /dev/null 2>&1; then \
-		echo "  $(GREEN)✓ Running$(NC) (http://localhost:8000)"; \
+		echo "  $(GREEN)✓ Running$(NC) (https://localhost:8000)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \
 	fi
 	@echo ""
 	@echo "Builder (port 3000):"
 	@if lsof -ti:3000 -sTCP:LISTEN > /dev/null 2>&1; then \
-		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3000)"; \
+		echo "  $(GREEN)✓ Running$(NC) (https://localhost:3000)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \
 	fi
 	@echo ""
 	@echo "Chat UI (port 3001):"
 	@if lsof -ti:3001 -sTCP:LISTEN > /dev/null 2>&1; then \
-		echo "  $(GREEN)✓ Running$(NC) (http://localhost:3001)"; \
+		echo "  $(GREEN)✓ Running$(NC) (https://localhost:3001)"; \
 	else \
 		echo "  $(RED)✗ Not running$(NC)"; \
 	fi

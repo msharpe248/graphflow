@@ -111,3 +111,7 @@ Thumbs.db
 
 # Session notes
 SESSION_NOTES.md
+
+# SSL Certificates (local development)
+.certs/
+*.pem
