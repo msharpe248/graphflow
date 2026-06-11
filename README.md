@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/msharpe248-graphflow-badge.png)](https://mseep.ai/app/msharpe248-graphflow)
+
 # GraphFlow
 
 🚀 **Status**: ✅ **Active Development**
